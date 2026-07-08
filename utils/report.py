@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import json
 from urllib.parse import urlparse
 from colorama import Fore, Style, init
 
@@ -526,6 +527,8 @@ def get_recommendation(vuln_name):
         return "Sanitizar y escapar adecuadamente todas las entradas del usuario antes de renderizarlas en el HTML de la página (por ejemplo, usar plantillas con auto-escaping)."
     elif "sqli" in vn:
         return "Implementar consultas preparadas (Prepared Statements) o consultas parametrizadas al interactuar con la base de datos para evitar la inyección de comandos SQL."
+    elif "formulario" in vn:
+        return "Se detectaron entradas inseguras en el formulario. Implementa validación estricta de tipos de datos en el servidor, usa consultas parametrizadas para base de datos (evitando SQLi), escapa todas las salidas en el HTML para evitar XSS y configura tokens anti-CSRF."
     elif "alerta ia" in vn:
         return "La Inteligencia Artificial ha detectado un comportamiento o estructura sospechosa en los parámetros. Se recomienda validar estrictamente la entrada del usuario, usar consultas parametrizadas para interactuar con la base de datos y sanitizar el HTML de salida."
     elif "3306" in vn or "mysql" in vn.lower():
@@ -548,6 +551,24 @@ def get_recommendation(vuln_name):
         return "Hay un servidor web alternativo expuesto en el puerto 8080. Podría ser un panel de administración o servidor de desarrollo. Verifica si debe ser accesible públicamente."
     elif "23" in vn or "telnet" in vn.lower():
         return "Telnet está expuesto. Es un protocolo completamente inseguro que transmite todo sin cifrar. Elimina el servicio Telnet y usa SSH como alternativa segura."
+    elif "cors" in vn:
+        return "Configurar las cabeceras CORS de forma restrictiva. No reflejar dinámicamente la cabecera 'Origin' recibida y evitar el uso de 'Access-Control-Allow-Origin: *' si la respuesta requiere cookies o credenciales ('Access-Control-Allow-Credentials: true')."
+    elif "csrf" in vn:
+        return "Implementar tokens anti-CSRF únicos, criptográficamente seguros y asociados a la sesión del usuario (ej. Double Submit Cookie o fichas sincronizadas) en todos los formularios y endpoints que realicen acciones de modificación del estado (POST, PUT, DELETE)."
+    elif "ssl" in vn or "tls" in vn or "certificado" in vn:
+        return "Configurar un certificado SSL/TLS válido emitido por una Autoridad de Certificación reconocida, forzar HTTPS y deshabilitar soporte para protocolos obsoletos (TLS 1.0 y TLS 1.1) y cifrados débiles en el servidor web."
+    elif "exposición de datos" in vn or "datos sensibles" in vn:
+        return "Remover secretos, claves de API, tokens JWT o credenciales del código fuente HTML y de los archivos JavaScript expuestos públicamente. Utilizar variables de entorno en el backend y almacenar credenciales de forma segura en un gestor de secretos."
+    elif "comentario" in vn:
+        return "Remover comentarios de desarrollo (TODOs, notas de depuración, credenciales provisionales o rutas internas) de la producción HTML y de archivos JavaScript expuestos antes del despliegue."
+    elif "inyección de comandos" in vn:
+        return "Evitar pasar entradas del usuario directamente a comandos del sistema operativo. Sanitizar las entradas y preferir APIs seguras del lenguaje (ej. usar listas con subprocess en lugar de shell=True en Python)."
+    elif "ssti" in vn or "inyección de plantillas" in vn:
+        return "Evitar pasar la entrada del usuario directamente a la renderización de plantillas. Sanitizar adecuadamente o usar mecanismos nativos de escape del motor de plantillas."
+    elif "archivo sensible" in vn:
+        return "Asegurar que los archivos de configuración, respaldos, base de datos (.sql) o control de versiones (.git) estén fuera de la raíz pública del servidor web o restringidos a través de reglas de acceso del servidor (Nginx, Apache)."
+    elif "subdominio activo" in vn:
+        return "Se identificó un subdominio activo. Asegúrate de que todos los puertos y servicios expuestos en este subdominio estén correctamente protegidos y actualizados."
     elif "puerto" in vn:
         return "Hay un puerto de servicio expuesto públicamente. Revisa las reglas de firewall y restringe el acceso solo a las IPs y servicios que realmente necesiten conectarse a este puerto."
     return "Revisar la configuración de seguridad y aplicar parches recomendados."
@@ -660,6 +681,20 @@ def print_report(url, all_results, duration=0.0, no_open=False):
 
     import webbrowser
 
+    # Deduplicar hallazgos idénticos (mismo vuln + detail) que aparecen en múltiples páginas.
+    # Los hallazgos específicos por página incluyen la URL/parámetro en el detail, por lo que se conservan.
+    seen = set()
+    deduped = []
+    for r in all_results:
+        key = (r.get("vuln", ""), r.get("detail", ""))
+        if key not in seen:
+            seen.add(key)
+            deduped.append(r)
+    if len(deduped) != len(all_results):
+        removed = len(all_results) - len(deduped)
+        print(f"  ℹ️  {removed} hallazgo(s) duplicado(s) consolidado(s) de varias páginas.")
+    all_results = deduped
+
     if not all_results:
         print(Fore.GREEN + "\n No se detectaron vulnerabilidades obvias.\n")
         # Generar reporte HTML aunque no haya vulnerabilidades
@@ -669,7 +704,7 @@ def print_report(url, all_results, duration=0.0, no_open=False):
         if not no_open:
             try:
                 webbrowser.open("file://" + os.path.abspath(html_path).replace("\\", "/"))
-                print("🚀 Reporte abierto automáticamente en tu navegador.\n")
+                print(" Reporte abierto automáticamente en tu navegador.\n")
             except Exception as e:
                 print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}\n")
         return
@@ -692,11 +727,36 @@ def print_report(url, all_results, duration=0.0, no_open=False):
     
     # Generar el reporte HTML e informar la ruta en consola
     html_path = generate_html_report(url, all_results, duration)
-    print(Fore.GREEN + f"🌐 Reporte HTML generado: {html_path}\n")
+    print(Fore.GREEN + f"🌐 Reporte HTML generado: {html_path}")
+    
+    # Generar reporte JSON
+    try:
+        report_data = {
+            "target": url,
+            "date": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+            "duration_seconds": round(duration, 2),
+            "summary": counts,
+            "vulnerabilities": all_results
+        }
+        parsed_url = urlparse(url)
+        safe_domain = (parsed_url.netloc or "localhost").replace(":", "_").replace(".", "_")
+        json_filename = f"reporte_{safe_domain}_{int(time.time())}.json"
+        
+        # Guardar en el mismo directorio 'reports' que el reporte HTML
+        reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        json_path = os.path.join(reports_dir, json_filename)
+        
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(report_data, f, ensure_ascii=False, indent=4)
+        print(Fore.GREEN + f"📁 Reporte JSON generado: {json_path}\n")
+    except Exception as e:
+        print(Fore.YELLOW + f"⚠️ No se pudo generar el reporte JSON: {e}\n")
     
     if not no_open:
         try:
+            import webbrowser
             webbrowser.open("file://" + os.path.abspath(html_path).replace("\\", "/"))
-            print("🚀 Reporte abierto automáticamente en tu navegador.\n")
+            print(" Reporte abierto automáticamente en tu navegador.\n")
         except Exception as e:
-            print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}\n")
+            print(f"⚠️ No se pudo abrir el navegador automáticamente: {e}\n")

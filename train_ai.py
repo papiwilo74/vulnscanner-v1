@@ -108,7 +108,7 @@ XSS_QUERIES = [
 ]
 
 def train():
-    print("🧹 Preparando dataset de entrenamiento...")
+    print(" Preparando dataset de entrenamiento...")
     
     # Combinar datos
     queries = BENIGN_QUERIES + SQLI_QUERIES + XSS_QUERIES

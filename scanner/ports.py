@@ -21,29 +21,26 @@ PORTS_TO_SCAN = {
 }
 
 def check_single_port(ip, port, name, service, risk):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(1.5)
+    # Usar un bloque try-except seguro para la creación y cierre de sockets
     try:
-        res = s.connect_ex((ip, port))
-        if res == 0:
-            return {
-                "vuln": f"Puerto expuesto públicamente: {port} ({name})",
-                "risk": risk,
-                "detail": f"El puerto está abierto en la IP {ip} ({service})."
-            }
-    except:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1.2)  # Timeout optimizado para respuestas rápidas
+            res = s.connect_ex((ip, port))
+            if res == 0:
+                return {
+                    "vuln": f"Puerto expuesto públicamente: {port} ({name})",
+                    "risk": risk,
+                    "detail": f"El puerto está abierto en la IP {ip} ({service})."
+                }
+    except (socket.timeout, socket.error):
         pass
-    finally:
-        try:
-            s.close()
-        except:
-            pass
+    except Exception:
+        pass
     return None
 
 def check_ports(url):
     results = []
     
-    # Extraer el host
     parsed = urlparse(url)
     hostname = parsed.hostname
     
@@ -51,23 +48,28 @@ def check_ports(url):
         return results
         
     try:
-        # Resolver IP
+        # Intentar resolver DNS con timeout controlado de sistema
         ip = socket.gethostbyname(hostname)
         print(f"  [IP] {hostname} resolvió a: {ip}")
-    except Exception as e:
+    except (socket.gaierror, Exception):
         print(f"  ⚠️ No se pudo resolver la IP para {hostname}. Omitiendo escaneo de puertos.")
         return results
         
-    print(f"  ✔ Escaneando {len(PORTS_TO_SCAN)} puertos críticos concurrentemente...")
+    print(f"   Escaneando {len(PORTS_TO_SCAN)} puertos críticos concurrentemente...")
     
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    # Limitar de forma segura max_workers según los elementos a escanear
+    workers = min(len(PORTS_TO_SCAN), 10)
+    with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {
             executor.submit(check_single_port, ip, port, data[0], data[1], data[2]): port 
             for port, data in PORTS_TO_SCAN.items()
         }
         for future in as_completed(futures):
-            res = future.result()
-            if res:
-                results.append(res)
+            try:
+                res = future.result()
+                if res:
+                    results.append(res)
+            except Exception:
+                pass  # Evitar que fallos en un hilo detengan el resto del escaneo
                 
     return results

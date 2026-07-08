@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+ENV/
+
+# Reportes generados por el escáner
+reports/
+
+# Configuración del editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Playwright
+ms-playwright/
