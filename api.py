@@ -19,7 +19,7 @@ logger = logging.getLogger("VulnScannerAPI")
 app = FastAPI(
     title="VulnScanner Enterprise API",
     description="Microservicio web para automatización de auditorías de seguridad, OAST, SARIF, Headless Crawling y Auto-Fix.",
-    version="2.2.0"
+    version="2.0.0"
 )
 
 
@@ -195,7 +195,7 @@ def send_webhook_notification(task_id: str, webhook_url: str, status: str, paylo
 def read_root():
     return {
         "message": "Bienvenido a VulnScanner Enterprise API",
-        "version": "2.2.0",
+        "version": "2.0.0",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "MITRE ATT&CK", "OAST", "Playwright Headless", "HAR v1.2"],
         "docs_url": "/docs",
         "status": "online"

@@ -366,10 +366,11 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="VulnScanner Enterprise — Escáner de vulnerabilidades web con OAST, SARIF, Auto-Fix y Headless Crawling",
+        description="VulnScanner Enterprise v2.0 — Escáner de vulnerabilidades web con OAST, SARIF, Auto-Fix y Headless Crawling",
         epilog="Ejemplo: python main.py https://ejemplo.com --profile normal --crawl 5 --headless-crawl"
     )
-    parser.add_argument("url", help="URL del sitio web a escanear")
+    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.0.0")
+    parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--no-open", action="store_true",
                         help="Evita abrir el reporte HTML automáticamente")
     parser.add_argument("--cookie", type=str, default=None,
@@ -405,6 +406,10 @@ if __name__ == "__main__":
                         help="Usa navegador headless interactivo para resolver el login")
 
     args = parser.parse_args()
+    if not args.url:
+        parser.print_help()
+        sys.exit(1)
+
     scan(
         args.url,
         no_open=args.no_open,

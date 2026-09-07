@@ -1,10 +1,11 @@
-# VulnScanner
+# VulnScanner v2.0 (Enterprise Edition)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Security-DAST%20%7C%20SAST%20%7C%20ML-blue?style=for-the-badge&logo=shield" alt="VulnScanner Security" />
+  <img src="https://img.shields.io/badge/VulnScanner-v2.0.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.0 Enterprise" />
 </p>
 
 <p align="center">
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/Release-v2.0.0-007EC6.svg?logo=github" alt="Release v2.0.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict-blue.svg" alt="Mypy" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
@@ -14,7 +15,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner** es un escáner de vulnerabilidades web de nivel empresarial (DAST + SAST + IA), modular, con soporte de auto-remediación, análisis asíncrono y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
+> **VulnScanner v2.0** es un escáner de vulnerabilidades web de nivel empresarial (DAST + SAST + IA), modular, con soporte de auto-remediación, análisis asíncrono y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
 
 ---
 
