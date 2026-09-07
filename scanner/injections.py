@@ -1,44 +1,39 @@
 import time
+from typing import Optional
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
 import requests
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 # Payloads de Command Injection basados en tiempo (duermen 5 segundos)
-CMD_TIME_PAYLOADS = [
+CMD_TIME_PAYLOADS: list[str] = [
     "|| sleep 5",
     "; sleep 5",
     "& sleep 5 &",
-    "| ping -n 6 127.0.0.1",  # Para Windows (6 pings de 1s de intervalo ≈ 5s de retraso)
+    "| ping -n 6 127.0.0.1",  # Para Windows
     "`sleep 5`",
-    "$(sleep 5)"
+    "$(sleep 5)",
 ]
 
-# Payloads de SSTI y sus resultados matemáticos esperados
-SSTI_PAYLOADS = [
-    ("${7*7}", "49"),
-    ("{{7*7}}", "49"),
-    ("#{7*7}", "49"),
-    ("{{7+'7'}}", "77"), # Para Jinja/Twig en ciertos contextos
-    ("${{7*7}}", "49")
+# Payloads de SSTI usando operaciones matemáticas únicas para evitar falsos positivos con números comunes
+SSTI_PAYLOADS: list[tuple[str, str]] = [
+    ("${9876*5432}", "53646432"),
+    ("{{9876*5432}}", "53646432"),
+    ("#{9876*5432}", "53646432"),
+    ("${{9876*5432}}", "53646432"),
+    ("*{9876*5432}", "53646432"),
 ]
 
-def check_injections(url, session=None):
+def check_injections(url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     """
     Analiza la URL en busca de vulnerabilidades de OS Command Injection (basado en tiempo)
     y Server-Side Template Injection (SSTI) en parámetros query.
-    
-    Args:
-        url: URL de la página.
-        session: Instancia opcional de requests.Session.
-        
-    Returns:
-        Lista de vulnerabilidades encontradas.
     """
-    results = []
+    results: list[dict[str, str]] = []
     client = session if session is not None else requests
-    
+
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query)
-    
+
     if not query_params:
         return results
 
@@ -48,75 +43,69 @@ def check_injections(url, session=None):
         r_base = client.get(url, timeout=6)
         baseline_time = time.time() - start_base
         baseline_text = r_base.text
-    except:
+    except requests.RequestException:
         baseline_time = 1.0
 
     # Analizar parámetro por parámetro
-    for param_name, param_values in query_params.items():
-        base_val = param_values[0] if param_values else ""
-        
+    for param_name in query_params:
         # --- A. OS Command Injection (Time-based) ---
         for payload in CMD_TIME_PAYLOADS:
-            # Reemplazar el parámetro con el payload
             modified_query = query_params.copy()
             modified_query[param_name] = [payload]
-            
+
             new_query_string = urlencode(modified_query, doseq=True)
             test_url = urlunparse((
                 parsed.scheme, parsed.netloc, parsed.path,
                 parsed.params, new_query_string, parsed.fragment
             ))
-            
+
             try:
                 start_test = time.time()
-                r = client.get(test_url, timeout=8)
+                r = client.get(test_url, timeout=9)
                 elapsed = time.time() - start_test
-                
-                # Si tarda al menos 4.5 segundos más que la línea base
+
+                # Debe requerir al menos 4.5s adicionales sobre la línea base
                 if elapsed >= baseline_time + 4.5:
-                    # Confirmar con doble verificación (enviando el valor original para ver si baja el tiempo)
+                    # Confirmación estricta realizando una petición de control sin payload
                     try:
                         start_verify = time.time()
-                        client.get(url, timeout=5)
+                        r_v = client.get(url, timeout=5)
                         verify_elapsed = time.time() - start_verify
-                        
-                        if verify_elapsed < baseline_time + 1.5:
+
+                        if verify_elapsed < baseline_time + 1.5 and r_v.status_code == 200:
                             results.append({
                                 "vuln": "Inyección de Comandos del Sistema Operativo (OS Command Injection)",
                                 "risk": "Alto",
                                 "detail": f"Inyección basada en tiempo exitosa en el parámetro '{param_name}'. Retardo de {elapsed:.2f}s (Línea base: {baseline_time:.2f}s) con payload: {payload}"
                             })
-                            break # Pasar al siguiente parámetro si ya es vulnerable
-                    except:
+                            break
+                    except requests.RequestException:
                         pass
-            except requests.exceptions.Timeout:
-                pass
-            except:
+            except (requests.exceptions.Timeout, requests.RequestException):
                 pass
 
         # --- B. Server-Side Template Injection (SSTI) ---
         for payload, expected in SSTI_PAYLOADS:
             modified_query = query_params.copy()
             modified_query[param_name] = [payload]
-            
+
             new_query_string = urlencode(modified_query, doseq=True)
             test_url = urlunparse((
                 parsed.scheme, parsed.netloc, parsed.path,
                 parsed.params, new_query_string, parsed.fragment
             ))
-            
+
             try:
                 r = client.get(test_url, timeout=5)
-                # Si la respuesta contiene el resultado matemático evaluado (ej. 49) 
-                # pero NO contiene la expresión matemática literal (ej. 7*7 o el payload entero)
+                # El resultado matemático debe aparecer en la respuesta, pero NO la expresión original ni en la respuesta base
                 if expected in r.text and payload not in r.text and expected not in baseline_text:
                     results.append({
                         "vuln": "Inyección de Plantillas del Servidor (SSTI)",
                         "risk": "Alto",
                         "detail": f"El servidor evaluó la expresión matemática del payload '{payload}' dando como resultado '{expected}' en el parámetro '{param_name}'."
                     })
-                    break # Pasar al siguiente parámetro
-            except:
+                    break
+            except requests.RequestException:
                 pass
-                
+
     return results

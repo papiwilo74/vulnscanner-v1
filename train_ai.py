@@ -1,10 +1,10 @@
-import sys
+import contextlib
 import os
+import sys
+
 if sys.platform.startswith('win'):
-    try:
+    with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding='utf-8')
-    except:
-        pass
 
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -107,49 +107,71 @@ XSS_QUERIES = [
     "<details open ontoggle=\"alert(1)\">"
 ]
 
-def train():
-    print(" Preparando dataset de entrenamiento...")
-    
-    # Combinar datos
+def train(ci: bool = False) -> None:
+    if not ci:
+        print(" Preparando dataset de entrenamiento...")
+
     queries = BENIGN_QUERIES + SQLI_QUERIES + XSS_QUERIES
     labels = [0] * len(BENIGN_QUERIES) + [1] * (len(SQLI_QUERIES) + len(XSS_QUERIES))
-    
-    print(f"   → Total ejemplos benignos (0): {len(BENIGN_QUERIES)}")
-    print(f"   → Total ejemplos SQLi (1): {len(SQLI_QUERIES)}")
-    print(f"   → Total ejemplos XSS (1): {len(XSS_QUERIES)}")
-    print(f"   → Total dataset: {len(queries)}")
-    
+
+    if not ci:
+        print(f"   -> Total ejemplos benignos (0): {len(BENIGN_QUERIES)}")
+        print(f"   -> Total ejemplos SQLi (1): {len(SQLI_QUERIES)}")
+        print(f"   -> Total ejemplos XSS (1): {len(XSS_QUERIES)}")
+        print(f"   -> Total dataset: {len(queries)}")
+
     # 2. Vectorizador a nivel de caracteres (n-gramas de 1 a 4 caracteres)
-    # Esto captura símbolos como <, >, ', ", --, #, scripts, etc.
-    print(" Vectorizando texto mediante TF-IDF (nivel de caracteres)...")
+    if not ci:
+        print(" Vectorizando texto mediante TF-IDF (nivel de caracteres)...")
     vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(1, 4))
-    X = vectorizer.fit_transform(queries)
-    y = labels
-    
-    # 3. Clasificador (Regresión Logística)
-    print(" Entrenando modelo de Regresión Logística...")
+    x_features = vectorizer.fit_transform(queries)
+    y_labels = labels
+
+    # 3. Clasificador (Regresion Logistica)
+    if not ci:
+        print(" Entrenando modelo de Regresion Logistica...")
     model = LogisticRegression(max_iter=1000)
-    model.fit(X, y)
-    
-    # Evaluar precisión
-    train_predictions = model.predict(X)
-    print("\n Métricas del entrenamiento:")
-    print(classification_report(y, train_predictions, target_names=["Seguro", "Vulnerable"]))
-    
+    model.fit(x_features, y_labels)
+
+    # Evaluar precision
+    train_predictions = model.predict(x_features)
+    accuracy = (train_predictions == y_labels).mean()
+    if not ci:
+        print("\n Metricas del entrenamiento:")
+        print(classification_report(y_labels, train_predictions, target_names=["Seguro", "Vulnerable"]))
+
+    if ci:
+        print(f"Model trained: accuracy={accuracy:.4f}")
+
+    if accuracy < 0.90:
+        msg = f"Model accuracy too low: {accuracy:.4f}"
+        if ci:
+            print(f"ERROR: {msg}")
+            sys.exit(1)
+        raise RuntimeError(msg)
+
     # 4. Guardar modelo y vectorizador
     models_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
     os.makedirs(models_dir, exist_ok=True)
-    
+
     model_path = os.path.join(models_dir, "ai_model.joblib")
     vectorizer_path = os.path.join(models_dir, "vectorizer.joblib")
-    
-    print(f" Guardando modelo en: {model_path}")
+
     joblib.dump(model, model_path)
-    
-    print(f" Guardando vectorizador en: {vectorizer_path}")
     joblib.dump(vectorizer, vectorizer_path)
-    
-    print("\n ¡IA entrenada con éxito y lista para usarse!")
+
+    if ci:
+        print(f"Model saved to: {model_path}")
+        print(f"Vectorizer saved to: {vectorizer_path}")
+    else:
+        print(f" Guardando modelo en: {model_path}")
+        print(f" Guardando vectorizador en: {vectorizer_path}")
+        print("\n IA entrenada con exito y lista para usarse!")
+
 
 if __name__ == "__main__":
-    train()
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--ci", action="store_true", help="CI mode: quiet output, exit code on failure")
+    args = p.parse_args()
+    train(ci=args.ci)

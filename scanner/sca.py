@@ -1,10 +1,12 @@
 import re
-import requests
+from typing import Optional
 from urllib.parse import urljoin, urlparse
+
+import requests
 
 # Base de datos local de versiones vulnerables de librerías comunes de frontend.
 # Formato: { "nombre_libreria": [ (version_maxima_vulnerable, "CVE/descripcion", "riesgo") ] }
-VULNERABLE_LIBS = {
+VULNERABLE_LIBS: dict[str, list[tuple[str, str, str]]] = {
     "jquery": [
         ("1.12.4", "Múltiples CVEs de XSS (CVE-2020-11022, CVE-2020-11023)", "Medio"),
         ("2.2.4", "Vulnerabilidades de XSS en métodos .html() y .append() (CVE-2020-11022)", "Medio"),
@@ -33,7 +35,7 @@ VULNERABLE_LIBS = {
 }
 
 # Patrones para detectar librerías y versiones en atributos src o contenido JS
-LIB_PATTERNS = {
+LIB_PATTERNS: dict[str, str] = {
     "jquery": r"jquery[.-]?v?(\d+\.\d+[\.\d]*)(\.min)?\.js",
     "bootstrap": r"bootstrap[.-]?v?(\d+\.\d+[\.\d]*)(\.min)?\.js",
     "lodash": r"lodash[.-]?v?(\d+\.\d+[\.\d]*)(\.min)?\.js",
@@ -44,27 +46,27 @@ LIB_PATTERNS = {
 }
 
 # Patrones de versión dentro del contenido del archivo JS
-CONTENT_VERSION_PATTERNS = {
+CONTENT_VERSION_PATTERNS: dict[str, str] = {
     "jquery": r"jQuery\s+v?(\d+\.\d+[\.\d]*)",
     "lodash": r"lodash\s+(\d+\.\d+[\.\d]*)",
     "moment": r"moment\.js\s+v?(\d+\.\d+[\.\d]*)",
     "handlebars": r"Handlebars\s+v?(\d+\.\d+[\.\d]*)",
 }
 
-def parse_version(version_str):
+def parse_version(version_str: str) -> tuple[int, ...]:
     """Convierte una cadena de versión a una tupla de enteros para comparación."""
     try:
         return tuple(int(x) for x in version_str.split('.'))
     except ValueError:
         return (0,)
 
-def is_version_vulnerable(detected_version, max_vulnerable_version):
+def is_version_vulnerable(detected_version: str, max_vulnerable_version: str) -> bool:
     """Comprueba si la versión detectada es <= la versión máxima vulnerable."""
     return parse_version(detected_version) <= parse_version(max_vulnerable_version)
 
-def check_library_vulnerabilities(lib_name, detected_version):
+def check_library_vulnerabilities(lib_name: str, detected_version: str) -> list[dict[str, str]]:
     """Devuelve hallazgos si la versión detectada es vulnerable."""
-    findings = []
+    findings: list[dict[str, str]] = []
     lib_key = lib_name.lower()
     if lib_key not in VULNERABLE_LIBS:
         return findings
@@ -81,30 +83,30 @@ def check_library_vulnerabilities(lib_name, detected_version):
             break  # Reportar solo el hallazgo más crítico por librería
     return findings
 
-def check_sca(url, html_content=None, session=None):
+def check_sca(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     """
     Analiza el HTML y los archivos JS de la página para detectar librerías
     de terceros con versiones vulnerables conocidas.
-    
+
     Args:
         url: URL de la página analizada.
         html_content: Contenido HTML de la página.
         session: Instancia opcional de requests.Session.
-        
+
     Returns:
         Lista de vulnerabilidades encontradas en componentes de software.
     """
-    results = []
+    results: list[dict[str, str]] = []
     client = session if session is not None else requests
 
     if not html_content:
         try:
             r = client.get(url, timeout=8)
             html_content = r.text
-        except Exception:
+        except requests.RequestException:
             return results
 
-    detected_libs = {}  # { "nombre": "version" }
+    detected_libs: dict[str, str] = {}
 
     # 1. Detectar librerías por la ruta de los archivos script src
     script_sources = re.findall(
@@ -142,7 +144,7 @@ def check_sca(url, html_content=None, session=None):
                             m = re.search(content_pattern, js_text, re.IGNORECASE)
                             if m:
                                 detected_libs[lib_name] = m.group(1)
-            except Exception:
+            except requests.RequestException:
                 pass
 
     # 3. Evaluar versiones detectadas contra la base de datos de vulnerabilidades

@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: vulnscanner-api
+    ports:
+      - "8000:8000"
+    environment:
+      - VULNSCANNER_DB=/app/reports/tasks.db
+    volumes:
+      - vulnscanner_reports:/app/reports
+    restart: unless-stopped
+
+  cli:
+    build: .
+    container_name: vulnscanner-cli
+    entrypoint: ["python", "main.py"]
+    profiles: ["cli"]
+    environment:
+      - VULNSCANNER_DB=/app/reports/tasks.db
+    volumes:
+      - vulnscanner_reports:/app/reports
+
+volumes:
+  vulnscanner_reports:

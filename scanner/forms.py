@@ -1,14 +1,18 @@
-import requests
-import time
-import os
+import html
 import re
-from html.parser import HTMLParser
-from urllib.parse import urljoin, urlparse
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from html.parser import HTMLParser
+from typing import Optional
+from urllib.parse import urljoin
+
+import requests
+
+from scanner.sqli import ERROR_PAYLOADS, ERROR_SIGNATURES, TIME_PAYLOADS
 
 # Reutilizar payloads y firmas ya definidos en otros módulos
 from scanner.xss import XSS_PAYLOADS
-from scanner.sqli import ERROR_PAYLOADS, TIME_PAYLOADS, ERROR_SIGNATURES
+
 
 class FormParser(HTMLParser):
     def __init__(self):
@@ -54,8 +58,8 @@ def extract_forms(url, html_content):
     try:
         parser.feed(html_content)
     except Exception as e:
-        print(f"  ⚠️ Error parsing HTML forms: {e}")
-        
+        print(f"  [WARN] Error parsing HTML forms: {e}")
+
     for form in parser.forms:
         # Resolver URLs de acción a absolutas
         form['action'] = urljoin(url, form['action'])
@@ -73,13 +77,24 @@ def test_form_xss(action_url, method, base_data, target_input, payload, baseline
     data[target_input] = payload
     try:
         r = send_form_request(action_url, method, data, timeout=5, session=session)
+        headers = getattr(r, "headers", {})
+        content_type = headers.get("Content-Type", "") if hasattr(headers, "get") else ""
+        if isinstance(content_type, str) and content_type:
+            ct_lower = content_type.lower()
+            if not any(t in ct_lower for t in ["text/html", "application/xhtml+xml", "image/svg+xml"]):
+                return None
+
         if payload in r.text and payload not in baseline_text:
+            escaped_payload = html.escape(payload)
+            if payload != escaped_payload and escaped_payload in r.text and r.text.count(payload) == r.text.count(escaped_payload):
+                return None
+
             return {
                 "vuln": f"XSS Reflejado en Formulario ({method.upper()})",
                 "risk": "Alto",
                 "detail": f"Input: '{target_input}', Action: {action_url}. Payload reflejado sin escapar: {payload}"
             }
-    except:
+    except requests.RequestException:
         pass
     return None
 
@@ -96,7 +111,7 @@ def test_form_error_sqli(action_url, method, base_data, target_input, payload, b
                 "risk": "Alto",
                 "detail": f"Input: '{target_input}', Action: {action_url}. Error de DB detectado con payload: {payload} (firmas: {', '.join(new_sigs)})"
             }
-    except:
+    except requests.RequestException:
         pass
     return None
 
@@ -105,9 +120,9 @@ def test_form_time_sqli(action_url, method, base_data, target_input, payload, ba
     data[target_input] = payload
     try:
         start_time = time.time()
-        r = send_form_request(action_url, method, data, timeout=7, session=session)
+        send_form_request(action_url, method, data, timeout=7, session=session)
         elapsed = time.time() - start_time
-        
+
         # Si tarda más de 2.7 segundos comparado con la línea base
         if elapsed >= baseline_time + 2.7:
             # Doble verificación: comprobar que responde rápido sin el payload
@@ -115,16 +130,16 @@ def test_form_time_sqli(action_url, method, base_data, target_input, payload, ba
                 start_verify = time.time()
                 send_form_request(action_url, method, base_data, timeout=5, session=session)
                 verify_elapsed = time.time() - start_verify
-                
+
                 if verify_elapsed < baseline_time + 1.2:
                     return {
                         "vuln": f"Blind SQLi (Tiempo) en Formulario ({method.upper()})",
                         "risk": "Alto",
                         "detail": f"Input: '{target_input}', Action: {action_url}. Retardo de {elapsed:.2f}s (Línea base: {baseline_time:.2f}s) con payload: {payload}"
                     }
-            except:
+            except requests.RequestException:
                 pass
-    except:
+    except requests.RequestException:
         pass
     return None
 
@@ -133,7 +148,7 @@ def scan_single_form(form, session=None, passive=False):
     action_url = form['action']
     method = form['method']
     inputs = form['inputs']
-    
+
     # 0. Detectar ausencia de Token CSRF en formularios POST (análisis estático, pasivo)
     if method == 'post':
         csrf_patterns = [
@@ -156,59 +171,59 @@ def scan_single_form(form, session=None, passive=False):
     if passive or not inputs:
         return results
 
-        
+
     # Construir el diccionario base con valores predeterminados vacíos
     base_data = {inp['name']: inp['value'] for inp in inputs}
-    
+
     baseline_body = ""
     try:
         start_base = time.time()
         r_base = send_form_request(action_url, method, base_data, timeout=5, session=session)
         baseline_time = time.time() - start_base
         baseline_body = r_base.text.lower()
-    except:
+    except requests.RequestException:
         baseline_time = 1.0
-        
+
     # Ejecutar escaneo para cada input
     for inp in inputs:
         target_name = inp['name']
-        
+
         # 1. Comprobar XSS
         for payload in XSS_PAYLOADS:
             res = test_form_xss(action_url, method, base_data, target_name, payload, baseline_text=baseline_body, session=session)
             if res:
                 results.append(res)
                 break # si un input es vulnerable a XSS, pasamos al siguiente test
-                
+
         # 2. Comprobar SQLi basado en errores
         for payload in ERROR_PAYLOADS:
             res = test_form_error_sqli(action_url, method, base_data, target_name, payload, baseline_body=baseline_body, session=session)
             if res:
                 results.append(res)
                 break
-                
+
         # 3. Comprobar Blind SQLi basado en tiempo
         for payload in TIME_PAYLOADS:
             res = test_form_time_sqli(action_url, method, base_data, target_name, payload, baseline_time, session)
             if res:
                 results.append(res)
                 break
-                
+
     return results
 
-def check_forms(url, html_content, session=None, passive=False):
-    results = []
+def check_forms(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None, passive: bool = False) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
     if not html_content:
         return results
-        
-    print(f"  ✔ Extrayendo formularios de la página...")
+
+    print("Extrayendo formularios de la pagina...")
     forms = extract_forms(url, html_content)
-    
+
     if not forms:
         return results
-        
-    print(f"  ✔ Escaneando {len(forms)} formularios detectados...")
-    
+
+    print(f"Escaneando {len(forms)} formularios detectados...")
+
     # Procesar formularios concurrentemente
     with ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(scan_single_form, form, session, passive): form for form in forms}
@@ -216,5 +231,5 @@ def check_forms(url, html_content, session=None, passive=False):
             res = future.result()
             if res:
                 results.extend(res)
-                
+
     return results

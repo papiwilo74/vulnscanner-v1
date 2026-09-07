@@ -1,8 +1,8 @@
-import time
 import random
+import time
 
 # Lista de User-Agents de navegadores reales modernos para rotar
-USER_AGENTS = [
+USER_AGENTS: list[str] = [
     # Chrome Windows
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     # Chrome Mac
@@ -20,27 +20,31 @@ USER_AGENTS = [
 ]
 
 # Cabeceras HTTP adicionales que imitan un navegador real
-BASE_HEADERS = {
+BASE_HEADERS: dict[str, str] = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "es-CO,es;q=0.9,en-US;q=0.8,en;q=0.7",
     "Accept-Encoding": "gzip, deflate, br",
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
     "Cache-Control": "no-cache",
-    "DNT": "1",  # Do Not Track
+    "DNT": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
 }
 
 
-def get_random_user_agent():
+def get_random_user_agent() -> str:
     """Retorna un User-Agent aleatorio de la lista."""
     return random.choice(USER_AGENTS)
 
 
-def apply_stealth_headers(session):
+def apply_stealth_headers(session) -> None:
     """
-    Aplica cabeceras de navegador real y un User-Agent aleatorio a la sesión.
-    Esto hace que el escáner parezca un navegador normal ante el servidor.
-    
+    Configura la sesion con un User-Agent de navegador real y cabeceras HTTP estandar,
+    reduciendo la carga en el servidor destino durante escaneos autorizados.
+
     Args:
         session: Instancia de requests.Session a configurar.
     """
@@ -49,15 +53,15 @@ def apply_stealth_headers(session):
     session.headers.update(stealth_headers)
 
 
-def polite_delay(delay=0.0, stealth=False):
+def polite_delay(delay: float = 0.0, stealth: bool = False) -> None:
     """
-    Aplica un retardo entre peticiones para evitar saturar el servidor
-    y reducir la visibilidad del escáner como bot.
-    
+    Aplica un retardo entre peticiones como buena practica de rate-limiting,
+    evitando saturar el servidor durante pruebas de seguridad autorizadas.
+    El modo sigiloso anade variabilidad aleatoria para distribuir la carga.
+
     Args:
         delay: Retardo fijo en segundos (0 = sin retardo).
-        stealth: Si es True, aplica un retardo aleatorio entre 1.5 y 4.0 segundos
-                 para imitar tiempos de navegación humana real.
+        stealth: Si es True, aplica un delay aleatorio adicional entre 1.5 y 4 segundos.
     """
     if stealth:
         sleep_time = random.uniform(1.5, 4.0)
@@ -66,11 +70,23 @@ def polite_delay(delay=0.0, stealth=False):
         time.sleep(delay)
 
 
+def stealth_check_delay(stealth: bool = False) -> None:
+    """
+    Micro-delays entre checks individuales en modo sigilo, simulando
+    que cada verificacion es una accion distinta del usuario.
+
+    Args:
+        stealth: Si es True, aplica un micro-delay aleatorio entre 0.3 y 1.5 segundos.
+    """
+    if stealth:
+        time.sleep(random.uniform(0.3, 1.5))
+
+
 def create_stealth_session():
     """
     Crea y retorna un requests.Session configurado con cabeceras de navegador
     real y un User-Agent aleatorio para escaneo pasivo/silencioso.
-    
+
     Returns:
         requests.Session con perfil de navegador real.
     """

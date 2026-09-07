@@ -12,6 +12,7 @@ ENV/
 
 # Reportes generados por el escáner
 reports/
+*.db
 
 # Configuración del editor / IDE
 .vscode/
@@ -22,3 +23,10 @@ reports/
 
 # Playwright
 ms-playwright/
+
+# Tool artifacts & cache
+.aider*
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml

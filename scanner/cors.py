@@ -1,21 +1,24 @@
+from typing import Optional
+
 import requests
 
-def check_cors(url, session=None):
+
+def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     """
     Analiza si el servidor tiene una mala configuración de CORS.
     Envía una petición con una cabecera Origin maliciosa/externa y evalúa las respuestas.
-    
+
     Args:
         url: La URL a probar.
         session: Instancia opcional de requests.Session para escaneo autenticado.
-        
+
     Returns:
         Una lista de diccionarios con vulnerabilidades detectadas.
     """
-    results = []
+    results: list[dict[str, str]] = []
     attacker_origin = "https://evil-attacker.com"
     client = session if session is not None else requests
-    
+
     try:
         # Enviar petición con Origin malicioso
         headers = {
@@ -29,7 +32,7 @@ def check_cors(url, session=None):
                     r = client.get(url, headers=headers, timeout=8)
                 else:
                     r = client.options(url, headers=headers, timeout=8)
-            except:
+            except requests.RequestException:
                 continue
 
             ac_origin = r.headers.get('Access-Control-Allow-Origin')
@@ -73,7 +76,7 @@ def check_cors(url, session=None):
                         "detail": f"El servidor ({method}) expone Access-Control-Allow-Origin: * permitiendo peticiones desde cualquier origen sin credenciales."
                     })
                     break
-    except Exception as e:
+    except Exception:
         # Silenciar excepciones de conexión general
         pass
 

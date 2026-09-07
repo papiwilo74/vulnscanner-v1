@@ -1,0 +1,27 @@
+﻿name: Solicitud de Característica
+description: Sugiere una nueva idea o módulo de escaneo para VulnScanner
+title: "[FEAT]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: ¡Gracias por proponer nuevas capacidades para VulnScanner!
+  - type: textarea
+    id: problem
+    attributes:
+      label: ¿Qué problema o caso de uso resuelve?
+      description: Describe la necesidad o brecha que aborda esta propuesta.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta de Solución
+      description: Explica cómo debería funcionar el nuevo módulo o cambio.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas Consideradas
+      description: ¿Hay otras formas de abordar esto?

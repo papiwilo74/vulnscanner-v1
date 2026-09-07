@@ -1,0 +1,54 @@
+﻿name: Reporte de Bug / Falso Positivo
+description: Reporta un error o un falso positivo en la detección de vulnerabilidades
+title: "[BUG]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Gracias por tomarte el tiempo de reportar este problema para mejorar VulnScanner.
+  - type: input
+    id: version
+    attributes:
+      label: Versión de VulnScanner / Commit
+      description: ¿Qué versión o commit estás utilizando?
+      placeholder: "v2.0.0 o commit hash"
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Módulo Afectado
+      description: Selecciona el módulo donde ocurrió la falla
+      options:
+        - XSS / DOM XSS
+        - SQLi / Blind SQLi
+        - SSRF / Open Redirect
+        - Headers / SSL
+        - Inyecciones (SSTI / Command)
+        - Crawler / SPA
+        - API REST / CLI
+        - Reportes (SARIF / HTML / JSON)
+        - Otro
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción del Problema
+      description: Explica qué ocurrió y por qué consideras que es un bug o falso positivo.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para Reproducir
+      description: Comando CLI ejecutado o llamada a la API
+      placeholder: |
+        python main.py http://example.com --profile normal
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Evidencia
+      description: Pega aquí los fragmentos de log relevantes (asegúrate de no incluir tokens o credenciales reales).

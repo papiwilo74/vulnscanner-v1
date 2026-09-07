@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
+
 import requests
 
-COMMON_PATHS = [
+COMMON_PATHS: list[str] = [
     "/admin", "/login", "/backup", "/config",
     "/wp-admin", "/.env", "/api/v1", "/phpmyadmin",
     "/dashboard", "/test", "/old", "/debug",
@@ -20,12 +22,12 @@ SPA_SIGNATURES = [
     "window.__NEXT_DATA__",
 ]
 
-def is_spa_fallback(response):
+def is_spa_fallback(response) -> bool:
     """Detecta si la respuesta es el index.html de un SPA (React, Vue, Next...)"""
     body = response.text.lower()
     return any(sig.lower() in body for sig in SPA_SIGNATURES)
 
-def check_single_directory(base_url, path, session=None, baseline_status=None, baseline_location="", baseline_body_sig=""):
+def check_single_directory(base_url: str, path: str, session: Optional[requests.Session] = None, baseline_status: Optional[int] = None, baseline_location: str = "", baseline_body_sig: str = "") -> Optional[dict[str, str]]:
     try:
         url = base_url.rstrip("/") + path
         client = session if session is not None else requests
@@ -45,30 +47,48 @@ def check_single_directory(base_url, path, session=None, baseline_status=None, b
         if status == 200 and is_spa_fallback(r):
             return None
 
-        if status in [200, 301, 302, 403]:
+        if status in [200, 301, 302, 307, 308, 403]:
             if status == 403:
                 return {
                     "vuln": f"Ruta existente protegida (403): {path}",
                     "risk": "Bajo",
-                    "detail": f"El recurso existe pero devuelve HTTP 403 (Forbidden). Solo revela la existencia del recurso."
+                    "detail": "El recurso existe pero devuelve HTTP 403 (Forbidden). Solo revela la existencia del recurso."
                 }
-            if status in (301, 302):
+            if status in (301, 302, 307, 308):
+                loc = r.headers.get("Location", "")
+                loc_lower = loc.lower()
+                # Filtrar redirecciones comunes (falsos positivos):
+                if any(auth_kw in loc_lower for auth_kw in ["/login", "/signin", "/auth", "/session", "/oauth"]):
+                    return None
+                if loc == baseline_location or loc_lower in ("", "/", "/index.html"):
+                    return None
+                if url.startswith("http://") and loc.startswith("https://"):
+                    return None
+
                 return {
                     "vuln": f"Directorio expuesto con redirección: {path}",
-                    "risk": "Medio",
-                    "detail": f"Responde con HTTP {status} -> {r.headers.get('Location', '?')}"
+                    "risk": "Bajo",
+                    "detail": f"Responde con HTTP {status} -> {loc}"
                 }
+
+            # Para status == 200: si es un archivo de backend/código y responde HTML, es falso positivo (404 personalizado)
+            content_type = r.headers.get("Content-Type", "").lower()
+            if any(path.endswith(ext) for ext in ['.env', '.sql', '.zip', '.git/config', '.yml', '.bak', '.local']) and (
+                'text/html' in content_type or '<html' in r.text[:200].lower() or '<!doctype' in r.text[:200].lower()
+            ):
+                return None
+
             return {
                 "vuln": f"Archivo o directorio expuesto: {path}",
                 "risk": "Alto",
                 "detail": f"Responde con HTTP {status}"
             }
-    except:
+    except requests.RequestException:
         pass
     return None
 
-def check_directories(base_url, session=None):
-    results = []
+def check_directories(base_url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
     client = session if session is not None else requests
 
     baseline_status = None
@@ -79,7 +99,7 @@ def check_directories(base_url, session=None):
         baseline_status = r_fake.status_code
         baseline_location = r_fake.headers.get("Location", "")
         baseline_body_sig = r_fake.text[:300].lower()
-    except:
+    except requests.RequestException:
         pass
 
     with ThreadPoolExecutor(max_workers=10) as executor:

@@ -1,0 +1,12 @@
+# Bandit configuration for VulnScanner
+# Skips checks that conflict with intentional security testing payloads (e.g. SQLi signatures, test random jitter)
+skips:
+  - B101  # Use of assert (used for type narrowing)
+  - B311  # Pseudo-random generators used for random delay jitter in polite stealth mode
+  - B608  # Hardcoded SQL strings (intentional DAST test payloads in scanner/sqli.py)
+
+exclude_dirs:
+  - tests
+  - reports
+  - venv
+  - .venv

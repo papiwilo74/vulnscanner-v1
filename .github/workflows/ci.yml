@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install deps
+        run: pip install ruff
+      - name: Lint with Ruff
+        run: ruff check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          pip install mypy types-requests types-urllib3 types-colorama
+          pip install -r requirements.txt
+          pip install -r requirements_ai.txt
+      - name: Type check with mypy
+        run: mypy scanner utils api.py main.py
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install security scanners
+        run: |
+          pip install bandit pip-audit
+          pip install -r requirements.txt
+          pip install -r requirements_ai.txt
+      - name: Run Bandit SAST
+        run: bandit -r scanner api.py main.py -c bandit.yaml -ll
+      - name: Run pip-audit SCA
+        run: pip-audit
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements_ai.txt
+          pip install pytest pytest-mock responses pytest-cov httpx
+      - name: Run tests with coverage
+        run: |
+          pytest -v tests/ --cov=. --cov-report=xml --cov-report=term-missing --cov-branch
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          flags: ${{ matrix.python-version }}
+        continue-on-error: true
+
+  train-model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r requirements_ai.txt
+      - name: Train AI model
+        run: python train_ai.py --ci
+      - name: Verify model files exist
+        run: |
+          test -f models/ai_model.joblib || (echo "ERROR: model not generated" && exit 1)
+          test -f models/vectorizer.joblib || (echo "ERROR: vectorizer not generated" && exit 1)
+          echo "Model files verified OK"
+
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tools
+        run: pip install build
+      - name: Verify package builds
+        run: python -m build --wheel

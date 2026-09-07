@@ -1,5 +1,7 @@
-def check_https(url, response):
-    results = []
+
+
+def check_https(url: str, response) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
 
     if not url.startswith("https://"):
         results.append({

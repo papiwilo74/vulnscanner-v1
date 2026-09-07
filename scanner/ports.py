@@ -1,9 +1,10 @@
 import socket
-from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
+from urllib.parse import urlparse
 
 # Puertos críticos a analizar
-PORTS_TO_SCAN = {
+PORTS_TO_SCAN: dict[int, tuple[str, str, str]] = {
     21: ("FTP", "Transferencia de archivos sin cifrar", "Medio"),
     22: ("SSH", "Acceso remoto seguro (consola de comandos)", "Medio"),
     23: ("Telnet", "Acceso remoto obsoleto e inseguro sin cifrar", "Medio"),
@@ -20,11 +21,10 @@ PORTS_TO_SCAN = {
     27017: ("MongoDB", "Base de datos NoSQL MongoDB", "Alto")
 }
 
-def check_single_port(ip, port, name, service, risk):
-    # Usar un bloque try-except seguro para la creación y cierre de sockets
+def check_single_port(ip: str, port: int, name: str, service: str, risk: str) -> Optional[dict[str, str]]:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(1.2)  # Timeout optimizado para respuestas rápidas
+            s.settimeout(1.2)
             res = s.connect_ex((ip, port))
             if res == 0:
                 return {
@@ -32,36 +32,34 @@ def check_single_port(ip, port, name, service, risk):
                     "risk": risk,
                     "detail": f"El puerto está abierto en la IP {ip} ({service})."
                 }
-    except (socket.timeout, socket.error):
-        pass
-    except Exception:
+    except (OSError, socket.timeout):
         pass
     return None
 
-def check_ports(url):
-    results = []
-    
+def check_ports(url: str) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+
     parsed = urlparse(url)
     hostname = parsed.hostname
-    
+
     if not hostname:
         return results
-        
+
     try:
         # Intentar resolver DNS con timeout controlado de sistema
         ip = socket.gethostbyname(hostname)
         print(f"  [IP] {hostname} resolvió a: {ip}")
-    except (socket.gaierror, Exception):
-        print(f"  ⚠️ No se pudo resolver la IP para {hostname}. Omitiendo escaneo de puertos.")
+    except socket.gaierror:
+        print(f"  [WARN] No se pudo resolver la IP para {hostname}. Omitiendo escaneo de puertos.")
         return results
-        
+
     print(f"   Escaneando {len(PORTS_TO_SCAN)} puertos críticos concurrentemente...")
-    
+
     # Limitar de forma segura max_workers según los elementos a escanear
     workers = min(len(PORTS_TO_SCAN), 10)
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = {
-            executor.submit(check_single_port, ip, port, data[0], data[1], data[2]): port 
+            executor.submit(check_single_port, ip, port, data[0], data[1], data[2]): port
             for port, data in PORTS_TO_SCAN.items()
         }
         for future in as_completed(futures):
@@ -70,6 +68,6 @@ def check_ports(url):
                 if res:
                     results.append(res)
             except Exception:
-                pass  # Evitar que fallos en un hilo detengan el resto del escaneo
-                
+                pass
+
     return results

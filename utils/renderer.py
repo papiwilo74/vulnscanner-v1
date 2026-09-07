@@ -1,9 +1,11 @@
+import contextlib
 import importlib
+from typing import Optional
 
-_playwright_available = None
+_playwright_available: Optional[bool] = None
 _playwright_checked = False
 
-def is_playwright_available():
+def is_playwright_available() -> bool:
     """Comprueba una sola vez si Playwright está instalado."""
     global _playwright_available, _playwright_checked
     if not _playwright_checked:
@@ -13,9 +15,9 @@ def is_playwright_available():
         except ImportError:
             _playwright_available = False
         _playwright_checked = True
-    return _playwright_available
+    return _playwright_available or False
 
-def render_page(url, wait_until="networkidle", timeout=15000, nav_timeout=20000):
+def render_page(url: str, wait_until: str = "networkidle", timeout: int = 15000, nav_timeout: int = 20000) -> tuple[Optional[str], list[str]]:
     """
     Renderiza una página con Playwright (Chromium headless) y devuelve el HTML
     ya ejecutado (JavaScript incluido) junto con la lista de enlaces <a href>.
@@ -49,10 +51,8 @@ def render_page(url, wait_until="networkidle", timeout=15000, nav_timeout=20000)
             page = context.new_page()
             page.goto(url, wait_until=wait_until, timeout=nav_timeout)
             # Esperar un poco más para que el JS de la SPA pinte formularios
-            try:
+            with contextlib.suppress(TimeoutError, Exception):
                 page.wait_for_load_state("networkidle", timeout=timeout)
-            except Exception:
-                pass
 
             html = page.content()
             # Extraer enlaces del DOM ya renderizado

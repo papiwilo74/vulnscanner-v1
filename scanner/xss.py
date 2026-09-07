@@ -1,16 +1,21 @@
-import requests
-import re
+import html
 import os
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, urljoin
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Optional
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
-XSS_PAYLOADS = [
+import requests
+
+XSS_PAYLOADS: list[str] = [
     "<script>alert(1)</script>",
     '"><img src=x onerror=alert(1)>',
     "javascript:alert(1)",
 ]
 
-def test_xss_payload(parsed, params, param, payload, baseline_text="", session=None):
+def test_xss_payload(
+    parsed, params, param: str, payload: str, baseline_text: str = "", session: Optional[requests.Session] = None
+) -> Optional[dict[str, str]]:
     test_params = params.copy()
     test_params[param] = [payload]
     new_query = urlencode(test_params, doseq=True)
@@ -18,114 +23,107 @@ def test_xss_payload(parsed, params, param, payload, baseline_text="", session=N
     try:
         client = session if session is not None else requests
         r = client.get(test_url, timeout=5)
-        if payload in r.text and payload not in baseline_text:
+        response_text = r.text
+
+        # Evitar falsos positivos:
+        # 1. Si el Content-Type no es HTML ni XML, el navegador no ejecuta scripts (ej. APIs JSON o texto plano)
+        headers = getattr(r, "headers", {})
+        content_type = headers.get("Content-Type", "") if hasattr(headers, "get") else ""
+        if isinstance(content_type, str) and content_type:
+            ct_lower = content_type.lower()
+            if not any(t in ct_lower for t in ["text/html", "application/xhtml+xml", "image/svg+xml"]):
+                return None
+
+        # 2. Verificar que el payload esté presente y que los caracteres clave HTML NO hayan sido escapados.
+        if payload in response_text and payload not in baseline_text:
+            escaped_payload = html.escape(payload)
+            # Si el payload aparece unívocamente codificado (ej. &lt;script&gt;), no es ejecutable -> Falso positivo
+            if payload != escaped_payload and escaped_payload in response_text and response_text.count(payload) == response_text.count(escaped_payload):
+                return None
+
             return {
                 "vuln": f"XSS reflejado en parámetro '{param}'",
                 "risk": "Alto",
-                "detail": f"Payload reflejado sin escapar: {payload}"
+                "detail": f"Payload reflejado sin escapar en la respuesta HTTP: {payload}",
             }
-    except:
+    except requests.RequestException:
         pass
     return None
 
-def analyze_js_code(code, script_name):
-    findings = []
-    
-    # 1. Patrones de concordancia directa
+def analyze_js_code(code: str, script_name: str) -> list[dict[str, str]]:
+    findings: list[dict[str, str]] = []
+
+    # Excluir bundles minificados comunes de librerías para evitar falsos positivos masivos en JS cliente
+    if any(lib in script_name.lower() for lib in ["jquery", "react", "vue", "angular", "bootstrap"]):
+        return findings
+
+    # Patrones de concordancia directa en código propio
     direct_patterns = [
-        (r"eval\s*\([^)]*(location\.|document\.URL|document\.referrer|window\.name)", "Uso de eval() con entrada directa del DOM"),
-        (r"document\.write(?:ln)?\s*\([^)]*(location\.|document\.URL|document\.referrer|window\.name)", "Uso de document.write() con entrada directa del DOM"),
-        (r"\.(?:inner|outer)HTML\s*=\s*[^;]*(location\.|document\.URL|document\.referrer|window\.name)", "Asignación a innerHTML/outerHTML con entrada directa del DOM"),
-        (r"setTimeout\s*\([^,)]*(location\.|document\.URL|document\.referrer|window\.name)", "Uso de setTimeout() con entrada directa del DOM"),
-        (r"\$\s*\([^)]*\)\.(?:html|append)\s*\([^)]*(location\.|document\.URL|document\.referrer|window\.name)", "Uso de .html()/.append() de jQuery con entrada directa del DOM")
+        (
+            r"eval\s*\([^)]*(location\.|document\.URL|document\.referrer|window\.name)",
+            "Uso de eval() con entrada directa del DOM",
+        ),
+        (
+            r"document\.write(?:ln)?\s*\([^)]*(location\.|document\.URL|document\.referrer|window\.name)",
+            "Uso de document.write() con entrada directa del DOM",
+        ),
+        (
+            r"\.(?:inner|outer)HTML\s*=\s*[^;]*(location\.|document\.URL|document\.referrer|window\.name)",
+            "Asignación a innerHTML/outerHTML con entrada directa del DOM",
+        ),
     ]
-    
+
     for pattern, desc in direct_patterns:
         match = re.search(pattern, code, re.IGNORECASE)
         if match:
             snippet = match.group(0)[:150].strip()
-            findings.append({
-                "vuln": "Posible XSS basado en DOM (Directo)",
-                "risk": "Medio",
-                "detail": f"{desc} en {script_name}. Código sospechoso: {snippet}"
-            })
+            findings.append(
+                {
+                    "vuln": "Posible XSS basado en DOM (Directo)",
+                    "risk": "Medio",
+                    "detail": f"{desc} en {script_name}. Código sospechoso: {snippet}",
+                }
+            )
             return findings
-            
-    # 2. Simulación simple de análisis de flujo de variables (Taint Analysis)
-    lines = code.split("\n")
-    tainted_vars = set()
-    
-    # Expresión regular para detectar asignación de fuentes DOM a variables
-    var_assign_pattern = re.compile(
-        r"(?:var|let|const|window\.)\s*([a-zA-Z0-9_$]+)\s*=\s*.*(location\.search|location\.hash|location\.href|document\.URL|document\.referrer|window\.name|URLSearchParams)",
-        re.IGNORECASE
-    )
-    
-    for idx, line in enumerate(lines):
-        m_assign = var_assign_pattern.search(line)
-        if m_assign:
-            var_name = m_assign.group(1)
-            tainted_vars.add(var_name)
-            
-        for var in tainted_vars:
-            sink_patterns = [
-                (rf"eval\s*\([^)]*\b{re.escape(var)}\b", "Uso de eval() con variable contaminada"),
-                (rf"document\.write(?:ln)?\s*\([^)]*\b{re.escape(var)}\b", "Uso de document.write() con variable contaminada"),
-                (rf"\.(?:inner|outer)HTML\s*=\s*[^;]*\b{re.escape(var)}\b", "Asignación a innerHTML/outerHTML con variable contaminada"),
-                (rf"setTimeout\s*\([^,)]*\b{re.escape(var)}\b", "Uso de setTimeout() con variable contaminada"),
-                (rf"\$\s*\([^)]*\)\.(?:html|append)\s*\([^)]*\b{re.escape(var)}\b", "Uso de .html()/.append() de jQuery con variable contaminada"),
-                (rf"location\.href\s*=\s*[^;]*\b{re.escape(var)}\b", "Redirección abierta/XSS asignando variable contaminada a location.href")
-            ]
-            
-            for pat, desc in sink_patterns:
-                match = re.search(pat, line, re.IGNORECASE)
-                if match:
-                    snippet = line[:150].strip()
-                    findings.append({
-                        "vuln": "Posible XSS basado en DOM (Flujo)",
-                        "risk": "Medio",
-                        "detail": f"{desc} ('{var}') en {script_name} (línea {idx+1}). Código sospechoso: {snippet}"
-                    })
-                    return findings
-                    
+
     return findings
 
-def check_dom_xss(url, html_content, session=None):
-    results = []
+def check_dom_xss(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
     if not html_content:
         return results
-        
+
     parsed_base = urlparse(url)
     base_domain = parsed_base.netloc
-    
-    # 1. Analizar scripts embebidos en el HTML
-    inline_scripts = re.findall(r'<script\b[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
+
+    # Analizar scripts embebidos en el HTML
+    inline_scripts = re.findall(r"<script\b[^>]*>(.*?)</script>", html_content, re.DOTALL | re.IGNORECASE)
     for idx, code in enumerate(inline_scripts):
         if code.strip():
-            findings = analyze_js_code(code, f"Script Embebido #{idx+1}")
+            findings = analyze_js_code(code, f"Script Embebido #{idx + 1}")
             results.extend(findings)
-            
-    # 2. Descargar y analizar archivos JavaScript locales
+
+    # Descargar y analizar archivos JavaScript propios del mismo dominio
     src_scripts = re.findall(r'<script\b[^>]*\bsrc=["\'\s]([^"\'\s>]+)["\'\s]', html_content, re.IGNORECASE)
-    
+
     js_urls = []
     for src in src_scripts:
         abs_url = urljoin(url, src)
         parsed_js = urlparse(abs_url)
         if parsed_js.netloc == base_domain:
             js_urls.append(abs_url)
-            
-    def fetch_and_analyze_js(js_url):
+
+    def fetch_and_analyze_js(js_url: str) -> list[dict[str, str]]:
         try:
             client = session if session is not None else requests
             r = client.get(js_url, timeout=5)
             if r.status_code == 200:
                 js_name = os.path.basename(urlparse(js_url).path) or js_url
                 return analyze_js_code(r.text, f"Archivo JS: {js_name}")
-        except:
+        except requests.RequestException:
             pass
         return []
-        
+
     if js_urls:
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(fetch_and_analyze_js, js_url): js_url for js_url in js_urls}
@@ -133,21 +131,18 @@ def check_dom_xss(url, html_content, session=None):
                 res = future.result()
                 if res:
                     results.extend(res)
-                    
+
     return results
 
-def check_xss(url, html_content=None, session=None, passive=False):
-    results = []
+def check_xss(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None, passive: bool = False) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
 
-    # 1. Comprobación pasiva de DOM XSS si se provee HTML (análisis estático, sin payloads)
     if html_content:
         results.extend(check_dom_xss(url, html_content, session=session))
 
-    # En modo pasivo, omitir las pruebas activas con payloads reflejados
     if passive:
         return results
 
-    # 2. Comprobación de XSS Reflejado en parámetros URL
     parsed = urlparse(url)
     params = parse_qs(parsed.query)
 
@@ -160,7 +155,7 @@ def check_xss(url, html_content=None, session=None, passive=False):
         try:
             r_base = client.get(urlunparse(parsed._replace(query=urlencode(params, doseq=True))), timeout=5)
             baselines[param] = r_base.text
-        except:
+        except requests.RequestException:
             baselines[param] = ""
 
     tasks = []
@@ -169,7 +164,10 @@ def check_xss(url, html_content=None, session=None, passive=False):
             tasks.append((param, payload))
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(test_xss_payload, parsed, params, t[0], t[1], baselines.get(t[0], ""), session): t for t in tasks}
+        futures = {
+            executor.submit(test_xss_payload, parsed, params, t[0], t[1], baselines.get(t[0], ""), session): t
+            for t in tasks
+        }
         flagged_params = set()
         for future in as_completed(futures):
             param, payload = futures[future]
@@ -180,4 +178,4 @@ def check_xss(url, html_content=None, session=None, passive=False):
                 results.append(res)
                 flagged_params.add(param)
 
-    return results
+    return results
