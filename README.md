@@ -119,14 +119,15 @@ python train_ai.py
 ## Uso Rapido
 
 ```bash
+# 🚀 COMANDO MAESTRO TODO-EN-UNO (Recomendado para auditar tu sitio al 100%)
+# Activa crawling (10 páginas), subdominios, stealth, WAF, grafos de ataque y auto-detección de OpenAPI/IAST
+python main.py https://ejemplo.com/ --full
+
 # Escaneo basico de una URL
 python main.py https://ejemplo.com/
 
 # Escaneo sin abrir el reporte automaticamente
 python main.py https://ejemplo.com/ --no-open
-
-# Modo sigiloso (rate-limiting, recomendado para pruebas autorizadas)
-python main.py https://ejemplo.com/ --stealth --no-open
 ```
 
 ---
@@ -160,6 +161,7 @@ python main.py <URL> [OPCIONES]
 | `--no-waf-detect` | Desactiva detección previa de WAFs y throttling adaptativo | `--no-waf-detect` |
 | `--iast-url <url>` | Correlaciona con agente IAST/RASP en tiempo de ejecución (archivo y línea de código) | `--iast-url http://localhost:8000` |
 | `--no-attack-chain` | Desactiva el modelado de Grafos de Ataque y análisis de Choke Points | `--no-attack-chain` |
+| `--full`, `--all` | **Modo Todo-en-Uno**: activa crawling (10 págs), subdominios, stealth, WAF, grafos y auto-OpenAPI | `--full` |
 
 ### Ejemplos Prácticos de Escaneo
 

@@ -167,7 +167,7 @@ class HookManager:
             real_conn = self._orig_sqlite_connect(*args, **kwargs)
             return HookedConnection(real_conn, self)
 
-        setattr(sqlite3, "connect", hooked_connect)
+        setattr(sqlite3, "connect", hooked_connect)  # noqa: B010
 
         # 2. Hook para subprocess.Popen
         self._orig_subprocess_popen = subprocess.Popen
@@ -200,7 +200,7 @@ class HookManager:
             assert self._orig_subprocess_popen is not None
             return self._orig_subprocess_popen(*args, **kwargs)
 
-        setattr(subprocess, "Popen", hooked_popen)
+        setattr(subprocess, "Popen", hooked_popen)  # noqa: B010
 
         # 3. Hook para builtins.open (Path Traversal)
         self._orig_builtin_open = builtins.open
@@ -228,7 +228,7 @@ class HookManager:
             assert self._orig_builtin_open is not None
             return self._orig_builtin_open(file, *args, **kwargs)
 
-        setattr(builtins, "open", hooked_open)
+        setattr(builtins, "open", hooked_open)  # noqa: B010
 
         self._installed = True
 
@@ -238,11 +238,11 @@ class HookManager:
             return
 
         if self._orig_sqlite_connect:
-            setattr(sqlite3, "connect", self._orig_sqlite_connect)
+            setattr(sqlite3, "connect", self._orig_sqlite_connect)  # noqa: B010
         if self._orig_subprocess_popen:
-            setattr(subprocess, "Popen", self._orig_subprocess_popen)
+            setattr(subprocess, "Popen", self._orig_subprocess_popen)  # noqa: B010
         if self._orig_builtin_open:
-            setattr(builtins, "open", self._orig_builtin_open)
+            setattr(builtins, "open", self._orig_builtin_open)  # noqa: B010
 
         self._installed = False
 

@@ -486,11 +486,43 @@ if __name__ == "__main__":
                         help="URL base del servidor instrumentado con agente IAST/RASP para correlación en memoria")
     parser.add_argument("--no-attack-chain", action="store_true",
                         help="Deshabilita el modelado de Grafos de Ataque y análisis de Choke Points defensivos")
+    parser.add_argument("--full", "--all", dest="full", action="store_true",
+                        help="Modo Todo-en-Uno: activa crawling (10 páginas), subdominios, stealth, detección WAF, grafos de ataque y auto-detección de OpenAPI e IAST")
 
     args = parser.parse_args()
     if not args.url:
         parser.print_help()
         sys.exit(1)
+
+    if args.full:
+        logger.info("[TODO-EN-UNO] Modo --full activado: Ejecutando suite completa de auditoría empresarial...")
+        if args.crawl == 1:
+            args.crawl = 10
+        args.subdomains = True
+        args.stealth = True
+        # Auto-descubrir OpenAPI si el servidor expone contrato
+        if not args.openapi:
+            session_check = build_session(args.cookie, args.auth) or requests.Session()
+            for cand in ["/openapi.json", "/swagger.json", "/api/openapi.json"]:
+                cand_url = f"{args.url.rstrip('/')}{cand}"
+                try:
+                    r = session_check.get(cand_url, timeout=3)
+                    if r.status_code == 200 and ("openapi" in r.text.lower() or "swagger" in r.text.lower()):
+                        args.openapi = cand_url
+                        logger.info("[AUTO-DISCOVERY] Especificación OpenAPI encontrada en: %s", cand_url)
+                        break
+                except Exception:
+                    pass
+        # Auto-descubrir si el servidor tiene agente IAST/RASP activo
+        if not args.iast_url:
+            session_check = build_session(args.cookie, args.auth) or requests.Session()
+            try:
+                r = session_check.get(f"{args.url.rstrip('/')}/__vulnscanner_iast__", timeout=2)
+                if r.status_code == 200 and "telemetry" in r.text:
+                    args.iast_url = args.url
+                    logger.info("[AUTO-DISCOVERY] Agente IAST/RASP en memoria detectado en el objetivo.")
+            except Exception:
+                pass
 
     scan(
         args.url,
