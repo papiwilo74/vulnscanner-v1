@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VulnScanner Enterprise API",
-    "description": "Microservicio web para automatizaci\u00f3n de auditor\u00edas de seguridad, OAST, SARIF, Headless Crawling y Auto-Fix.",
-    "version": "2.0.0"
+    "description": "Microservicio web para automatizaci\u00f3n de auditor\u00edas de seguridad, IAST/RASP, Grafos de Ataque, OpenAPI, OAST y SARIF.",
+    "version": "2.2.0"
   },
   "paths": {
     "/": {
@@ -250,6 +250,22 @@
             "type": "boolean",
             "title": "No Waf Detect",
             "default": false
+          },
+          "iast_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iast Url"
+          },
+          "enable_attack_chain": {
+            "type": "boolean",
+            "title": "Enable Attack Chain",
+            "default": true
           }
         },
         "type": "object",

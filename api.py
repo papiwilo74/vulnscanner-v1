@@ -18,8 +18,8 @@ logger = logging.getLogger("VulnScannerAPI")
 
 app = FastAPI(
     title="VulnScanner Enterprise API",
-    description="Microservicio web para automatización de auditorías de seguridad, OAST, SARIF, Headless Crawling y Auto-Fix.",
-    version="2.0.0"
+    description="Microservicio web para automatización de auditorías de seguridad, IAST/RASP, Grafos de Ataque, OpenAPI, OAST y SARIF.",
+    version="2.2.0"
 )
 
 
@@ -112,6 +112,8 @@ class ScanRequest(BaseModel):
     openapi_spec: Optional[str] = None
     use_async_engine: bool = False
     no_waf_detect: bool = False
+    iast_url: Optional[str] = None
+    enable_attack_chain: bool = True
 
 
 def run_scan_in_background(task_id: str, req: ScanRequest):
@@ -147,6 +149,8 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
             openapi_spec=req.openapi_spec,
             use_async_engine=req.use_async_engine,
             no_waf_detect=req.no_waf_detect,
+            iast_url=req.iast_url,
+            attack_chain=req.enable_attack_chain,
         )
         if report_data and "error" in report_data:
             raise RuntimeError(report_data["error"])

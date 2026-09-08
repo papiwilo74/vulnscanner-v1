@@ -6,8 +6,13 @@ import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
+
+import requests
+
+from scanner.attack_graph import AttackGraph
+from scanner.models import Finding
 
 log = logging.getLogger("VulnScanner.Engine")
 
@@ -80,6 +85,8 @@ class ScanConfig:
     login_creds: Optional[str] = None
 
     allow_private: bool = False
+    iast_url: Optional[str] = None
+    enable_attack_chain: bool = True
 
     @classmethod
     def from_profile(cls, profile: ScanProfile, target: str = "", **overrides) -> "ScanConfig":
@@ -259,6 +266,57 @@ class ScanEngine:
             "waf_detected": self.waf_detected,
             "cancelled": self._cancelled.is_set(),
         }
+
+    def correlate_iast(self, findings: list[Finding], session: Optional[requests.Session] = None) -> int:
+        """Consulta telemetría en tiempo de ejecución del agente IAST y correlaciona con hallazgos DAST.
+
+        Retorna el número de hallazgos enriquecidos con archivo fuente, línea y traza de ejecución.
+        """
+        if not self.config.iast_url:
+            return 0
+
+        target_endpoint = f"{self.config.iast_url.rstrip('/')}/__vulnscanner_iast__"
+        sess = session or requests.Session()
+        try:
+            resp = sess.get(target_endpoint, timeout=5)
+            if resp.status_code != 200:
+                return 0
+            data = resp.json()
+            telemetry_list: list[dict[str, Any]] = data.get("telemetry", [])
+            if not telemetry_list:
+                return 0
+
+            enriched_count = 0
+            # Mapear eventos de telemetría por tipo de sink
+            sink_map: dict[str, list[dict[str, Any]]] = {}
+            for t in telemetry_list:
+                st = t.get("sink_type", "")
+                sink_map.setdefault(st, []).append(t)
+
+            category_sink_pairs = {
+                "sqli": "sql",
+                "injections": "command",
+                "path_traversal": "file",
+            }
+
+            for finding in findings:
+                expected_sink = category_sink_pairs.get(finding.category)
+                if expected_sink and expected_sink in sink_map and sink_map[expected_sink]:
+                    event = sink_map[expected_sink][0]
+                    finding.iast_source_file = event.get("source_file")
+                    finding.iast_source_line = event.get("source_line")
+                    finding.iast_call_stack = event.get("call_stack", [])
+                    finding.rasp_blocked = event.get("blocked_by_rasp", False)
+                    finding.confidence = "certain"
+                    enriched_count += 1
+            return enriched_count
+        except Exception as ex:
+            log.debug("No se pudo correlacionar telemetría IAST: %s", ex)
+            return 0
+
+    def build_attack_graph(self, findings: list[Finding]) -> AttackGraph:
+        """Construye el Grafo de Ataque y calcula los Choke Points defensivos."""
+        return AttackGraph.build_from_findings(findings)
 
 
 def generate_request_id(url: str, payload: str = "") -> str:

@@ -219,7 +219,8 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          profile: str = "normal", allow_private: bool = False,
          har_file: Optional[str] = None, headless_crawl: bool = False,
          headless_login: bool = False, openapi_spec: Optional[str] = None,
-         use_async_engine: bool = False, no_waf_detect: bool = False) -> tuple:
+         use_async_engine: bool = False, no_waf_detect: bool = False,
+         iast_url: Optional[str] = None, attack_chain: bool = True) -> tuple:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
         profile_enum, target=url,
@@ -228,6 +229,8 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         login_url=login_url,
         login_creds=login_creds,
         allow_private=allow_private,
+        iast_url=iast_url,
+        enable_attack_chain=attack_chain,
     )
     if delay > 0:
         config.delay = delay
@@ -408,17 +411,37 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
     all_findings = deduplicate_findings(all_findings)
     all_findings = enrich_findings_with_autofix(all_findings, list(global_tech_stack))
 
+    # 5. Correlación de telemetría IAST en tiempo de ejecución
+    if iast_url:
+        enriched_count = engine.correlate_iast(all_findings, session=session)
+        if enriched_count > 0:
+            logger.info("[IAST] Correlación exitosa: %d hallazgo(s) enriquecido(s) con archivo y línea de código exacta.", enriched_count)
+
+    # 6. Orquestador de Grafos de Ataque y Análisis de Choke Points Defensivos
+    attack_graph_dict = None
+    if attack_chain and all_findings:
+        attack_graph = engine.build_attack_graph(all_findings)
+        choke_points = attack_graph.calculate_choke_points()
+        if choke_points:
+            top_cp = choke_points[0]
+            logger.info("[DEFENSA] Choke Point Crítico: '%s' corta %d ruta(s) de ataque hacia impacto final.",
+                        top_cp.node_title, top_cp.severed_paths_count)
+            logger.info("[DEFENSA] Contramedida recomendada: %s", top_cp.recommended_defense)
+        attack_graph_dict = attack_graph.to_dict()
+
     engine_summary = engine.get_summary()
+    if attack_graph_dict:
+        engine_summary["attack_graph"] = attack_graph_dict
     SCAN_STATS["total_requests"] = engine.request_count
 
     return print_report(url, all_findings, engine.elapsed, no_open=no_open, engine_summary=engine_summary)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="VulnScanner Enterprise v2.0 — Escáner de vulnerabilidades web con OAST, SARIF, Auto-Fix y Headless Crawling",
+        description="VulnScanner Enterprise v2.2 — Escáner de vulnerabilidades web con IAST/RASP, Grafos de Ataque, OpenAPI y Motor Asíncrono",
         epilog="Ejemplo: python main.py https://ejemplo.com --profile normal --crawl 5 --headless-crawl"
     )
-    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.0.0")
+    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.2.0")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--no-open", action="store_true",
                         help="Evita abrir el reporte HTML automáticamente")
@@ -459,6 +482,10 @@ if __name__ == "__main__":
                         help="Habilita motor asíncrono httpx/asyncio de ultra alto rendimiento")
     parser.add_argument("--no-waf-detect", action="store_true",
                         help="Deshabilita la detección automática de WAF")
+    parser.add_argument("--iast-url", type=str, default=None,
+                        help="URL base del servidor instrumentado con agente IAST/RASP para correlación en memoria")
+    parser.add_argument("--no-attack-chain", action="store_true",
+                        help="Deshabilita el modelado de Grafos de Ataque y análisis de Choke Points defensivos")
 
     args = parser.parse_args()
     if not args.url:
@@ -486,4 +513,6 @@ if __name__ == "__main__":
         openapi_spec=args.openapi,
         use_async_engine=args.async_engine,
         no_waf_detect=args.no_waf_detect,
+        iast_url=args.iast_url,
+        attack_chain=not args.no_attack_chain,
     )

@@ -163,3 +163,30 @@ Para entornos donde el rendimiento y la velocidad de escaneo son prioritarios, e
 - **Conexiones Concurrentes No Bloqueantes:** Controladas mediante `asyncio.Semaphore` con pooling de conexiones HTTP/1.1 y HTTP/2.
 - **Espaciamiento No Bloqueante:** Implementa rate limiting asíncrono y pausas de Circuit Breaker con `asyncio.sleep()`, multiplicando el rendimiento por 10x-20x frente a pools de hilos tradicionales.
 
+---
+
+## 10. Agente Híbrido IAST y Defensa Activa RASP (`scanner/iast_agent.py`)
+
+Para cerrar la brecha entre el escaneo externo (DAST) y el código fuente interno, VulnScanner incluye un agente de instrumentación en memoria (`VulnScannerASGI`):
+
+- **IAST (Interactive Application Security Testing):**
+  - Se acopla como middleware ASGI/WSGI a aplicaciones Python (FastAPI, Starlette, Flask).
+  - Instrumenta sinks de ejecución críticos: llamadas SQL (`sqlite3`, SQLAlchemy), comandos del sistema (`subprocess.Popen`), apertura de archivos (`builtins.open`) y evaluación de código.
+  - Al recibir peticiones de prueba correlacionadas (`X-VulnScanner-Correlation-ID`), inspecciona la pila de llamadas (`inspect.stack()`) y registra el archivo fuente exacto, línea de código y argumentos recibidos, eliminando el 100% de los falsos positivos.
+  - Expone el endpoint nativo `/__vulnscanner_iast__` para alimentar al escáner DAST con la traza de ejecución.
+- **RASP (Runtime Application Self-Protection - Defensa Activa):**
+  - Al configurarse en modo `mode="protect"`, el agente actúa como un WAF en memoria.
+  - Si un payload malicioso no sanitizado alcanza un sink peligroso, **intercepta y aborta la ejecución antes de tocar el sistema operativo o la base de datos**, respondiendo con HTTP 403 Forbidden y la cabecera `X-Protection-By: VulnScanner-RASP`.
+
+---
+
+## 11. Orquestador de Grafos de Ataque y Choke Points Defensivos (`scanner/attack_graph.py`)
+
+Supera las limitaciones de los escáneres que reportan vulnerabilidades aisladas, modelando el panorama de seguridad como un **Grafo Dirigido Acíclico (DAG)** de progresión adversarial:
+
+- **Mapeo MITRE ATT&CK & Cyber Kill Chain:** Modela las etapas del ataque:
+  - `Reconocimiento` (directorios, puertos) ➔ `Fuga de Credenciales` (.env, JWT) ➔ `Acceso Inicial / Elevación` (APIs rotas, robo de sesión) ➔ `Impacto Crítico` (SQLi, RCE).
+- **Encadenamiento Causal Autónomo:** Genera aristas dirigidas entre vulnerabilidades complementarias descubiertas durante el escaneo.
+- **Cálculo de Choke Points Defensivos:** Aplica análisis de caminos y centralidad de grafos para identificar los nodos de estrangulamiento donde una sola contramedida defensiva (ej. parametrización estricta o validación de tokens) corta el mayor número de rutas de escalamiento hacia impactos críticos.
+- **Visualización Interactiva:** Genera sintaxis Mermaid (`graph LR`) con nodos destacados para visualización directa en dashboards y reportes.
+

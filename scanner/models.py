@@ -295,6 +295,13 @@ class Finding:
     owasp_category: str = ""
     autofix: Optional[dict[str, Any]] = None
 
+    # Telemetría en tiempo de ejecución IAST / RASP y Grafos de Ataque
+    iast_source_file: Optional[str] = None
+    iast_source_line: Optional[int] = None
+    iast_call_stack: Optional[list[str]] = None
+    rasp_blocked: bool = False
+    attack_chain_id: Optional[str] = None
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
 
     SEVERITY_ORDER: dict[str, int] = field(default_factory=lambda: {
@@ -354,6 +361,11 @@ class Finding:
             "mitre_attack_name": self.mitre_attack_name,
             "owasp_category": self.owasp_category,
             "autofix": self.autofix,
+            "iast_source_file": self.iast_source_file,
+            "iast_source_line": self.iast_source_line,
+            "iast_call_stack": self.iast_call_stack,
+            "rasp_blocked": self.rasp_blocked,
+            "attack_chain_id": self.attack_chain_id,
         }
 
     @classmethod

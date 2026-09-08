@@ -1,22 +1,22 @@
-# VulnScanner v2.1 (Enterprise Edition)
+# VulnScanner v2.2 (Enterprise Edition)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/VulnScanner-v2.1.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.1 Enterprise" />
+  <img src="https://img.shields.io/badge/VulnScanner-v2.2.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.2 Enterprise" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.1.0"><img src="https://img.shields.io/badge/Release-v2.1.0-007EC6.svg?logo=github" alt="Release v2.1.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.2.0"><img src="https://img.shields.io/badge/Release-v2.2.0-007EC6.svg?logo=github" alt="Release v2.2.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict-blue.svg" alt="Mypy" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
   <a href="https://pypi.org/project/pip-audit/"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-200%20passing-brightgreen.svg" alt="200 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-208%20passing-brightgreen.svg" alt="208 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.1** es un escáner de vulnerabilidades web de nivel empresarial (DAST + SAST + IA + API Security), con motor asíncrono ultra-rápido (`httpx`/`asyncio`), detección inteligente de WAFs con Circuit Breaker, auditoría de contratos OpenAPI/Swagger, soporte de auto-remediación y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
+> **VulnScanner v2.2** es una plataforma integral de seguridad web de nivel empresarial que combina **DAST + SAST + IAST/RASP + ML + API Security**. Incorpora un agente híbrido de instrumentación en tiempo de ejecución con **defensa activa y bloqueo de ataques en memoria (RASP)**, un **orquestador de grafos de ataque** con cálculo de **Choke Points defensivos**, motor asíncrono ultra-rápido (`httpx`/`asyncio`), detección inteligente de WAFs con Circuit Breaker, auditoría OpenAPI/Swagger y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
 
 ---
 
@@ -55,6 +55,8 @@ Disenada con enfoque **defensivo y educativo**. El modo `--stealth` aplica rate-
 
 | Modulo | Descripcion |
 |---|---|
+| **IAST / RASP Hybrid Agent** | Instrumentación en tiempo de ejecución de sinks (SQL, OS, Path Traversal) con **defensa activa y bloqueo en memoria (HTTP 403)** |
+| **Attack Graph & Choke Points** | Grafo Dirigido Acíclico (DAG) de progresión de ataque con cálculo matemático de **Choke Points defensivos** |
 | **WAF Detection & Circuit Breaker** | Detección inteligente de WAFs (Cloudflare, AWS WAF, Akamai, Imperva...) con throttling adaptativo |
 | **OpenAPI / Swagger Scanner** | Auditoría basada en esquemas de API (Broken Auth, Fuzzing SQLi, Stack Trace Leaks) |
 | **Async I/O Engine** | Motor HTTP asíncrono ultra-rápido (`httpx` + `asyncio`) con pool de conexiones y semáforos |
@@ -156,6 +158,8 @@ python main.py <URL> [OPCIONES]
 | `--openapi <path/url>` | Audita endpoints a partir de especificación OpenAPI 3.x / Swagger 2.0 | `--openapi https://api.ejemplo.com/openapi.json` |
 | `--async-engine` | Habilita motor HTTP asíncrono ultra-rápido (`httpx` + `asyncio`) | `--async-engine` |
 | `--no-waf-detect` | Desactiva detección previa de WAFs y throttling adaptativo | `--no-waf-detect` |
+| `--iast-url <url>` | Correlaciona con agente IAST/RASP en tiempo de ejecución (archivo y línea de código) | `--iast-url http://localhost:8000` |
+| `--no-attack-chain` | Desactiva el modelado de Grafos de Ataque y análisis de Choke Points | `--no-attack-chain` |
 
 ### Ejemplos combinados
 
@@ -220,6 +224,8 @@ El escaner esta organizado en modulos independientes dentro de la carpeta `scann
 | `waf_detector.py` | Detección de WAFs con firmas activas/pasivas y Circuit Breaker adaptativo | -- |
 | `openapi_scanner.py` | Auditoría de contratos de API REST (OpenAPI 3.x / Swagger 2.0) | Alto/Medio |
 | `async_engine.py` | Motor DAST asíncrono ultra-rápido basado en `httpx` + `asyncio` | -- |
+| `iast_agent.py` | Agente ASGI/WSGI IAST/RASP con instrumentación en memoria y defensa activa (HTTP 403) | -- |
+| `attack_graph.py` | Orquestador DAG de Grafos de Ataque y cálculo de Choke Points defensivos | -- |
 
 ---
 
@@ -420,7 +426,9 @@ VulnScanner/
 │   ├── websocket.py
 │   ├── waf_detector.py
 │   ├── openapi_scanner.py
-│   └── async_engine.py
+│   ├── async_engine.py
+│   ├── iast_agent.py
+│   └── attack_graph.py
 │
 ├── utils/                   # Utilidades del escaner
 │   ├── report.py            # Generacion de reportes HTML y JSON
@@ -430,7 +438,7 @@ VulnScanner/
 │
 ├── models/                  # Modelo de IA entrenado (generado por train_ai.py)
 ├── reports/                 # Reportes HTML, JSON y base de datos SQLite
-├── tests/                   # Suite de pruebas unitarias e integracion (200 pruebas)
+├── tests/                   # Suite de pruebas unitarias e integracion (208 pruebas)
 │   ├── test_vulnscanner.py
 │   ├── test_integration.py
 │   ├── test_accuracy.py
@@ -438,7 +446,9 @@ VulnScanner/
 │   ├── test_nextlevel_features.py
 │   ├── test_waf_detector.py
 │   ├── test_openapi_scanner.py
-│   └── test_async_engine.py
+│   ├── test_async_engine.py
+│   ├── test_iast_rasp.py
+│   └── test_attack_graph.py
 └── .github/workflows/       # CI/CD pipelines
     ├── ci.yml
     └── release.yml
