@@ -229,6 +229,27 @@
             "type": "boolean",
             "title": "Headless Login",
             "default": false
+          },
+          "openapi_spec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Openapi Spec"
+          },
+          "use_async_engine": {
+            "type": "boolean",
+            "title": "Use Async Engine",
+            "default": false
+          },
+          "no_waf_detect": {
+            "type": "boolean",
+            "title": "No Waf Detect",
+            "default": false
           }
         },
         "type": "object",

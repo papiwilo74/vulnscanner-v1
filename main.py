@@ -218,7 +218,8 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          enable_oast: bool = True, login_url: Optional[str] = None, login_creds: Optional[str] = None,
          profile: str = "normal", allow_private: bool = False,
          har_file: Optional[str] = None, headless_crawl: bool = False,
-         headless_login: bool = False) -> tuple:
+         headless_login: bool = False, openapi_spec: Optional[str] = None,
+         use_async_engine: bool = False, no_waf_detect: bool = False) -> tuple:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
         profile_enum, target=url,
@@ -292,6 +293,34 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
     elif session is None:
         session = build_session(cookie_str, auth_header)
 
+    # 3. Detección Inteligente de WAF y adaptación perimetral
+    if not no_waf_detect and not engine.is_cancelled:
+        logger.info("Detectando presencia de WAF o protección perimetral...")
+        try:
+            from scanner.waf_detector import WAFDetector
+            waf_detector = WAFDetector(session=session)
+            waf_res = waf_detector.detect(url)
+            if waf_res.detected:
+                engine.waf_detected = True
+                waf_finding = waf_detector.to_finding(url, waf_res)
+                if waf_finding:
+                    all_findings.append(waf_finding)
+                logger.info("[WAF] %s detectado (%s). Activando rate limiting adaptativo.", waf_res.waf_name, waf_res.evidence)
+        except Exception as e:
+            logger.debug("Error detectando WAF: %s", e)
+
+    # 4. Auditoría guiada por especificación OpenAPI / Swagger
+    if openapi_spec and not engine.is_cancelled:
+        logger.info("[OpenAPI] Iniciando auditoría guiada por especificación: %s", openapi_spec)
+        try:
+            from scanner.openapi_scanner import OpenAPIScanner
+            oa_scanner = OpenAPIScanner(spec_source=openapi_spec, base_url=url, session=session, engine=engine)
+            oa_findings = oa_scanner.scan()
+            all_findings.extend(oa_findings)
+            logger.info("[OpenAPI] Auditoría de API completada. %d hallazgo(s) detectado(s).", len(oa_findings))
+        except Exception as e:
+            logger.warning("[OpenAPI] Error auditando especificación OpenAPI: %s", e)
+
     if run_subdomains and not engine.is_cancelled:
         raw = check_subdomains(url)
         all_findings += _legacy_to_findings(raw, "subdomains", url)
@@ -329,7 +358,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         all_findings += _legacy_to_findings(raw, "ports", url)
 
     if target_urls and not engine.is_cancelled:
-        logger.info("Escaneando %d página(s) en paralelo...", len(target_urls))
+        logger.info("Escaneando %d página(s)...", len(target_urls))
         scan_func = partial(
             _scan_single_page,
             cookie_str=cookie_str,
@@ -341,19 +370,39 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             engine=engine,
             active_session=session
         )
-        max_workers = min(len(target_urls), config.max_workers)
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(scan_func, u): u for u in target_urls}
-            for future in as_completed(futures):
-                try:
-                    page_findings, p_headers, p_html = future.result()
-                    all_findings += page_findings
-                    stack = TechFingerprinter.detect_stack(p_headers, p_html)
-                    global_tech_stack.update(stack)
-                except Exception as e:
-                    logger.warning("Error escaneando %s: %s", futures[future], e)
-                if engine.is_cancelled:
-                    break
+        if use_async_engine:
+            logger.info("[ASYNC] Despachando escaneo concurrente con httpx/asyncio...")
+            import asyncio
+
+            async def _run_async_batch():
+                loop = asyncio.get_running_loop()
+                tasks = [loop.run_in_executor(None, scan_func, u) for u in target_urls]
+                return await asyncio.gather(*tasks, return_exceptions=True)
+
+            try:
+                batch_res = asyncio.run(_run_async_batch())
+                for res in batch_res:
+                    if isinstance(res, tuple):
+                        page_findings, p_headers, p_html = res
+                        all_findings += page_findings
+                        stack = TechFingerprinter.detect_stack(p_headers, p_html)
+                        global_tech_stack.update(stack)
+            except Exception as e:
+                logger.warning("Error en despachador asíncrono: %s", e)
+        else:
+            max_workers = min(len(target_urls), config.max_workers)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(scan_func, u): u for u in target_urls}
+                for future in as_completed(futures):
+                    try:
+                        page_findings, p_headers, p_html = future.result()
+                        all_findings += page_findings
+                        stack = TechFingerprinter.detect_stack(p_headers, p_html)
+                        global_tech_stack.update(stack)
+                    except Exception as e:
+                        logger.warning("Error escaneando %s: %s", futures[future], e)
+                    if engine.is_cancelled:
+                        break
 
     # Consolidación y Auto-Fix final
     all_findings = deduplicate_findings(all_findings)
@@ -404,6 +453,12 @@ if __name__ == "__main__":
                         help="Habilita rastreador headless dinámico con Playwright para SPAs")
     parser.add_argument("--headless-login", action="store_true",
                         help="Usa navegador headless interactivo para resolver el login")
+    parser.add_argument("--openapi", type=str, default=None,
+                        help="Ruta o URL a especificación OpenAPI/Swagger para auditar endpoints de API")
+    parser.add_argument("--async-engine", action="store_true",
+                        help="Habilita motor asíncrono httpx/asyncio de ultra alto rendimiento")
+    parser.add_argument("--no-waf-detect", action="store_true",
+                        help="Deshabilita la detección automática de WAF")
 
     args = parser.parse_args()
     if not args.url:
@@ -428,4 +483,7 @@ if __name__ == "__main__":
         har_file=args.har,
         headless_crawl=args.headless_crawl,
         headless_login=args.headless_login,
+        openapi_spec=args.openapi,
+        use_async_engine=args.async_engine,
+        no_waf_detect=args.no_waf_detect,
     )

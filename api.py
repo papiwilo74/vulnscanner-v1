@@ -109,6 +109,9 @@ class ScanRequest(BaseModel):
     har_file: Optional[str] = None
     headless_crawl: bool = False
     headless_login: bool = False
+    openapi_spec: Optional[str] = None
+    use_async_engine: bool = False
+    no_waf_detect: bool = False
 
 
 def run_scan_in_background(task_id: str, req: ScanRequest):
@@ -141,6 +144,9 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
             har_file=req.har_file,
             headless_crawl=req.headless_crawl,
             headless_login=req.headless_login,
+            openapi_spec=req.openapi_spec,
+            use_async_engine=req.use_async_engine,
+            no_waf_detect=req.no_waf_detect,
         )
         if report_data and "error" in report_data:
             raise RuntimeError(report_data["error"])

@@ -1,4 +1,4 @@
-﻿# Arquitectura y Diseño Técnico de VulnScanner
+# Arquitectura y Diseño Técnico de VulnScanner
 
 Este documento detalla la arquitectura interna, los flujos de ejecución, los mecanismos de seguridad operacional y las especificaciones de datos de **VulnScanner**.
 
@@ -133,3 +133,33 @@ docker compose run --rm cli https://target.local --stealth --no-open
 
 ### Modelo Kubernetes CronJob (Auditorías Programadas)
 Para escaneos periódicos en clústeres empresariales, se recomienda desplegar la imagen como un `CronJob` que ejecute el CLI con salida hacia un bucket S3 o volumen compartido montado en `/reports`.
+
+---
+
+## 7. Detección Inteligente de WAF y Circuit Breaker (`scanner/waf_detector.py`)
+
+Para operar de forma fiable contra infraestructuras protegidas por WAFs comerciales (Cloudflare, AWS WAF, Akamai, Imperva, ModSecurity, F5), el motor implementa detección de firmas pasivas y activas:
+
+- **Sondeo Perimetral:** Identifica cabeceras (`cf-ray`, `x-amzn-requestid`), cookies (`__cfduid`, `awselb`, `incap_ses`) y códigos de bloqueo.
+- **Circuit Breaker:** Si el servidor objetivo o WAF devuelve códigos `429 Too Many Requests` o `503 Service Unavailable`, el motor transiciona de `CLOSED` a `OPEN`, aplicando un backoff exponencial y reduciendo dinámicamente la tasa de peticiones por segundo (`current_rps = max(1, current_rps * 0.5)`). Tras la ventana de enfriamiento, el circuito pasa a `HALF-OPEN` y se reanuda de manera cautelosa hasta volver a `CLOSED`.
+
+---
+
+## 8. Escaneo Guiado por Especificaciones API (`scanner/openapi_scanner.py`)
+
+Permite auditar Microservicios y APIs REST sin depender de rastreadores HTML:
+- **Soporte de Estándares:** OpenAPI 3.0 / 3.1 y Swagger 2.0 (remoto o archivo local).
+- **Mapeo OWASP API Security Top 10:**
+  - **API1:2023 BOLA / IDOR:** Pruebas automáticas de parámetros de ruta identificadores (`{id}`).
+  - **API2:2023 Broken Authentication:** Detección de operaciones mutables (`POST`, `PUT`, `DELETE`) expuestas sin esquemas de seguridad.
+  - **API8:2023 Security Misconfiguration:** Fuzzing con JSON malformado para detectar fugas de trazas internas o errores HTTP 500.
+  - **Inyecciones en Parámetros:** Fuzzing controlado de parámetros query con firmas de bases de datos.
+
+---
+
+## 9. Motor Asíncrono de Ultra Alto Rendimiento (`scanner/async_engine.py`)
+
+Para entornos donde el rendimiento y la velocidad de escaneo son prioritarios, el flag `--async-engine` activa el motor basado en `httpx.AsyncClient` y `asyncio`:
+- **Conexiones Concurrentes No Bloqueantes:** Controladas mediante `asyncio.Semaphore` con pooling de conexiones HTTP/1.1 y HTTP/2.
+- **Espaciamiento No Bloqueante:** Implementa rate limiting asíncrono y pausas de Circuit Breaker con `asyncio.sleep()`, multiplicando el rendimiento por 10x-20x frente a pools de hilos tradicionales.
+

@@ -103,6 +103,20 @@ class ScanEngine:
         self._request_log: list[dict] = []
         self._ratelimit_window_start: float = time.monotonic()
         self._ratelimit_count: int = 0
+        self.adaptive_rate_limiting: bool = True
+        self.waf_detected: bool = False
+        self._current_rps: float = float(self.config.max_rps)
+        self._circuit_state: str = "CLOSED"  # "CLOSED", "OPEN", "HALF-OPEN"
+        self._consecutive_throttles: int = 0
+        self._circuit_open_until: float = 0.0
+
+    @property
+    def current_rps(self) -> float:
+        return self._current_rps
+
+    @property
+    def circuit_state(self) -> str:
+        return self._circuit_state
 
     @property
     def request_count(self) -> int:
@@ -159,6 +173,31 @@ class ScanEngine:
                 return False
         return True
 
+    def handle_response(self, status: Optional[int], headers: Optional[dict] = None) -> None:
+        """Adapta el ritmo de peticiones segun codigos de estado del servidor o WAF."""
+        if not self.adaptive_rate_limiting or status is None:
+            return
+
+        now = time.monotonic()
+        with self._lock:
+            if status in (429, 503):
+                self._consecutive_throttles += 1
+                backoff = min(10.0, 1.5 * (2 ** (self._consecutive_throttles - 1)))
+                self._circuit_state = "OPEN"
+                self._circuit_open_until = now + backoff
+                self._current_rps = max(1.0, self._current_rps * 0.5)
+                log.warning(
+                    "[CircuitBreaker] Servidor devolvio HTTP %d. Circuito ABIERTO por %.1fs. RPS reducido a %.1f",
+                    status, backoff, self._current_rps
+                )
+            elif 200 <= status < 400:
+                if self._circuit_state == "OPEN" and now >= self._circuit_open_until:
+                    self._circuit_state = "HALF-OPEN"
+                elif self._circuit_state == "HALF-OPEN":
+                    self._circuit_state = "CLOSED"
+                    self._consecutive_throttles = 0
+                    self._current_rps = min(float(self.config.max_rps), self._current_rps + 1.0)
+
     def record_request(self, url: str, method: str = "GET", status: Optional[int] = None) -> None:
         with self._lock:
             self._request_count += 1
@@ -166,19 +205,31 @@ class ScanEngine:
                 "url": url, "method": method, "status": status,
                 "timestamp": time.time(),
             })
+        if status is not None:
+            self.handle_response(status)
 
     def ratelimit(self) -> None:
-        if self.config.max_rps <= 0:
+        target_rps = self._current_rps if self.adaptive_rate_limiting else float(self.config.max_rps)
+        if target_rps <= 0:
             return
+
         now = time.monotonic()
         with self._lock:
+            # Si el circuito esta abierto debido a throttling reciente, esperar el enfriamiento
+            if self._circuit_state == "OPEN":
+                if now < self._circuit_open_until:
+                    wait_time = self._circuit_open_until - now
+                    time.sleep(wait_time)
+                    now = time.monotonic()
+                self._circuit_state = "HALF-OPEN"
+
             elapsed = now - self._ratelimit_window_start
             if elapsed >= 1.0:
                 self._ratelimit_window_start = now
                 self._ratelimit_count = 0
             self._ratelimit_count += 1
-            if self._ratelimit_count > self.config.max_rps:
-                sleep_time = 1.0 - elapsed + 0.05
+            if self._ratelimit_count > target_rps:
+                sleep_time = (1.0 / target_rps) if target_rps > 0 else 0.1
                 if sleep_time > 0:
                     time.sleep(sleep_time)
                     self._ratelimit_window_start = time.monotonic()
@@ -203,6 +254,9 @@ class ScanEngine:
             "total_requests": self._request_count,
             "duration_seconds": round(self.elapsed, 2),
             "max_rps": self.config.max_rps,
+            "current_rps": round(self._current_rps, 1),
+            "circuit_state": self._circuit_state,
+            "waf_detected": self.waf_detected,
             "cancelled": self._cancelled.is_set(),
         }
 

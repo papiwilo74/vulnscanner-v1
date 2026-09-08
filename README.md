@@ -1,21 +1,22 @@
-# VulnScanner v2.0 (Enterprise Edition)
+# VulnScanner v2.1 (Enterprise Edition)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/VulnScanner-v2.0.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.0 Enterprise" />
+  <img src="https://img.shields.io/badge/VulnScanner-v2.1.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.1 Enterprise" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/Release-v2.0.0-007EC6.svg?logo=github" alt="Release v2.0.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.1.0"><img src="https://img.shields.io/badge/Release-v2.1.0-007EC6.svg?logo=github" alt="Release v2.1.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict-blue.svg" alt="Mypy" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
   <a href="https://pypi.org/project/pip-audit/"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-200%20passing-brightgreen.svg" alt="200 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.0** es un escáner de vulnerabilidades web de nivel empresarial (DAST + SAST + IA), modular, con soporte de auto-remediación, análisis asíncrono y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
+> **VulnScanner v2.1** es un escáner de vulnerabilidades web de nivel empresarial (DAST + SAST + IA + API Security), con motor asíncrono ultra-rápido (`httpx`/`asyncio`), detección inteligente de WAFs con Circuit Breaker, auditoría de contratos OpenAPI/Swagger, soporte de auto-remediación y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
 
 ---
 
@@ -54,6 +55,9 @@ Disenada con enfoque **defensivo y educativo**. El modo `--stealth` aplica rate-
 
 | Modulo | Descripcion |
 |---|---|
+| **WAF Detection & Circuit Breaker** | Detección inteligente de WAFs (Cloudflare, AWS WAF, Akamai, Imperva...) con throttling adaptativo |
+| **OpenAPI / Swagger Scanner** | Auditoría basada en esquemas de API (Broken Auth, Fuzzing SQLi, Stack Trace Leaks) |
+| **Async I/O Engine** | Motor HTTP asíncrono ultra-rápido (`httpx` + `asyncio`) con pool de conexiones y semáforos |
 | **SSL/TLS** | Validez y expiracion de certificados, soporte a protocolos obsoletos |
 | **Headers HTTP** | Detecta ausencia de CSP, HSTS, X-Frame-Options, Referrer-Policy |
 | **Cookies** | Verifica flags `Secure`, `HttpOnly` y `SameSite` |
@@ -149,6 +153,9 @@ python main.py <URL> [OPCIONES]
 | `--har` | Importa una sesion grabada desde un archivo HTTP Archive | `--har session.har` |
 | `--headless-crawl` | Usa Playwright para descubrir rutas SPA y APIs dinamicas | `--headless-crawl` |
 | `--headless-login` | Usa navegador headless para login interactivo | `--headless-login` |
+| `--openapi <path/url>` | Audita endpoints a partir de especificación OpenAPI 3.x / Swagger 2.0 | `--openapi https://api.ejemplo.com/openapi.json` |
+| `--async-engine` | Habilita motor HTTP asíncrono ultra-rápido (`httpx` + `asyncio`) | `--async-engine` |
+| `--no-waf-detect` | Desactiva detección previa de WAFs y throttling adaptativo | `--no-waf-detect` |
 
 ### Ejemplos combinados
 
@@ -210,6 +217,9 @@ El escaner esta organizado en modulos independientes dentro de la carpeta `scann
 | `har_parser.py` | Importacion de sesiones desde archivos HAR | -- |
 | `headless_crawler.py` | Rastreo dinamico con Playwright/Chromium | -- |
 | `autofix.py` | Fingerprinting tecnologico y remediaciones accionables | -- |
+| `waf_detector.py` | Detección de WAFs con firmas activas/pasivas y Circuit Breaker adaptativo | -- |
+| `openapi_scanner.py` | Auditoría de contratos de API REST (OpenAPI 3.x / Swagger 2.0) | Alto/Medio |
+| `async_engine.py` | Motor DAST asíncrono ultra-rápido basado en `httpx` + `asyncio` | -- |
 
 ---
 
@@ -407,7 +417,10 @@ VulnScanner/
 │   ├── file_upload.py
 │   ├── prototype_pollution.py
 │   ├── graphql.py
-│   └── websocket.py
+│   ├── websocket.py
+│   ├── waf_detector.py
+│   ├── openapi_scanner.py
+│   └── async_engine.py
 │
 ├── utils/                   # Utilidades del escaner
 │   ├── report.py            # Generacion de reportes HTML y JSON
@@ -417,12 +430,15 @@ VulnScanner/
 │
 ├── models/                  # Modelo de IA entrenado (generado por train_ai.py)
 ├── reports/                 # Reportes HTML, JSON y base de datos SQLite
-├── tests/                   # Suite de pruebas unitarias e integracion
+├── tests/                   # Suite de pruebas unitarias e integracion (200 pruebas)
 │   ├── test_vulnscanner.py
 │   ├── test_integration.py
 │   ├── test_accuracy.py
 │   ├── test_advanced_features.py
-│   └── test_nextlevel_features.py
+│   ├── test_nextlevel_features.py
+│   ├── test_waf_detector.py
+│   ├── test_openapi_scanner.py
+│   └── test_async_engine.py
 └── .github/workflows/       # CI/CD pipelines
     ├── ci.yml
     └── release.yml
