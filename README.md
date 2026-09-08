@@ -1,22 +1,22 @@
-# VulnScanner v2.2 (Enterprise Edition)
+# VulnScanner v2.3 (Enterprise Edition)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/VulnScanner-v2.2.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.2 Enterprise" />
+  <img src="https://img.shields.io/badge/VulnScanner-v2.3.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.3 Enterprise" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.2.0"><img src="https://img.shields.io/badge/Release-v2.2.0-007EC6.svg?logo=github" alt="Release v2.2.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.3.0"><img src="https://img.shields.io/badge/Release-v2.3.0-007EC6.svg?logo=github" alt="Release v2.3.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict-blue.svg" alt="Mypy" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
   <a href="https://pypi.org/project/pip-audit/"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-208%20passing-brightgreen.svg" alt="208 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-211%20passing-brightgreen.svg" alt="211 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.2** es una plataforma integral de seguridad web de nivel empresarial que combina **DAST + SAST + IAST/RASP + ML + API Security**. Incorpora un agente híbrido de instrumentación en tiempo de ejecución con **defensa activa y bloqueo de ataques en memoria (RASP)**, un **orquestador de grafos de ataque** con cálculo de **Choke Points defensivos**, motor asíncrono ultra-rápido (`httpx`/`asyncio`), detección inteligente de WAFs con Circuit Breaker, auditoría OpenAPI/Swagger y reportes ejecutivos en HTML, JSON y SARIF v2.1.0.
+> **VulnScanner v2.3** es una plataforma integral de ciberdefensa y auditoría web de nivel empresarial que combina **DAST + SAST + IAST/RASP + ML + API Security + DevSecOps Autónomo**. Incorpora generación de **Reportes Ejecutivos en PDF** para CISOs con matrices de cumplimiento (PCI-DSS v4.0, ISO/IEC 27001), un bot de **Auto-Remediación DevSecOps con GitHub Pull Requests**, un **Panel Web SOC en Tiempo Real** vía WebSockets, agente híbrido RASP con bloqueo en memoria, grafos de ataque y motor asíncrono ultra-rápido.
 
 ---
 
@@ -55,6 +55,9 @@ Disenada con enfoque **defensivo y educativo**. El modo `--stealth` aplica rate-
 
 | Modulo | Descripcion |
 |---|---|
+| **Executive PDF Audit Report** | Reporte formal en PDF para comités CISO/Dirección con matrices de cumplimiento normativo (PCI-DSS v4.0, ISO/IEC 27001), calificación de seguridad (A+, A, B, C, F) y acta de firma |
+| **GitHub Auto-PR DevSecOps** | Bot autónomo que se conecta a la API de GitHub, crea ramas, aplica parches automáticos de seguridad y abre Pull Requests con análisis CVSS |
+| **Real-Time SOC Dashboard** | Consola web interactiva en vivo con WebSockets, velocímetro RPS, estado de Circuit Breaker, gráficas dinámicas y composición de Grafos de Ataque Mermaid |
 | **IAST / RASP Hybrid Agent** | Instrumentación en tiempo de ejecución de sinks (SQL, OS, Path Traversal) con **defensa activa y bloqueo en memoria (HTTP 403)** |
 | **Attack Graph & Choke Points** | Grafo Dirigido Acíclico (DAG) de progresión de ataque con cálculo matemático de **Choke Points defensivos** |
 | **WAF Detection & Circuit Breaker** | Detección inteligente de WAFs (Cloudflare, AWS WAF, Akamai, Imperva...) con throttling adaptativo |
@@ -161,7 +164,12 @@ python main.py <URL> [OPCIONES]
 | `--no-waf-detect` | Desactiva detección previa de WAFs y throttling adaptativo | `--no-waf-detect` |
 | `--iast-url <url>` | Correlaciona con agente IAST/RASP en tiempo de ejecución (archivo y línea de código) | `--iast-url http://localhost:8000` |
 | `--no-attack-chain` | Desactiva el modelado de Grafos de Ataque y análisis de Choke Points | `--no-attack-chain` |
-| `--full`, `--all` | **Modo Todo-en-Uno**: activa crawling (10 págs), subdominios, stealth, WAF, grafos y auto-OpenAPI | `--full` |
+| `--pdf` | Genera Reporte Ejecutivo formal en PDF para comités CISO/Dirección | `--pdf` |
+| `--auto-pr` | Crea y abre automáticamente un Pull Request de remediación en GitHub | `--auto-pr` |
+| `--github-repo` | Repositorio GitHub en formato `owner/repo` para Auto-PR | `--github-repo papiwilo74/app` |
+| `--github-token` | Token de acceso personal (PAT) de GitHub para Auto-PR | `--github-token ghp_xxxx` |
+| `--base-branch` | Rama base sobre la cual abrir el Pull Request (defecto: `main`) | `--base-branch main` |
+| `--full`, `--all` | **Modo Todo-en-Uno**: activa crawling (10 págs), subdominios, stealth, WAF, grafos, PDF y auto-OpenAPI | `--full` |
 
 ### Ejemplos Prácticos de Escaneo
 
@@ -251,11 +259,14 @@ python -m uvicorn api:app --host 0.0.0.0 --port 8000
 
 | Endpoint | Metodo | Descripcion |
 |---|---|---|
-| `/` | GET | Estado del servicio |
-| `/scan` | POST | Iniciar escaneo en background, devuelve `task_id` |
+| `/` | GET | Estado del servicio y catálogo de estándares soportados |
+| `/dashboard` | GET | **Real-Time Web SOC Dashboard** con streaming WebSocket |
+| `/ws/scan/{task_id}` | WS | Canal WebSocket para telemetría en vivo y hallazgos en tiempo real |
+| `/download` | GET | Descarga segura de reportes generados (`.html`, `.json`, `.sarif`, `.pdf`) |
+| `/scan` | POST | Iniciar escaneo en background, devuelve `task_id` y `websocket_url` |
 | `/scan/{task_id}` | GET | Estado y resultados de una tarea |
 | `/scans` | GET | Historial completo de escaneos |
-| `/docs` | GET | Documentacion interactiva Swagger |
+| `/docs` | GET | Documentacion interactiva Swagger / OpenAPI |
 
 Las tareas persisten en SQLite (`reports/tasks.db`), sobreviviendo reinicios del servidor.
 
@@ -263,8 +274,9 @@ Las tareas persisten en SQLite (`reports/tasks.db`), sobreviviendo reinicios del
 
 ## Reportes Generados
 
-Al finalizar cada escaneo se generan **tres reportes** en la carpeta `reports/`:
+Al finalizar cada escaneo se generan **cuatro formatos de reporte** en la carpeta `reports/`:
 
+- **`reporte_*.pdf`** — **Reporte Ejecutivo Formal** para comités de seguridad y CISOs con matrices de cumplimiento normativo (PCI-DSS v4.0, ISO/IEC 27001, OWASP Top 10), calificación global de seguridad (A+, A, B, C, F) y acta de firma de auditoría.
 - **`reporte_*.html`** — Dashboard visual interactivo con modo oscuro/claro, filtros por severidad y recomendaciones de remediacion.
 - **`reporte_*.json`** — Datos estructurados para integracion con pipelines CI/CD, dashboards SOC o bases de datos.
 - **`reporte_*.sarif`** — Reporte OASIS SARIF v2.1.0 para GitHub Code Scanning, GitLab, Azure DevOps y herramientas ASPM.

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from colorama import Fore, init
 
 from scanner.models import VULN_STANDARDS_DB
+from utils.pdf_report import generate_pdf_report
 from utils.sarif import generate_sarif_v210
 
 init(autoreset=True)
@@ -960,7 +961,7 @@ def generate_sarif_report(url: str, findings: list, duration: float = 0.0) -> di
     return generate_sarif_v210(url, findings, duration)
 
 
-def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=None):
+def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=None, generate_pdf=False):
     from scanner.models import deduplicate_findings
 
     is_finding_list = all_results and hasattr(all_results[0], 'to_dict')
@@ -1010,6 +1011,7 @@ def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=N
         html_path = generate_html_report(url, all_results, duration)
         _logger.info("Reporte HTML generado: %s", html_path)
         sarif_path = _save_sarif_report(url, all_results, duration)
+        pdf_path = _save_pdf_report(url, all_results, duration, engine_summary) if generate_pdf else None
         json_path, report_data = _save_json_report(
             url,
             risk_counts,
@@ -1017,6 +1019,7 @@ def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=N
             duration,
             engine_summary,
             sarif_path=sarif_path,
+            pdf_path=pdf_path,
         )
         if not no_open:
             _open_report(html_path)
@@ -1049,6 +1052,7 @@ def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=N
     _logger.info("Reporte HTML generado: %s", html_path)
 
     sarif_path = _save_sarif_report(url, all_results, duration)
+    pdf_path = _save_pdf_report(url, all_results, duration, engine_summary) if generate_pdf else None
     json_path, report_data = _save_json_report(
         url,
         risk_counts,
@@ -1056,12 +1060,57 @@ def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=N
         duration,
         engine_summary,
         sarif_path=sarif_path,
+        pdf_path=pdf_path,
     )
 
     if not no_open:
         _open_report(html_path)
 
     return html_path, json_path, report_data
+
+
+def _save_pdf_report(url: str, findings: list, duration: float, engine_summary=None) -> str:
+    try:
+        from scanner.models import Finding
+        parsed_url = urlparse(url)
+        safe_domain = (parsed_url.netloc or "localhost").replace(":", "_").replace(".", "_")
+        pdf_filename = f"reporte_{safe_domain}_{int(time.time())}.pdf"
+        reports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "reports")
+        os.makedirs(reports_dir, exist_ok=True)
+        pdf_path = os.path.join(reports_dir, pdf_filename)
+
+        # Convertir a objetos Finding si son diccionarios legados
+        finding_objs: list[Finding] = []
+        for f in findings:
+            if isinstance(f, Finding):
+                finding_objs.append(f)
+            elif isinstance(f, dict):
+                finding_objs.append(Finding(
+                    title=f.get("vuln") or f.get("title") or "Vulnerabilidad",
+                    severity=f.get("severity") or "info",
+                    category=f.get("category") or "general",
+                    affected_url=f.get("url") or url,
+                    description=f.get("detail") or f.get("description") or "",
+                    remediation=f.get("remediation") or "",
+                    cwe_id=f.get("cwe_id") or "",
+                    mitre_attack_id=f.get("mitre_attack_id") or "",
+                    cvss_score=f.get("cvss_score", 0.0),
+                ))
+
+        profile_val = engine_summary.get("profile", "normal") if engine_summary else "normal"
+        generate_pdf_report(
+            target_url=url,
+            findings=finding_objs,
+            output_path=pdf_path,
+            duration=duration,
+            scan_profile=profile_val,
+            engine_summary=engine_summary,
+        )
+        _logger.info("Reporte Ejecutivo PDF generado: %s", pdf_path)
+        return pdf_path
+    except Exception as e:
+        _logger.warning("No se pudo generar el reporte PDF: %s", e)
+        return ""
 
 
 def _save_json_report(
@@ -1071,6 +1120,7 @@ def _save_json_report(
     duration: float,
     engine_summary=None,
     sarif_path: str = "",
+    pdf_path: str | None = None,
 ) -> tuple:
     json_path = None
     report_data = {
@@ -1079,6 +1129,7 @@ def _save_json_report(
         "duration_seconds": round(duration, 2),
         "engine": engine_summary or {},
         "sarif_report_path": sarif_path,
+        "pdf_report_path": pdf_path or "",
         "summary": {
             "Alto": counts.get("Alto", 0),
             "Medio": counts.get("Medio", 0),

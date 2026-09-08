@@ -4,3 +4,4 @@ scikit-learn>=1.0
 joblib>=1.1
 fastapi>=0.100.0
 uvicorn>=0.20.0
+reportlab>=4.0.0

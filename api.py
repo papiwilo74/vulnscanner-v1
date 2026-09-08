@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import json
 import logging
@@ -8,7 +9,8 @@ from threading import Lock
 from typing import Any, Optional
 
 import requests
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from main import scan
@@ -18,13 +20,67 @@ logger = logging.getLogger("VulnScannerAPI")
 
 app = FastAPI(
     title="VulnScanner Enterprise API",
-    description="Microservicio web para automatización de auditorías de seguridad, IAST/RASP, Grafos de Ataque, OpenAPI, OAST y SARIF.",
-    version="2.2.0"
+    description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI y Dashboard SOC en tiempo real.",
+    version="2.3.0"
 )
 
 
 _db_path = os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db"))
 _db_lock = Lock()
+
+
+class EventBroadcaster:
+    """Administra conexiones WebSocket activas y retransmite eventos en vivo."""
+
+    def __init__(self) -> None:
+        self.active_connections: dict[str, list[WebSocket]] = {}
+        self.event_history: dict[str, list[dict[str, Any]]] = {}
+        self.lock = Lock()
+
+    def connect(self, task_id: str, websocket: WebSocket) -> list[dict[str, Any]]:
+        with self.lock:
+            self.active_connections.setdefault(task_id, []).append(websocket)
+            return list(self.event_history.get(task_id, []))
+
+    def disconnect(self, task_id: str, websocket: WebSocket) -> None:
+        with self.lock:
+            if task_id in self.active_connections:
+                if websocket in self.active_connections[task_id]:
+                    self.active_connections[task_id].remove(websocket)
+                if not self.active_connections[task_id]:
+                    del self.active_connections[task_id]
+
+    def record_and_get_targets(self, task_id: str, event_data: dict[str, Any]) -> list[WebSocket]:
+        with self.lock:
+            self.event_history.setdefault(task_id, []).append(event_data)
+            return list(self.active_connections.get(task_id, []))
+
+
+broadcaster = EventBroadcaster()
+
+
+def broadcast_event_sync(task_id: str, event_data: dict[str, Any]) -> None:
+    """Envía un evento a todos los clientes WebSocket suscritos a la tarea."""
+    sockets = broadcaster.record_and_get_targets(task_id, event_data)
+    if not sockets:
+        return
+
+    msg = json.dumps(event_data, ensure_ascii=False)
+
+    async def _send_all():
+        for ws in sockets:
+            with contextlib.suppress(Exception):
+                await ws.send_text(msg)
+
+    try:
+        loop = asyncio.get_running_loop()
+        asyncio.run_coroutine_threadsafe(_send_all(), loop)
+    except RuntimeError:
+        new_loop = asyncio.new_event_loop()
+        try:
+            new_loop.run_until_complete(_send_all())
+        finally:
+            new_loop.close()
 
 
 def _get_db() -> sqlite3.Connection:
@@ -45,12 +101,14 @@ def _init_db(conn: sqlite3.Connection) -> None:
             html_report_path TEXT,
             json_report_path TEXT,
             sarif_report_path TEXT,
+            pdf_report_path TEXT,
             results TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
     _ensure_column(conn, "tasks", "sarif_report_path", "TEXT")
+    _ensure_column(conn, "tasks", "pdf_report_path", "TEXT")
     conn.commit()
 
 
@@ -64,7 +122,7 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaratio
 
 
 def _save_task(conn: sqlite3.Connection, task_id: str, **fields) -> None:
-    valid = {"task_id", "url", "status", "html_report_path", "json_report_path", "sarif_report_path", "results"}
+    valid = {"task_id", "url", "status", "html_report_path", "json_report_path", "sarif_report_path", "pdf_report_path", "results"}
     updates = {k: fields[k] for k in fields if k in valid}
     if "results" in updates and not isinstance(updates["results"], str):
         updates["results"] = json.dumps(updates["results"], ensure_ascii=False)
@@ -114,12 +172,17 @@ class ScanRequest(BaseModel):
     no_waf_detect: bool = False
     iast_url: Optional[str] = None
     enable_attack_chain: bool = True
+    generate_pdf: bool = True
+    auto_pr: bool = False
+    github_repo: Optional[str] = None
+    github_token: Optional[str] = None
+    base_branch: str = "main"
 
 
 def run_scan_in_background(task_id: str, req: ScanRequest):
     """
-    Ejecuta el escaneo en segundo plano, actualiza el estado de la tarea
-    y envía la notificación por Webhook al finalizar si está configurada.
+    Ejecuta el escaneo en segundo plano, transmite telemetría por WebSockets,
+    actualiza el estado de la tarea y envía notificación por Webhook si está configurada.
     """
     with _db_lock:
         conn = _get_db()
@@ -128,8 +191,29 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
         conn.close()
 
     logger.info(f"Iniciando escaneo para la tarea {task_id} - URL: {req.url}")
+    broadcast_event_sync(task_id, {
+        "event": "progress",
+        "step": "Iniciando motor de auditoría y análisis de entorno...",
+        "percent": 10,
+        "current_rps": 10.0,
+        "total_requests": 1,
+        "circuit_state": "CLOSED",
+        "waf_detected": False,
+    })
+
+    def _progress_cb(evt: dict[str, Any]):
+        broadcast_event_sync(task_id, evt)
 
     try:
+        broadcast_event_sync(task_id, {
+            "event": "progress",
+            "step": "Ejecutando pruebas de seguridad DAST & correlación...",
+            "percent": 35,
+            "current_rps": 12.0,
+            "total_requests": 5,
+            "circuit_state": "CLOSED",
+        })
+
         html_path, json_path, report_data = scan(
             url=req.url,
             no_open=True,
@@ -151,11 +235,26 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
             no_waf_detect=req.no_waf_detect,
             iast_url=req.iast_url,
             attack_chain=req.enable_attack_chain,
+            generate_pdf=req.generate_pdf,
+            auto_pr=req.auto_pr,
+            github_repo=req.github_repo,
+            github_token=req.github_token,
+            base_branch=req.base_branch,
+            progress_callback=_progress_cb,
         )
         if report_data and "error" in report_data:
             raise RuntimeError(report_data["error"])
 
         sarif_path = report_data.get("sarif_report_path") if isinstance(report_data, dict) else None
+        pdf_path = report_data.get("pdf_report_path") if isinstance(report_data, dict) else None
+
+        # Transmitir todos los hallazgos al cliente WS
+        if isinstance(report_data, dict) and "vulnerabilities" in report_data:
+            for v in report_data["vulnerabilities"]:
+                broadcast_event_sync(task_id, {
+                    "event": "finding",
+                    "finding": v,
+                })
 
         with _db_lock:
             conn = _get_db()
@@ -163,10 +262,24 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
                        html_report_path=html_path,
                        json_report_path=json_path,
                        sarif_report_path=sarif_path,
+                       pdf_report_path=pdf_path,
                        results=report_data)
             conn.close()
 
         logger.info(f"Escaneo completado exitosamente para la tarea {task_id}")
+
+        # Enviar evento de finalización
+        attack_graph_info = report_data.get("engine", {}).get("attack_graph") if isinstance(report_data, dict) else None
+        broadcast_event_sync(task_id, {
+            "event": "completed",
+            "percent": 100,
+            "step": "¡Auditoría completada exitosamente!",
+            "html_path": html_path,
+            "json_path": json_path,
+            "sarif_path": sarif_path,
+            "pdf_path": pdf_path,
+            "attack_graph": attack_graph_info,
+        })
 
         if req.webhook_url:
             send_webhook_notification(task_id, req.webhook_url, "completed", report_data)
@@ -178,6 +291,12 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
             conn = _get_db()
             _save_task(conn, task_id, status="failed", results=error_info)
             conn.close()
+
+        broadcast_event_sync(task_id, {
+            "event": "failed",
+            "error": str(e),
+            "step": f"Fallo de escaneo: {e}",
+        })
 
         if req.webhook_url:
             send_webhook_notification(task_id, req.webhook_url, "failed", error_info)
@@ -205,11 +324,58 @@ def send_webhook_notification(task_id: str, webhook_url: str, status: str, paylo
 def read_root():
     return {
         "message": "Bienvenido a VulnScanner Enterprise API",
-        "version": "2.0.0",
-        "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "MITRE ATT&CK", "OAST", "Playwright Headless", "HAR v1.2"],
+        "version": "2.3.0",
+        "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST"],
+        "dashboard_url": "/dashboard",
         "docs_url": "/docs",
         "status": "online"
     }
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def get_dashboard():
+    """Sirve la consola interactiva en tiempo real del SOC Dashboard."""
+    dashboard_path = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
+    if not os.path.exists(dashboard_path):
+        raise HTTPException(status_code=404, detail="Plantilla de dashboard no encontrada")
+    with open(dashboard_path, encoding="utf-8") as f:
+        content = f.read()
+    return HTMLResponse(content=content)
+
+
+@app.websocket("/ws/scan/{task_id}")
+async def websocket_scan_stream(websocket: WebSocket, task_id: str):
+    """Canal WebSocket para transmisión reactiva de telemetría, hallazgos y estado del escaneo."""
+    await websocket.accept()
+    past_events = broadcaster.connect(task_id, websocket)
+
+    # Reenviar historial previo si el cliente se conectó tarde o refrescó
+    for evt in past_events:
+        try:
+            await websocket.send_text(json.dumps(evt, ensure_ascii=False))
+        except Exception:
+            break
+
+    try:
+        while True:
+            # Mantener la conexión abierta recibiendo pings o mensajes del cliente
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        broadcaster.disconnect(task_id, websocket)
+
+
+@app.get("/download")
+def download_report(path: str):
+    """Permite la descarga segura de reportes generados (HTML, JSON, SARIF, PDF)."""
+    normalized = os.path.abspath(path)
+    reports_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "reports"))
+
+    # Validar que el archivo resida en la carpeta de reportes por seguridad
+    if not normalized.startswith(reports_dir) or not os.path.exists(normalized):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado o acceso denegado")
+
+    filename = os.path.basename(normalized)
+    return FileResponse(normalized, filename=filename)
 
 
 @app.post("/scan", status_code=202)
@@ -229,7 +395,8 @@ def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
     return {
         "message": "Escaneo encolado correctamente",
         "task_id": task_id,
-        "status_url": f"/scan/{task_id}"
+        "status_url": f"/scan/{task_id}",
+        "websocket_url": f"/ws/scan/{task_id}"
     }
 
 

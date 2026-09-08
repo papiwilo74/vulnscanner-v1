@@ -190,3 +190,33 @@ Supera las limitaciones de los escáneres que reportan vulnerabilidades aisladas
 - **Cálculo de Choke Points Defensivos:** Aplica análisis de caminos y centralidad de grafos para identificar los nodos de estrangulamiento donde una sola contramedida defensiva (ej. parametrización estricta o validación de tokens) corta el mayor número de rutas de escalamiento hacia impactos críticos.
 - **Visualización Interactiva:** Genera sintaxis Mermaid (`graph LR`) con nodos destacados para visualización directa en dashboards y reportes.
 
+---
+
+## 12. Generador de Reportes Ejecutivos PDF (`utils/pdf_report.py`)
+
+Para auditorías formales ante comités directivos y CISOs, el módulo produce reportes en formato PDF con diseño corporativo y rigurosidad técnica:
+- **Calificación Global de Seguridad:** Algoritmo ponderado (A+, A, B, C, F) basado en conteo de hallazgos críticos y altos.
+- **Matrices de Cumplimiento Normativo:** Mapeo automático contra PCI-DSS v4.0 (Req 6.4.1), ISO/IEC 27001 (A.8.20/A.8.26) y OWASP Top 10.
+- **Desglose CVSS v3.1 y CWE:** Catálogo de hallazgos con severidad, impacto y remediaciones sugeridas.
+- **Acta Formal de Cierre:** Bloque de firma para conformidad de auditoría entre el auditor líder y el responsable de sistemas.
+
+---
+
+## 13. Bot DevSecOps de Auto-Remediación con GitHub (`utils/github_pr.py`)
+
+Permite cerrar el ciclo de seguridad de forma autónoma (Auto-Remediation):
+- **Integración con GitHub REST API v3:** Se conecta de forma segura mediante Personal Access Token (PAT).
+- **Branching y Commits Automatizados:** Obtiene el SHA de la rama base (`main`), crea una rama aislada de remediación (`vulnscanner/remediation-*`) y aplica parches (`vercel.json`, middlewares o headers).
+- **Pull Request con Justificación Técnica:** Abre un Pull Request descriptivo detallando las vulnerabilidades mitigadas, puntajes CVSS v3.1, identificadores CWE y MITRE ATT&CK.
+
+---
+
+## 14. Real-Time Web SOC Dashboard (`api.py` + WebSockets + `templates/dashboard.html`)
+
+Proporciona una consola web operativa de ciberdefensa en tiempo real:
+- **Transmisión Bidireccional WebSocket:** Endpoint `/ws/scan/{task_id}` con retransmisión instantánea de eventos de progreso, velocidad en peticiones por segundo (RPS) y hallazgos descubiertos.
+- **Métricas Operacionales en Vivo:** Velocímetro de RPS, estado del Circuit Breaker (CLOSED, OPEN, HALF-OPEN), detección perimetral de WAF y calificación de seguridad en tiempo real.
+- **Renderizado Dinámico:** Gráfica de distribución de severidad con Chart.js y renderizado visual del Grafo de Ataque y Choke Points con Mermaid.js.
+- **Descargas Centralizadas:** Enlaces directos a reportes HTML, JSON, SARIF y PDF generados.
+
+

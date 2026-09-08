@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VulnScanner Enterprise — Real-Time SOC Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+                        soc: { dark: '#0b0f19', card: '#111827', border: '#1f2937', hover: '#1e293b' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+    </script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulse-live {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .live-dot {
+            animation: pulse-live 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0f19; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-soc-dark text-slate-100 font-sans min-h-screen flex flex-col antialiased">
+    <!-- Navbar -->
+    <header class="border-b border-soc-border bg-soc-card/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-shield-halved text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-none tracking-tight flex items-center gap-2">
+                        VulnScanner <span class="bg-indigo-500/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full font-mono border border-indigo-500/30">v2.3.0 SOC</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Panel de Operaciones de Ciberdefensa & Telemetría en Vivo</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div id="conn-badge" class="flex items-center space-x-2 text-xs font-mono bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
+                    <span id="conn-dot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 live-dot"></span>
+                    <span id="conn-text" class="text-slate-300">WebSocket: Conectado</span>
+                </div>
+                <a href="/docs" target="_blank" class="text-xs text-slate-400 hover:text-white transition flex items-center gap-1">
+                    <i class="fa-solid fa-book-open"></i> API Docs
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+        <!-- Scan Launcher Card -->
+        <section class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex-1">
+                    <label for="target-url" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Objetivo de Auditoría</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-globe"></i>
+                        </span>
+                        <input type="url" id="target-url" placeholder="https://ejemplo.com" value="https://www.orderflowapp.online/"
+                               class="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm placeholder-slate-500">
+                    </div>
+                </div>
+                <div class="flex items-end gap-3">
+                    <div>
+                        <label for="scan-profile" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Perfil</label>
+                        <select id="scan-profile" class="py-2.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500">
+                            <option value="normal" selected>Normal</option>
+                            <option value="aggressive">Agresivo</option>
+                            <option value="passive">Pasivo</option>
+                        </select>
+                    </div>
+                    <button id="btn-launch" onclick="launchScan()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
+                        <i class="fa-solid fa-play"></i> Iniciar Escaneo
+                    </button>
+                </div>
+            </div>
+            <!-- Progress Bar -->
+            <div id="progress-container" class="mt-5 hidden">
+                <div class="flex justify-between text-xs font-mono text-slate-400 mb-1">
+                    <span id="scan-step-text">Iniciando auditoría...</span>
+                    <span id="scan-percent-text">0%</span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div id="scan-progress-bar" class="bg-indigo-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SOC Metrics Row -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Speedometer / RPS -->
+            <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Velocidad Actual</span>
+                    <div class="text-2xl font-bold font-mono mt-1 flex items-baseline gap-1">
+                        <span id="metric-rps" class="text-indigo-400">0.0</span>
+                        <span class="text-xs text-slate-400 font-normal">req/s</span>
+                    </div>
+                    <span class="text-xs text-slate-400">Total: <span id="metric-total-req" class="text-slate-200">0</span> peticiones</span>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl">
+                    <i class="fa-solid fa-gauge-high"></i>
+                </div>
+            </div>
+            <!-- Circuit Breaker State -->
+            <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Circuit Breaker</span>
+                    <div class="text-xl font-bold font-mono mt-1">
+                        <span id="metric-circuit" class="text-emerald-400">CLOSED</span>
+                    </div>
+                    <span class="text-xs text-slate-400">WAF: <span id="metric-waf" class="text-slate-200">No detectado</span></span>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                    <i class="fa-solid fa-microchip"></i>
+                </div>
+            </div>
+            <!-- Critical & High Count -->
+            <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Amenazas Críticas / Altas</span>
+                    <div class="text-2xl font-bold font-mono mt-1">
+                        <span id="metric-high" class="text-rose-500">0</span>
+                    </div>
+                    <span class="text-xs text-slate-400">Medias: <span id="metric-med" class="text-amber-400">0</span> | Bajas: <span id="metric-low" class="text-cyan-400">0</span></span>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+            <!-- Security Grade -->
+            <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Calificación Global</span>
+                    <div class="text-3xl font-black font-mono mt-1">
+                        <span id="metric-grade" class="text-emerald-400">--</span>
+                    </div>
+                    <span class="text-xs text-slate-400">Estándar CVSS / CISO</span>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 text-xl">
+                    <i class="fa-solid fa-award"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Workspace: Findings Table & Attack Graph -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Real-time Findings Feed (2 Cols) -->
+            <div class="lg:col-span-2 bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-radar text-indigo-400"></i>
+                        <h2 class="font-bold text-base">Hallazgos en Tiempo Real</h2>
+                    </div>
+                    <div id="downloads-container" class="hidden flex items-center gap-2">
+                        <a id="btn-pdf" href="#" download class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-rose-400 flex items-center gap-1">
+                            <i class="fa-solid fa-file-pdf"></i> PDF
+                        </a>
+                        <a id="btn-html" href="#" target="_blank" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-indigo-400 flex items-center gap-1">
+                            <i class="fa-solid fa-file-code"></i> HTML
+                        </a>
+                        <a id="btn-sarif" href="#" download class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-emerald-400 flex items-center gap-1">
+                            <i class="fa-solid fa-shield"></i> SARIF
+                        </a>
+                    </div>
+                </div>
+                <div class="overflow-y-auto flex-1 max-h-[420px] space-y-3 pr-1" id="findings-list">
+                    <div class="text-center py-12 text-slate-500 text-sm">
+                        <i class="fa-solid fa-satellite-dish text-3xl mb-2 block opacity-40"></i>
+                        Esperando inicio de escaneo para transmitir telemetría en vivo...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Severity Chart & Attack Graph (1 Col) -->
+            <div class="space-y-6">
+                <!-- Severity Distribution Chart -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl">
+                    <h3 class="font-bold text-sm mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-pie text-indigo-400"></i> Distribución de Riesgo
+                    </h3>
+                    <div class="relative h-44 flex items-center justify-center">
+                        <canvas id="severityChart"></canvas>
+                    </div>
+                </div>
+                <!-- Attack Graph Preview -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl">
+                    <h3 class="font-bold text-sm mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-diagram-project text-indigo-400"></i> Grafo de Ataque & Choke Points
+                    </h3>
+                    <div id="mermaid-graph" class="overflow-x-auto text-xs font-mono bg-slate-900/60 p-3 rounded-xl border border-slate-800 min-h-[140px] flex items-center justify-center text-slate-500">
+                        El grafo se compondrá dinámicamente al finalizar la auditoría.
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-soc-border py-4 text-center text-xs text-slate-500">
+        VulnScanner Enterprise Edition v2.3.0 &copy; 2026 — DevSecOps, Real-Time SOC Dashboard & IAST/RASP Hybrid Defense.
+    </footer>
+
+    <!-- Frontend Script -->
+    <script>
+        let currentTaskId = null;
+        let ws = null;
+        let chartInstance = null;
+        let severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+
+        function initChart() {
+            const ctx = document.getElementById('severityChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Crítico', 'Alto', 'Medio', 'Bajo'],
+                    datasets: [{
+                        data: [0, 0, 0, 0],
+                        backgroundColor: ['#b91c1c', '#ef4444', '#f59e0b', '#06b6d4'],
+                        borderWidth: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+        initChart();
+
+        function connectWebSocket(taskId) {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${proto}//${window.location.host}/ws/scan/${taskId}`;
+            
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 live-dot';
+                document.getElementById('conn-text').textContent = 'WebSocket: Conectado (' + taskId.substring(0, 8) + ')';
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    handleSocketMessage(msg);
+                } catch(e) {
+                    console.error("Error procesando mensaje WS:", e);
+                }
+            };
+
+            ws.onclose = () => {
+                document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+                document.getElementById('conn-text').textContent = 'WebSocket: Desconectado';
+            };
+
+            ws.onerror = () => {
+                document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                document.getElementById('conn-text').textContent = 'WebSocket: Error';
+            };
+        }
+
+        function handleSocketMessage(msg) {
+            if (msg.event === 'progress') {
+                document.getElementById('scan-step-text').textContent = msg.step || 'Escaneando...';
+                const pct = Math.min(100, Math.max(0, msg.percent || 0));
+                document.getElementById('scan-percent-text').textContent = pct + '%';
+                document.getElementById('scan-progress-bar').style.width = pct + '%';
+
+                if (msg.current_rps) {
+                    document.getElementById('metric-rps').textContent = msg.current_rps.toFixed(1);
+                }
+                if (msg.total_requests) {
+                    document.getElementById('metric-total-req').textContent = msg.total_requests;
+                }
+                if (msg.circuit_state) {
+                    const cEl = document.getElementById('metric-circuit');
+                    cEl.textContent = msg.circuit_state;
+                    cEl.className = msg.circuit_state === 'CLOSED' ? 'text-emerald-400' : 'text-rose-400';
+                }
+                if (msg.waf_detected !== undefined) {
+                    document.getElementById('metric-waf').textContent = msg.waf_detected ? 'Detectado' : 'No detectado';
+                }
+            } else if (msg.event === 'finding') {
+                appendFinding(msg.finding);
+            } else if (msg.event === 'completed') {
+                document.getElementById('scan-percent-text').textContent = '100%';
+                document.getElementById('scan-progress-bar').style.width = '100%';
+                document.getElementById('scan-step-text').textContent = '¡Auditoría Finalizada!';
+                document.getElementById('btn-launch').disabled = false;
+                document.getElementById('btn-launch').innerHTML = '<i class="fa-solid fa-rotate-right"></i> Nuevo Escaneo';
+                
+                // Mostrar botones de descarga
+                const dc = document.getElementById('downloads-container');
+                dc.classList.remove('hidden');
+                if (msg.pdf_path) {
+                    document.getElementById('btn-pdf').href = '/download?path=' + encodeURIComponent(msg.pdf_path);
+                }
+                if (msg.html_path) {
+                    document.getElementById('btn-html').href = '/download?path=' + encodeURIComponent(msg.html_path);
+                }
+                if (msg.sarif_path) {
+                    document.getElementById('btn-sarif').href = '/download?path=' + encodeURIComponent(msg.sarif_path);
+                }
+
+                // Renderizar grafo si existe
+                if (msg.attack_graph && msg.attack_graph.mermaid_source) {
+                    const mContainer = document.getElementById('mermaid-graph');
+                    mContainer.innerHTML = `<pre class="mermaid">${msg.attack_graph.mermaid_source}</pre>`;
+                    mermaid.run({ nodes: [mContainer.querySelector('.mermaid')] });
+                }
+            }
+        }
+
+        function appendFinding(f) {
+            const list = document.getElementById('findings-list');
+            // Quitar placeholder inicial si existe
+            if (list.querySelector('.fa-satellite-dish')) {
+                list.innerHTML = '';
+            }
+
+            const sev = (f.severity || 'low').toLowerCase();
+            const colors = {
+                critical: { border: 'border-rose-500/40', badge: 'bg-rose-500/20 text-rose-400 border-rose-500/30', icon: 'fa-circle-radiation text-rose-400' },
+                high: { border: 'border-orange-500/40', badge: 'bg-orange-500/20 text-orange-400 border-orange-500/30', icon: 'fa-fire text-orange-400' },
+                medium: { border: 'border-amber-500/40', badge: 'bg-amber-500/20 text-amber-400 border-amber-500/30', icon: 'fa-triangle-exclamation text-amber-400' },
+                low: { border: 'border-cyan-500/40', badge: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30', icon: 'fa-circle-info text-cyan-400' },
+            }[sev] || { border: 'border-slate-700', badge: 'bg-slate-700 text-slate-300', icon: 'fa-info text-slate-400' };
+
+            // Actualizar contadores
+            if (severityCounts[sev] !== undefined) {
+                severityCounts[sev]++;
+                document.getElementById('metric-high').textContent = severityCounts.critical + severityCounts.high;
+                document.getElementById('metric-med').textContent = severityCounts.medium;
+                document.getElementById('metric-low').textContent = severityCounts.low;
+                
+                // Actualizar grade
+                const gEl = document.getElementById('metric-grade');
+                if (severityCounts.critical > 0 || severityCounts.high >= 3) {
+                    gEl.textContent = 'F'; gEl.className = 'text-rose-500';
+                } else if (severityCounts.high > 0) {
+                    gEl.textContent = 'C'; gEl.className = 'text-orange-500';
+                } else if (severityCounts.medium > 0) {
+                    gEl.textContent = 'B'; gEl.className = 'text-amber-400';
+                } else {
+                    gEl.textContent = 'A+'; gEl.className = 'text-emerald-400';
+                }
+
+                // Actualizar Chart
+                chartInstance.data.datasets[0].data = [
+                    severityCounts.critical,
+                    severityCounts.high,
+                    severityCounts.medium,
+                    severityCounts.low
+                ];
+                chartInstance.update();
+            }
+
+            const item = document.createElement('div');
+            item.className = `p-4 rounded-xl bg-slate-900/80 border ${colors.border} space-y-2 transition-all hover:bg-slate-800/80`;
+            item.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${colors.icon}"></i>
+                        <span class="font-semibold text-sm text-slate-200">${f.title || f.vuln || 'Vulnerabilidad'}</span>
+                    </div>
+                    <span class="text-xs px-2 py-0.5 rounded-full border font-mono uppercase ${colors.badge}">${sev}</span>
+                </div>
+                <p class="text-xs text-slate-400">${f.description || f.detail || ''}</p>
+                <div class="flex flex-wrap gap-3 text-[11px] text-slate-500 font-mono pt-1 border-t border-slate-800/60">
+                    <span>CWE: <b class="text-slate-400">${f.cwe_id || 'N/A'}</b></span>
+                    <span>MITRE: <b class="text-slate-400">${f.mitre_attack_id || 'N/A'}</b></span>
+                    <span>CVSS: <b class="text-slate-400">${(f.cvss_score || 0).toFixed(1)}</b></span>
+                </div>
+            `;
+            list.prepend(item);
+        }
+
+        async function launchScan() {
+            const urlInput = document.getElementById('target-url');
+            const targetUrl = urlInput.value.trim();
+            if (!targetUrl) {
+                alert("Por favor ingresa una URL válida.");
+                return;
+            }
+
+            const profile = document.getElementById('scan-profile').value;
+            const btn = document.getElementById('btn-launch');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Auditando...';
+
+            // Reset UI
+            severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+            document.getElementById('metric-high').textContent = '0';
+            document.getElementById('metric-med').textContent = '0';
+            document.getElementById('metric-low').textContent = '0';
+            document.getElementById('metric-grade').textContent = '--';
+            document.getElementById('findings-list').innerHTML = '';
+            document.getElementById('progress-container').classList.remove('hidden');
+            document.getElementById('downloads-container').classList.add('hidden');
+            document.getElementById('scan-progress-bar').style.width = '5%';
+            document.getElementById('scan-percent-text').textContent = '5%';
+            document.getElementById('scan-step-text').textContent = 'Conectando con el motor...';
+
+            chartInstance.data.datasets[0].data = [0, 0, 0, 0];
+            chartInstance.update();
+
+            try {
+                const res = await fetch('/scan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: targetUrl,
+                        profile: profile,
+                        generate_pdf: true,
+                    })
+                });
+                const data = await res.json();
+                if (data.task_id) {
+                    currentTaskId = data.task_id;
+                    connectWebSocket(currentTaskId);
+                } else {
+                    throw new Error("No se recibió task_id");
+                }
+            } catch(err) {
+                alert("Error al iniciar escaneo: " + err.message);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Escaneo';
+            }
+        }
+    </script>
+</body>
+</html>

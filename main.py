@@ -1,6 +1,7 @@
 import argparse
 import contextlib
 import logging
+import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
@@ -40,6 +41,7 @@ from scanner.subdomains import check_subdomains
 from scanner.websocket import check_websocket
 from scanner.xss import check_xss
 from scanner.xxe import check_xxe
+from utils.github_pr import GitHubPRClient
 from utils.renderer import is_playwright_available, render_page
 from utils.report import print_report
 from utils.stealth import apply_stealth_headers, polite_delay, stealth_check_delay
@@ -220,7 +222,11 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          har_file: Optional[str] = None, headless_crawl: bool = False,
          headless_login: bool = False, openapi_spec: Optional[str] = None,
          use_async_engine: bool = False, no_waf_detect: bool = False,
-         iast_url: Optional[str] = None, attack_chain: bool = True) -> tuple:
+         iast_url: Optional[str] = None, attack_chain: bool = True,
+         generate_pdf: bool = False, auto_pr: bool = False,
+         github_repo: Optional[str] = None, github_token: Optional[str] = None,
+         base_branch: str = "main",
+         progress_callback: Optional[Any] = None) -> tuple:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
         profile_enum, target=url,
@@ -429,22 +435,57 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             logger.info("[DEFENSA] Contramedida recomendada: %s", top_cp.recommended_defense)
         attack_graph_dict = attack_graph.to_dict()
 
+    # 7. Auto-Remediación DevSecOps con GitHub Pull Request
+    pr_result = None
+    if auto_pr and github_repo and github_token and all_findings:
+        try:
+            logger.info("[DevSecOps] Iniciando bot de auto-remediación para repositorio '%s'...", github_repo)
+            gh_client = GitHubPRClient(token=github_token, repo=github_repo)
+            pr_result = gh_client.auto_remediate_and_open_pr(
+                findings=all_findings,
+                target_url=url,
+                base_branch=base_branch,
+            )
+            if pr_result and "html_url" in pr_result:
+                logger.info("[DevSecOps] ✅ Pull Request de seguridad generado: %s", pr_result["html_url"])
+        except Exception as e:
+            logger.error("[DevSecOps] Error al crear Pull Request en GitHub: %s", e)
+
     engine_summary = engine.get_summary()
     if attack_graph_dict:
         engine_summary["attack_graph"] = attack_graph_dict
+    if pr_result:
+        engine_summary["github_pr"] = pr_result
     SCAN_STATS["total_requests"] = engine.request_count
 
-    return print_report(url, all_findings, engine.elapsed, no_open=no_open, engine_summary=engine_summary)
+    return print_report(
+        url,
+        all_findings,
+        engine.elapsed,
+        no_open=no_open,
+        engine_summary=engine_summary,
+        generate_pdf=generate_pdf,
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="VulnScanner Enterprise v2.2 — Escáner de vulnerabilidades web con IAST/RASP, Grafos de Ataque, OpenAPI y Motor Asíncrono",
-        epilog="Ejemplo: python main.py https://ejemplo.com --profile normal --crawl 5 --headless-crawl"
+        description="VulnScanner Enterprise v2.3 — Suite Empresarial con Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP y Grafos de Ataque",
+        epilog="Ejemplo: python main.py https://ejemplo.com --full --pdf --auto-pr --github-repo owner/repo"
     )
-    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.2.0")
+    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.3.0")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--no-open", action="store_true",
                         help="Evita abrir el reporte HTML automáticamente")
+    parser.add_argument("--pdf", action="store_true",
+                        help="Genera un Reporte Ejecutivo formal en PDF para comités CISO/Dirección")
+    parser.add_argument("--auto-pr", action="store_true",
+                        help="Genera automáticamente un Pull Request de remediación en GitHub con los parches aplicados")
+    parser.add_argument("--github-repo", type=str, default=os.environ.get("GITHUB_REPOSITORY"),
+                        help="Repositorio de GitHub en formato 'owner/repo' para Auto-PR")
+    parser.add_argument("--github-token", type=str, default=os.environ.get("GITHUB_TOKEN"),
+                        help="Token de acceso personal (PAT) de GitHub para Auto-PR")
+    parser.add_argument("--base-branch", type=str, default="main",
+                        help="Rama base en GitHub sobre la cual abrir el Pull Request (defecto: main)")
     parser.add_argument("--cookie", type=str, default=None,
                         help="Cookies de sesión en formato 'nombre=valor; nombre2=valor2'")
     parser.add_argument("--auth", type=str, default=None,
@@ -547,4 +588,9 @@ if __name__ == "__main__":
         no_waf_detect=args.no_waf_detect,
         iast_url=args.iast_url,
         attack_chain=not args.no_attack_chain,
+        generate_pdf=args.pdf or args.full,
+        auto_pr=args.auto_pr,
+        github_repo=args.github_repo,
+        github_token=args.github_token,
+        base_branch=args.base_branch,
     )
