@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import time
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 from colorama import Fore, init
@@ -698,7 +699,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
-def get_recommendation(vuln_name):
+def get_recommendation(vuln_name: str) -> str:
     vn = vuln_name.lower()
     if "x-frame-options" in vn:
         return "Configurar cabecera 'X-Frame-Options: DENY' o 'SAMEORIGIN' para mitigar Clickjacking."
@@ -768,7 +769,7 @@ def get_recommendation(vuln_name):
 SEVERITY_RISK_MAP = {"critical": "Alto", "high": "Alto", "medium": "Medio", "low": "Bajo", "info": "Bajo"}
 
 
-def _normalize_finding(r) -> dict:
+def _normalize_finding(r: Any) -> dict[str, Any]:
     """Convierte un Finding o dict legacy a un dict unificado con estándares de seguridad."""
     if hasattr(r, 'to_dict'):
         d = r.to_dict()
@@ -817,7 +818,7 @@ def _normalize_finding(r) -> dict:
     }
 
 
-def generate_html_report(url, all_results, duration):
+def generate_html_report(url: str, all_results: list[Any], duration: float) -> str:
     parsed_url = urlparse(url)
     domain = parsed_url.netloc or "localhost"
 
@@ -956,12 +957,19 @@ def generate_html_report(url, all_results, duration):
     return filepath
 
 
-def generate_sarif_report(url: str, findings: list, duration: float = 0.0) -> dict:
+def generate_sarif_report(url: str, findings: list[Any], duration: float = 0.0) -> dict[str, Any]:
     """Genera reporte en formato estándar OASIS SARIF v2.1.0."""
     return generate_sarif_v210(url, findings, duration)
 
 
-def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=None, generate_pdf=False):
+def print_report(
+    url: str,
+    all_results: list[Any],
+    duration: float = 0.0,
+    no_open: bool = False,
+    engine_summary: Optional[dict[str, Any]] = None,
+    generate_pdf: bool = False,
+) -> tuple[str, Optional[str], dict[str, Any]]:
     from scanner.models import deduplicate_findings
 
     is_finding_list = all_results and hasattr(all_results[0], 'to_dict')
@@ -1069,7 +1077,7 @@ def print_report(url, all_results, duration=0.0, no_open=False, engine_summary=N
     return html_path, json_path, report_data
 
 
-def _save_pdf_report(url: str, findings: list, duration: float, engine_summary=None) -> str:
+def _save_pdf_report(url: str, findings: list[Any], duration: float, engine_summary: Optional[dict[str, Any]] = None) -> str:
     try:
         from scanner.models import Finding
         parsed_url = urlparse(url)
@@ -1115,15 +1123,15 @@ def _save_pdf_report(url: str, findings: list, duration: float, engine_summary=N
 
 def _save_json_report(
     url: str,
-    counts: dict,
-    normalized: list,
+    counts: dict[str, int],
+    normalized: list[dict[str, Any]],
     duration: float,
-    engine_summary=None,
+    engine_summary: Optional[dict[str, Any]] = None,
     sarif_path: str = "",
     pdf_path: str | None = None,
-) -> tuple:
+) -> tuple[Optional[str], dict[str, Any]]:
     json_path = None
-    report_data = {
+    report_data: dict[str, Any] = {
         "target": url,
         "date": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
         "duration_seconds": round(duration, 2),
@@ -1152,7 +1160,7 @@ def _save_json_report(
     return json_path, report_data
 
 
-def _save_sarif_report(url: str, findings: list, duration: float) -> str:
+def _save_sarif_report(url: str, findings: list[Any], duration: float) -> str:
     try:
         sarif = generate_sarif_v210(url, findings, duration)
         parsed_url = urlparse(url)

@@ -12,7 +12,7 @@ class TechFingerprinter:
     """Identifica el framework y tecnologías web a partir de cabeceras, cookies y cuerpo HTML."""
 
     @staticmethod
-    def detect_stack(headers: Optional[dict] = None, html: str = "", cookies: Optional[dict] = None) -> list[str]:
+    def detect_stack(headers: Optional[dict[str, Any]] = None, html: str = "", cookies: Optional[dict[str, Any]] = None) -> list[str]:
         headers = headers or {}
         cookies = cookies or {}
         detected: list[str] = []

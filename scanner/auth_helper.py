@@ -7,7 +7,7 @@ Soporta:
 """
 import contextlib
 import logging
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import requests
 
@@ -203,7 +203,7 @@ class AuthSessionManager:
         has_auth = "Authorization" in headers if hasattr(headers, "__contains__") else False
         self.is_authenticated = has_cookies or has_auth
 
-    def request(self, method: str, url: str, **kwargs) -> requests.Response:
+    def request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
         """Envía una petición HTTP con manejo automático de 401 Unauthorized."""
         response = self.session.request(method, url, **kwargs)
 
@@ -218,8 +218,8 @@ class AuthSessionManager:
 
         return response
 
-    def get(self, url: str, **kwargs) -> requests.Response:
+    def get(self, url: str, **kwargs: Any) -> requests.Response:
         return self.request("GET", url, **kwargs)
 
-    def post(self, url: str, **kwargs) -> requests.Response:
+    def post(self, url: str, **kwargs: Any) -> requests.Response:
         return self.request("POST", url, **kwargs)

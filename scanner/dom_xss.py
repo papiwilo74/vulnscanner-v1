@@ -57,7 +57,7 @@ def analyze_scripts_for_dom_xss(html_content: str, target_url: str) -> list[dict
     return findings
 
 
-def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict]:
+def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict[str, Any]]:
     """
     Prueba dinámicamente si el navegador evalúa payloads inyectados en fragmentos
     (#) o parámetros de búsqueda (?) mediante Playwright.

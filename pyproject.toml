@@ -4,7 +4,7 @@ build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "vulnscanner"
-version = "2.0.0"
+version = "2.4.0"
 description = "Escáner de vulnerabilidades web modular con soporte de IA, modo sigiloso y reportes HTML/JSON"
 readme = "README.md"
 license = { text = "MIT" }
@@ -90,7 +90,7 @@ ignore = ["E501", "B904", "SIM108"]
 [tool.mypy]
 python_version = "3.10"
 warn_unused_configs = true
-disallow_untyped_defs = false
+disallow_untyped_defs = true
 check_untyped_defs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
@@ -108,6 +108,7 @@ module = [
     "playwright.*",
     "defusedxml.*",
     "reportlab.*",
+    "yaml",
 ]
 ignore_missing_imports = true
 

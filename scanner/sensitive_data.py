@@ -23,7 +23,7 @@ PLACEHOLDER_VALUES = {
     "your_value_here", "your_value", "yourvalue", "dummy", "sample",
 }
 
-def _is_placeholder(val):
+def _is_placeholder(val: str) -> bool:
     lv = val.lower()
     if lv in PLACEHOLDER_VALUES:
         return True

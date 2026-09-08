@@ -5,6 +5,7 @@ asíncrono (XHR/Fetch) y descubrir endpoints de API ocultos para auditorías pro
 """
 import contextlib
 import logging
+from typing import Any
 from urllib.parse import urljoin, urlparse
 
 from utils.renderer import is_playwright_available
@@ -55,7 +56,7 @@ class HeadlessCrawler:
                 base_domain = parsed_base.netloc
 
                 # Interceptar peticiones de red salientes (XHR / Fetch)
-                def on_request(req):
+                def on_request(req: Any) -> None:
                     try:
                         req_url = req.url
                         r_type = req.resource_type

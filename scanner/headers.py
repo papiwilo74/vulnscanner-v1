@@ -1,3 +1,8 @@
+from collections.abc import Mapping
+from typing import Any
+
+import requests
+
 SECURITY_HEADERS: dict[str, tuple[str, str]] = {
     "X-Frame-Options": ("Alto", "Protege contra clickjacking"),
     "Content-Security-Policy": ("Alto", "Previene XSS y code injection"),
@@ -20,19 +25,20 @@ HTML_CONTENT_TYPES: tuple[str, ...] = (
     "image/svg+xml",
 )
 
-def _get_header_case_insensitive(headers, name: str) -> str | None:
+def _get_header_case_insensitive(headers: Mapping[str, Any], name: str) -> str | None:
     target = name.lower()
     for key, value in headers.items():
         if str(key).lower() == target:
             return str(value)
     return None
 
-def _is_https_response(response) -> bool:
+def _is_https_response(response: requests.Response | Any) -> bool:
     url = getattr(response, "url", "") or ""
     return str(url).lower().startswith("https://")
 
-def _is_browser_document_response(response) -> bool:
-    content_type = _get_header_case_insensitive(response.headers, "Content-Type")
+def _is_browser_document_response(response: requests.Response | Any) -> bool:
+    headers = getattr(response, "headers", {})
+    content_type = _get_header_case_insensitive(headers, "Content-Type")
 
     if not content_type:
         return True
@@ -40,7 +46,7 @@ def _is_browser_document_response(response) -> bool:
     content_type = content_type.lower()
     return any(expected in content_type for expected in HTML_CONTENT_TYPES)
 
-def check_headers(response) -> list[dict[str, str]]:
+def check_headers(response: requests.Response | Any) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
     is_https = _is_https_response(response)
     is_browser_document = _is_browser_document_response(response)

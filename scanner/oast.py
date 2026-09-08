@@ -59,7 +59,7 @@ class OASTClient:
             "redirect": cb_url,
         }
 
-    def record_mock_interaction(self, token: str, interaction_type: str = "DNS", client_ip: str = "127.0.0.1"):
+    def record_mock_interaction(self, token: str, interaction_type: str = "DNS", client_ip: str = "127.0.0.1") -> None:
         """Permite registrar interacciones en modo simulado para tests unitarios."""
         if token in self._registered_interactions:
             self._registered_interactions[token].append({

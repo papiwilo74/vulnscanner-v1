@@ -1,40 +1,40 @@
 import contextlib
 import re
 from html.parser import HTMLParser
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import requests
 
 
 class FileUploadParser(HTMLParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.file_forms = []
-        self.current_form = None
-        self.has_file_input = False
+        self.file_forms: list[dict[str, Any]] = []
+        self.current_form: Optional[dict[str, Any]] = None
+        self.has_file_input: bool = False
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         attr_dict = dict(attrs)
         if tag == "form":
             self.current_form = {
-                "action": attr_dict.get("action", ""),
-                "method": attr_dict.get("method", "get").lower(),
-                "enctype": attr_dict.get("enctype", ""),
+                "action": attr_dict.get("action", "") or "",
+                "method": (attr_dict.get("method", "get") or "get").lower(),
+                "enctype": attr_dict.get("enctype", "") or "",
                 "file_inputs": [],
             }
             self.has_file_input = False
         elif self.current_form is not None and tag == "input":
-            input_type = attr_dict.get("type", "text").lower()
-            input_name = attr_dict.get("name", "")
+            input_type = (attr_dict.get("type", "text") or "text").lower()
+            input_name = attr_dict.get("name", "") or ""
             if input_type == "file":
                 self.has_file_input = True
                 self.current_form["file_inputs"].append({
                     "name": input_name,
-                    "accept": attr_dict.get("accept", ""),
+                    "accept": attr_dict.get("accept", "") or "",
                 })
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, tag: str) -> None:
         if tag == "form" and self.current_form is not None:
             if self.has_file_input:
                 self.file_forms.append(self.current_form)

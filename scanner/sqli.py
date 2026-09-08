@@ -1,7 +1,7 @@
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
@@ -33,7 +33,7 @@ TIME_PAYLOADS: list[str] = [
 ]
 
 def test_error_sqli(
-    parsed, params, param: str, payload: str, baseline_body: str = "", session: Optional[requests.Session] = None
+    parsed: Any, params: dict[str, list[str]], param: str, payload: str, baseline_body: str = "", session: Optional[requests.Session] = None
 ) -> Optional[dict[str, str]]:
     test_params = params.copy()
     test_params[param] = [payload]
@@ -64,8 +64,8 @@ def test_error_sqli(
     return None
 
 def test_time_sqli(
-    parsed,
-    params,
+    parsed: Any,
+    params: dict[str, list[str]],
     param: str,
     payload: str,
     baseline_time: float,

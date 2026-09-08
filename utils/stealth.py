@@ -1,5 +1,9 @@
 import random
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import requests
 
 # Lista de User-Agents de navegadores reales modernos para rotar
 USER_AGENTS: list[str] = [
@@ -40,7 +44,7 @@ def get_random_user_agent() -> str:
     return random.choice(USER_AGENTS)
 
 
-def apply_stealth_headers(session) -> None:
+def apply_stealth_headers(session: "requests.Session") -> None:
     """
     Configura la sesion con un User-Agent de navegador real y cabeceras HTTP estandar,
     reduciendo la carga en el servidor destino durante escaneos autorizados.
@@ -82,7 +86,7 @@ def stealth_check_delay(stealth: bool = False) -> None:
         time.sleep(random.uniform(0.3, 1.5))
 
 
-def create_stealth_session():
+def create_stealth_session() -> "requests.Session":
     """
     Crea y retorna un requests.Session configurado con cabeceras de navegador
     real y un User-Agent aleatorio para escaneo pasivo/silencioso.

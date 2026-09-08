@@ -24,11 +24,11 @@ COMMON_SPA_ROUTES: list[str] = [
 
 
 class LinkParser(HTMLParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.links = []
+        self.links: list[str] = []
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         if tag == 'a':
             attr_dict = dict(attrs)
             href = attr_dict.get('href')
@@ -90,7 +90,7 @@ def fetch_sitemap(root_url: str, session: Optional[requests.Session] = None) -> 
     return urls
 
 
-def fetch_robots_paths(root_url: str, session: Optional[requests.Session] = None):
+def fetch_robots_paths(root_url: str, session: Optional[requests.Session] = None) -> tuple[set[str], set[str]]:
     """Lee robots.txt y extrae rutas Disallow/Allow/Sitemap."""
     client = session if session is not None else requests
     paths: set[str] = set()

@@ -8,7 +8,7 @@ from typing import Any
 from scanner.models import VULN_STANDARDS_DB
 
 
-def generate_sarif_v210(url: str, findings: list, duration: float = 0.0) -> dict[str, Any]:
+def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) -> dict[str, Any]:
     """Genera un documento JSON SARIF v2.1.0 totalmente compatible con GitHub Code Scanning.
 
     Args:

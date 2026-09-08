@@ -36,6 +36,13 @@ class TestAPIContract:
         assert "/scan" in schema["paths"]
         assert "/scan/{task_id}" in schema["paths"]
         assert "/scans" in schema["paths"]
+        assert "/openapi.yaml" in schema["paths"]
+
+    def test_openapi_yaml_contract(self):
+        response = client.get("/openapi.yaml")
+        assert response.status_code == 200
+        assert "openapi: 3.1.0" in response.text
+        assert "/scan:" in response.text
 
     def test_scans_list_contract(self):
         response = client.get("/scans")

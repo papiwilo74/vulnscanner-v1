@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "VulnScanner Enterprise API",
-    "description": "Microservicio web para automatizaci\u00f3n de auditor\u00edas de seguridad, IAST/RASP, Grafos de Ataque, OpenAPI, OAST y SARIF.",
-    "version": "2.2.0"
+    "description": "Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI y Dashboard SOC en tiempo real.",
+    "version": "2.4.0"
   },
   "paths": {
     "/": {
@@ -15,7 +15,68 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Read Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "summary": "Get Dashboard",
+        "description": "Sirve la consola interactiva en tiempo real del SOC Dashboard.",
+        "operationId": "get_dashboard_dashboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/download": {
+      "get": {
+        "summary": "Download Report",
+        "description": "Permite la descarga segura de reportes generados (HTML, JSON, SARIF, PDF).",
+        "operationId": "download_report_download_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
               }
             }
           }
@@ -42,7 +103,11 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Start Scan Scan Post"
+                }
               }
             }
           },
@@ -62,7 +127,7 @@
     "/scan/{task_id}": {
       "get": {
         "summary": "Get Scan Status",
-        "description": "Retorna el estado actual de una tarea de escaneo espec\u00edfica y sus resultados si termin\u00f3.",
+        "description": "Retorna el estado actual de una tarea de escaneo específica y sus resultados si terminó.",
         "operationId": "get_scan_status_scan__task_id__get",
         "parameters": [
           {
@@ -80,7 +145,11 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Scan Status Scan  Task Id  Get"
+                }
               }
             }
           },
@@ -107,7 +176,30 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Scans Scans Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.yaml": {
+      "get": {
+        "summary": "Get Openapi Yaml",
+        "description": "Retorna el esquema contractual oficial OpenAPI 3.1 en formato YAML.",
+        "operationId": "get_openapi_yaml_openapi_yaml_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -266,6 +358,43 @@
             "type": "boolean",
             "title": "Enable Attack Chain",
             "default": true
+          },
+          "generate_pdf": {
+            "type": "boolean",
+            "title": "Generate Pdf",
+            "default": true
+          },
+          "auto_pr": {
+            "type": "boolean",
+            "title": "Auto Pr",
+            "default": false
+          },
+          "github_repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Github Repo"
+          },
+          "github_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Github Token"
+          },
+          "base_branch": {
+            "type": "string",
+            "title": "Base Branch",
+            "default": "main"
           }
         },
         "type": "object",

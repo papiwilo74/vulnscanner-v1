@@ -5,7 +5,7 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 import requests
 
@@ -87,7 +87,7 @@ CATEGORY_MAP: dict[str, str] = {
     "oast": "oast",
 }
 
-def _legacy_to_findings(legacy_list: list[dict], category: str, url: str) -> list[Finding]:
+def _legacy_to_findings(legacy_list: list[dict[str, Any]], category: str, url: str) -> list[Finding]:
     return Finding.from_legacy_list(legacy_list, category, url)
 
 def build_session(cookie_str: Optional[str] = None, auth_header: Optional[str] = None) -> Optional[requests.Session]:
@@ -109,7 +109,7 @@ def build_session(cookie_str: Optional[str] = None, auth_header: Optional[str] =
 def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_header: Optional[str] = None,
                        stealth: bool = False, delay: float = 0.0, passive: bool = False,
                        enable_oast: bool = True, engine: Optional[ScanEngine] = None,
-                       active_session: Optional[requests.Session] = None) -> tuple[list[Finding], dict, str]:
+                       active_session: Optional[requests.Session] = None) -> tuple[list[Finding], dict[str, Any], str]:
     session: requests.Session
     if active_session is not None:
         session = active_session
@@ -123,20 +123,13 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
     polite_delay(delay=delay, stealth=stealth)
     if engine and engine.is_cancelled:
         return [], {}, ""
-    if engine and engine.is_duplicate(page_url):
-        logger.info("URL duplicada, omitiendo: %s", page_url)
-        return [], {}, ""
 
-    if engine:
-        engine.ratelimit()
-    engine.record_request(page_url, "GET") if engine else None
-
-    logger.info("Analizando página: %s", page_url)
+    resp_headers: dict[str, Any] = {}
     try:
         response = session.get(page_url, timeout=10)
         resp_headers = dict(response.headers)
     except Exception as e:
-        logger.warning("Error conectando a %s: %s", page_url, e)
+        logger.warning("Error accediendo a %s: %s", page_url, e)
         return [], {}, ""
 
     if engine:
@@ -148,7 +141,7 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
     # Detección de Stack Tecnológico para Auto-Fix
     detected_tech = TechFingerprinter.detect_stack(resp_headers, dom_html, dict(response.cookies))
 
-    def _task(name, category, fn, *args, **kwargs):
+    def _task(name: str, category: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> list[Finding]:
         if engine and not engine.check_limits():
             return []
         if engine:
@@ -157,7 +150,7 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
             logger.info("  %s...", name)
             raw = fn(*args, **kwargs)
             if raw and isinstance(raw[0], Finding):
-                return raw
+                return [r for r in raw if isinstance(r, Finding)]
             return _legacy_to_findings(raw, category, page_url)
         except Exception as e:
             logger.warning("  Error en %s: %s", name, e)
@@ -226,7 +219,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          generate_pdf: bool = False, auto_pr: bool = False,
          github_repo: Optional[str] = None, github_token: Optional[str] = None,
          base_branch: str = "main",
-         progress_callback: Optional[Any] = None) -> tuple:
+         progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
         profile_enum, target=url,
@@ -383,10 +376,11 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             logger.info("[ASYNC] Despachando escaneo concurrente con httpx/asyncio...")
             import asyncio
 
-            async def _run_async_batch():
+            async def _run_async_batch() -> list[Any]:
                 loop = asyncio.get_running_loop()
                 tasks = [loop.run_in_executor(None, scan_func, u) for u in target_urls]
-                return await asyncio.gather(*tasks, return_exceptions=True)
+                res = await asyncio.gather(*tasks, return_exceptions=True)
+                return list(res)
 
             try:
                 batch_res = asyncio.run(_run_async_batch())
@@ -469,11 +463,13 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="VulnScanner Enterprise v2.3 — Suite Empresarial con Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP y Grafos de Ataque",
-        epilog="Ejemplo: python main.py https://ejemplo.com --full --pdf --auto-pr --github-repo owner/repo"
+        description="VulnScanner Enterprise v2.4 — Suite Empresarial con Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque y Modo Lab Hermético",
+        epilog="Ejemplo: python main.py --lab --full"
     )
-    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.3.0")
+    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.4.0")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
+    parser.add_argument("--lab", "--offline", dest="lab_mode", action="store_true",
+                        help="Modo Laboratorio Aislado: ejecuta un servidor de prueba local hermético para escaneo sin conexión")
     parser.add_argument("--no-open", action="store_true",
                         help="Evita abrir el reporte HTML automáticamente")
     parser.add_argument("--pdf", action="store_true",
@@ -531,6 +527,15 @@ if __name__ == "__main__":
                         help="Modo Todo-en-Uno: activa crawling (10 páginas), subdominios, stealth, detección WAF, grafos de ataque y auto-detección de OpenAPI e IAST")
 
     args = parser.parse_args()
+
+    lab_server = None
+    if args.lab_mode:
+        from scanner.lab_server import LabServer
+        lab_server = LabServer()
+        args.url = lab_server.start()
+        args.allow_private = True
+        logger.info("[LAB MODE] Servidor de pruebas hermético iniciado en %s", args.url)
+
     if not args.url:
         parser.print_help()
         sys.exit(1)
@@ -565,32 +570,37 @@ if __name__ == "__main__":
             except Exception:
                 pass
 
-    scan(
-        args.url,
-        no_open=args.no_open,
-        cookie_str=args.cookie,
-        auth_header=args.auth,
-        crawl_pages=args.crawl,
-        run_subdomains=args.subdomains,
-        delay=args.delay,
-        stealth=args.stealth,
-        passive=args.passive,
-        enable_oast=not args.no_oast,
-        login_url=args.login_url,
-        login_creds=args.login_creds,
-        profile=args.profile,
-        allow_private=args.allow_private,
-        har_file=args.har,
-        headless_crawl=args.headless_crawl,
-        headless_login=args.headless_login,
-        openapi_spec=args.openapi,
-        use_async_engine=args.async_engine,
-        no_waf_detect=args.no_waf_detect,
-        iast_url=args.iast_url,
-        attack_chain=not args.no_attack_chain,
-        generate_pdf=args.pdf or args.full,
-        auto_pr=args.auto_pr,
-        github_repo=args.github_repo,
-        github_token=args.github_token,
-        base_branch=args.base_branch,
-    )
+    try:
+        scan(
+            args.url,
+            no_open=args.no_open,
+            cookie_str=args.cookie,
+            auth_header=args.auth,
+            crawl_pages=args.crawl,
+            run_subdomains=args.subdomains,
+            delay=args.delay,
+            stealth=args.stealth,
+            passive=args.passive,
+            enable_oast=not args.no_oast,
+            login_url=args.login_url,
+            login_creds=args.login_creds,
+            profile=args.profile,
+            allow_private=args.allow_private,
+            har_file=args.har,
+            headless_crawl=args.headless_crawl,
+            headless_login=args.headless_login,
+            openapi_spec=args.openapi,
+            use_async_engine=args.async_engine,
+            no_waf_detect=args.no_waf_detect,
+            iast_url=args.iast_url,
+            attack_chain=not args.no_attack_chain,
+            generate_pdf=args.pdf or args.full,
+            auto_pr=args.auto_pr,
+            github_repo=args.github_repo,
+            github_token=args.github_token,
+            base_branch=args.base_branch,
+        )
+    finally:
+        if lab_server:
+            lab_server.stop()
+            logger.info("[LAB MODE] Servidor de pruebas hermético detenido.")

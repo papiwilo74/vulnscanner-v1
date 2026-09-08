@@ -3,7 +3,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -15,29 +15,29 @@ from scanner.xss import XSS_PAYLOADS
 
 
 class FormParser(HTMLParser):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.forms = []
-        self.current_form = None
+        self.forms: list[dict[str, Any]] = []
+        self.current_form: Optional[dict[str, Any]] = None
 
-    def handle_starttag(self, tag, attrs):
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         attr_dict = dict(attrs)
         if tag == 'form':
             self.current_form = {
-                'action': attr_dict.get('action', ''),
-                'method': attr_dict.get('method', 'get').lower(),
+                'action': attr_dict.get('action', '') or '',
+                'method': (attr_dict.get('method', 'get') or 'get').lower(),
                 'inputs': []
             }
         elif self.current_form is not None:
             if tag == 'input':
                 input_name = attr_dict.get('name')
-                input_type = attr_dict.get('type', 'text').lower()
+                input_type = (attr_dict.get('type', 'text') or 'text').lower()
                 # Omitir botones y elementos que no reciben entrada textual directa
                 if input_name and input_type not in ['submit', 'reset', 'button', 'image', 'file']:
                     self.current_form['inputs'].append({
                         'name': input_name,
                         'type': input_type,
-                        'value': attr_dict.get('value', '')
+                        'value': attr_dict.get('value', '') or ''
                     })
             elif tag in ['textarea', 'select']:
                 input_name = attr_dict.get('name')
@@ -48,12 +48,12 @@ class FormParser(HTMLParser):
                         'value': ''
                     })
 
-    def handle_endtag(self, tag):
+    def handle_endtag(self, tag: str) -> None:
         if tag == 'form' and self.current_form is not None:
             self.forms.append(self.current_form)
             self.current_form = None
 
-def extract_forms(url, html_content):
+def extract_forms(url: str, html_content: str) -> list[dict[str, Any]]:
     parser = FormParser()
     try:
         parser.feed(html_content)
@@ -65,14 +65,28 @@ def extract_forms(url, html_content):
         form['action'] = urljoin(url, form['action'])
     return parser.forms
 
-def send_form_request(action_url, method, data, timeout=5, session=None):
+def send_form_request(
+    action_url: str,
+    method: str,
+    data: dict[str, Any],
+    timeout: int = 5,
+    session: Optional[requests.Session] = None
+) -> requests.Response:
     client = session if session is not None else requests
     if method == 'post':
         return client.post(action_url, data=data, timeout=timeout)
     else:
         return client.get(action_url, params=data, timeout=timeout)
 
-def test_form_xss(action_url, method, base_data, target_input, payload, baseline_text="", session=None):
+def test_form_xss(
+    action_url: str,
+    method: str,
+    base_data: dict[str, Any],
+    target_input: str,
+    payload: str,
+    baseline_text: str = "",
+    session: Optional[requests.Session] = None
+) -> Optional[dict[str, str]]:
     data = base_data.copy()
     data[target_input] = payload
     try:
@@ -98,7 +112,15 @@ def test_form_xss(action_url, method, base_data, target_input, payload, baseline
         pass
     return None
 
-def test_form_error_sqli(action_url, method, base_data, target_input, payload, baseline_body="", session=None):
+def test_form_error_sqli(
+    action_url: str,
+    method: str,
+    base_data: dict[str, Any],
+    target_input: str,
+    payload: str,
+    baseline_body: str = "",
+    session: Optional[requests.Session] = None
+) -> Optional[dict[str, str]]:
     data = base_data.copy()
     data[target_input] = payload
     try:
@@ -115,7 +137,15 @@ def test_form_error_sqli(action_url, method, base_data, target_input, payload, b
         pass
     return None
 
-def test_form_time_sqli(action_url, method, base_data, target_input, payload, baseline_time, session=None):
+def test_form_time_sqli(
+    action_url: str,
+    method: str,
+    base_data: dict[str, Any],
+    target_input: str,
+    payload: str,
+    baseline_time: float,
+    session: Optional[requests.Session] = None
+) -> Optional[dict[str, str]]:
     data = base_data.copy()
     data[target_input] = payload
     try:
@@ -143,7 +173,11 @@ def test_form_time_sqli(action_url, method, base_data, target_input, payload, ba
         pass
     return None
 
-def scan_single_form(form, session=None, passive=False):
+def scan_single_form(
+    form: dict[str, Any],
+    session: Optional[requests.Session] = None,
+    passive: bool = False
+) -> list[dict[str, str]]:
     results = []
     action_url = form['action']
     method = form['method']

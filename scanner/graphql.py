@@ -1,5 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -42,7 +42,7 @@ GQL_SCHEMA_KEYWORDS = [
 ]
 
 
-def _probe_endpoint(endpoint: str, client) -> Optional[dict[str, str]]:
+def _probe_endpoint(endpoint: str, client: Any) -> Optional[dict[str, str]]:
     headers = {"Content-Type": "application/json"}
     try:
         r = client.post(endpoint, json={"query": INTROSPECTION_QUERY}, headers=headers, timeout=5)
@@ -70,7 +70,7 @@ def _probe_endpoint(endpoint: str, client) -> Optional[dict[str, str]]:
     return None
 
 
-def _check_get(endpoint: str, client) -> Optional[dict[str, str]]:
+def _check_get(endpoint: str, client: Any) -> Optional[dict[str, str]]:
     try:
         r = client.get(endpoint, timeout=4)
         if r.status_code == 200 and any(

@@ -1,8 +1,12 @@
 
+from typing import Any
+
+import requests
+
 CSRF_COOKIE_PATTERNS = {"csrf", "xsrf", "_token", "authenticity_token", "middlewaretoken"}
 
 
-def check_cookies(response) -> list[dict[str, str]]:
+def check_cookies(response: requests.Response | Any) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
 
     for cookie in response.cookies:

@@ -14,7 +14,7 @@ class Evidence:
     response_status: Optional[int] = None
     response_fragment: Optional[str] = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "request_method": self.request_method,
             "request_url": self.request_url,
@@ -48,7 +48,7 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
         "cwe_id": "CWE-79",
         "cwe_name": "Improper Neutralization of Input During Web Page Generation ('DOM-based Cross-site Scripting')",
         "mitre_attack_id": "T1059.007",
-        "mitre_attack_name": "JavaScript Execution / DOM XSS",
+        "mitre_attack_name": "Command and Scripting Interpreter: JavaScript",
         "default_cvss_score": 6.1,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
         "owasp_category": "A03:2021-Injection",
@@ -56,8 +56,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "injections": {
         "cwe_id": "CWE-78",
         "cwe_name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
-        "mitre_attack_id": "T1059",
-        "mitre_attack_name": "Command and Scripting Interpreter",
+        "mitre_attack_id": "T1059.004",
+        "mitre_attack_name": "Command and Scripting Interpreter: Unix Shell",
         "default_cvss_score": 9.8,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
         "owasp_category": "A03:2021-Injection",
@@ -83,8 +83,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "ssrf": {
         "cwe_id": "CWE-918",
         "cwe_name": "Server-Side Request Forgery (SSRF)",
-        "mitre_attack_id": "T1190",
-        "mitre_attack_name": "Exploit Public-Facing Application",
+        "mitre_attack_id": "T1090.003",
+        "mitre_attack_name": "Proxy: Multi-hop Proxy",
         "default_cvss_score": 8.6,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:N/A:N",
         "owasp_category": "A10:2021-Server-Side Request Forgery",
@@ -92,8 +92,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "oast": {
         "cwe_id": "CWE-918",
         "cwe_name": "Out-of-Band Interaction (Blind SSRF / Blind RCE / Blind XXE)",
-        "mitre_attack_id": "T1190",
-        "mitre_attack_name": "Exploit Public-Facing Application",
+        "mitre_attack_id": "T1090.003",
+        "mitre_attack_name": "Proxy: Multi-hop Proxy",
         "default_cvss_score": 9.0,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:N",
         "owasp_category": "A10:2021-Server-Side Request Forgery",
@@ -101,8 +101,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "jwt": {
         "cwe_id": "CWE-347",
         "cwe_name": "Improper Verification of Cryptographic Signature",
-        "mitre_attack_id": "T1552",
-        "mitre_attack_name": "Unsecured Credentials",
+        "mitre_attack_id": "T1552.004",
+        "mitre_attack_name": "Unsecured Credentials: Private Keys",
         "default_cvss_score": 8.1,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N",
         "owasp_category": "A07:2021-Identification and Authentication Failures",
@@ -110,8 +110,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "cors": {
         "cwe_id": "CWE-942",
         "cwe_name": "Permissive Cross-Domain Policy with Untrusted Domains",
-        "mitre_attack_id": "T1189",
-        "mitre_attack_name": "Drive-by Compromise",
+        "mitre_attack_id": "T1557",
+        "mitre_attack_name": "Adversary-in-the-Middle",
         "default_cvss_score": 5.3,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
         "owasp_category": "A05:2021-Security Misconfiguration",
@@ -128,8 +128,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "headers": {
         "cwe_id": "CWE-693",
         "cwe_name": "Protection Mechanism Failure (Missing Security Headers)",
-        "mitre_attack_id": "T1190",
-        "mitre_attack_name": "Exploit Public-Facing Application",
+        "mitre_attack_id": "T1562.001",
+        "mitre_attack_name": "Impair Defenses: Disable or Modify Tools",
         "default_cvss_score": 3.7,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N",
         "owasp_category": "A05:2021-Security Misconfiguration",
@@ -156,7 +156,7 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
         "cwe_id": "CWE-200",
         "cwe_name": "Exposure of Sensitive Information to an Unauthorized Actor",
         "mitre_attack_id": "T1552.001",
-        "mitre_attack_name": "Credentials in Files",
+        "mitre_attack_name": "Unsecured Credentials: Credentials In Files",
         "default_cvss_score": 7.5,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
         "owasp_category": "A02:2021-Cryptographic Failures",
@@ -165,7 +165,7 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
         "cwe_id": "CWE-601",
         "cwe_name": "URL Redirection to Untrusted Site ('Open Redirect')",
         "mitre_attack_id": "T1566.002",
-        "mitre_attack_name": "Spearphishing Link",
+        "mitre_attack_name": "Phishing: Spearphishing Link",
         "default_cvss_score": 6.1,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
         "owasp_category": "A01:2021-Broken Access Control",
@@ -174,7 +174,7 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
         "cwe_id": "CWE-1321",
         "cwe_name": "Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')",
         "mitre_attack_id": "T1059.007",
-        "mitre_attack_name": "JavaScript",
+        "mitre_attack_name": "Command and Scripting Interpreter: JavaScript",
         "default_cvss_score": 7.3,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
         "owasp_category": "A03:2021-Injection",
@@ -182,8 +182,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "file_upload": {
         "cwe_id": "CWE-434",
         "cwe_name": "Unrestricted Upload of File with Dangerous Type",
-        "mitre_attack_id": "T1190",
-        "mitre_attack_name": "Exploit Public-Facing Application",
+        "mitre_attack_id": "T1505.003",
+        "mitre_attack_name": "Server Software Component: Web Shell",
         "default_cvss_score": 8.8,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
         "owasp_category": "A03:2021-Injection",
@@ -209,8 +209,8 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
     "sca": {
         "cwe_id": "CWE-1395",
         "cwe_name": "Dependency on Vulnerable Third-Party Component",
-        "mitre_attack_id": "T1190",
-        "mitre_attack_name": "Exploit Public-Facing Application",
+        "mitre_attack_id": "T1195.002",
+        "mitre_attack_name": "Supply Chain Compromise: Compromise Software Supply Chain",
         "default_cvss_score": 6.5,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
         "owasp_category": "A06:2021-Vulnerable and Outdated Components",
@@ -237,7 +237,7 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
         "cwe_id": "CWE-538",
         "cwe_name": "Insertion of Sensitive Information into Externally-Accessible File or Directory",
         "mitre_attack_id": "T1552.001",
-        "mitre_attack_name": "Credentials in Files",
+        "mitre_attack_name": "Unsecured Credentials: Credentials In Files",
         "default_cvss_score": 7.5,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
         "owasp_category": "A05:2021-Security Misconfiguration",
@@ -246,7 +246,7 @@ VULN_STANDARDS_DB: dict[str, dict[str, Any]] = {
         "cwe_id": "CWE-693",
         "cwe_name": "Protection Mechanism Failure",
         "mitre_attack_id": "T1562.001",
-        "mitre_attack_name": "Disable or Modify Tools",
+        "mitre_attack_name": "Impair Defenses: Disable or Modify Tools",
         "default_cvss_score": 0.0,
         "default_cvss_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N",
         "owasp_category": "A05:2021-Security Misconfiguration",
@@ -308,7 +308,7 @@ class Finding:
         "critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4,
     }, repr=False, init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Auto-enriquecer con estándares de seguridad si no se especificaron explícitamente
         std = VULN_STANDARDS_DB.get(self.category, VULN_STANDARDS_DB["default"])
         if not self.cwe_id:
@@ -341,7 +341,7 @@ class Finding:
     def severity_rank(self) -> int:
         return self.SEVERITY_ORDER.get(self.severity, 99)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "category": self.category,
@@ -369,7 +369,7 @@ class Finding:
         }
 
     @classmethod
-    def from_legacy(cls, data: dict, category: str, url: str = "", param: str = "") -> "Finding":
+    def from_legacy(cls, data: dict[str, Any], category: str, url: str = "", param: str = "") -> "Finding":
         """Convierte un dict legacy {vuln, risk, detail} a Finding con enriquecimiento automático."""
         risk_map = {"Alto": "high", "Medio": "medium", "Bajo": "low"}
         return cls(
@@ -383,7 +383,7 @@ class Finding:
         )
 
     @classmethod
-    def from_legacy_list(cls, items: list[dict], category: str, url: str = "") -> list["Finding"]:
+    def from_legacy_list(cls, items: list[dict[str, Any]], category: str, url: str = "") -> list["Finding"]:
         return [cls.from_legacy(item, category, url) for item in items]
 
     def __hash__(self) -> int:

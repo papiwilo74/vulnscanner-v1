@@ -1,7 +1,7 @@
 """Detector inteligente de WAF (Web Application Firewall) y firmas de seguridad."""
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -11,7 +11,7 @@ from scanner.models import Finding
 log = logging.getLogger("VulnScanner.WAF")
 
 # Firmas de WAFs conocidos en cabeceras, cookies y cuerpos de respuesta
-WAF_SIGNATURES: dict[str, dict] = {
+WAF_SIGNATURES: dict[str, dict[str, list[Any]]] = {
     "Cloudflare": {
         "headers": ["cf-ray", "cf-cache-status", "cf-request-id"],
         "cookies": ["__cfduid", "cf_clearance"],

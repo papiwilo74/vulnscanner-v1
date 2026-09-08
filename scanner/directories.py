@@ -22,7 +22,7 @@ SPA_SIGNATURES = [
     "window.__NEXT_DATA__",
 ]
 
-def is_spa_fallback(response) -> bool:
+def is_spa_fallback(response: requests.Response) -> bool:
     """Detecta si la respuesta es el index.html de un SPA (React, Vue, Next...)"""
     body = response.text.lower()
     return any(sig.lower() in body for sig in SPA_SIGNATURES)

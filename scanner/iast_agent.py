@@ -129,9 +129,9 @@ class HookManager:
         """
         self.on_sink_event = on_sink_event
         self._installed = False
-        self._orig_sqlite_connect: Callable | None = None
-        self._orig_subprocess_popen: Callable | None = None
-        self._orig_builtin_open: Callable | None = None
+        self._orig_sqlite_connect: Callable[..., Any] | None = None
+        self._orig_subprocess_popen: Callable[..., Any] | None = None
+        self._orig_builtin_open: Callable[..., Any] | None = None
 
     def _check_sql_operation(self, operation: Any) -> None:
         """Inspecciona la operación SQL en tiempo de ejecución."""
@@ -338,7 +338,7 @@ class VulnScannerASGI:
         """Limpia el buffer de telemetría en memoria."""
         self.telemetry_history.clear()
 
-    async def __call__(self, scope: dict[str, Any], receive: Callable, send: Callable) -> None:
+    async def __call__(self, scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return

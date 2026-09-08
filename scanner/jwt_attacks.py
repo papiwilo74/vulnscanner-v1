@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import json
 import re
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import requests
@@ -26,7 +26,7 @@ AUTH_RE = re.compile(
 )
 
 
-def _decode_jwt(token: str) -> Optional[dict]:
+def _decode_jwt(token: str) -> Optional[dict[str, Any]]:
     try:
         parts = token.split(".")
         if len(parts) != 3:

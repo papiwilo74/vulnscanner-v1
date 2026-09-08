@@ -23,7 +23,7 @@ class ScanProfile(str, Enum):
     AGGRESSIVE = "aggressive"
 
 
-PROFILE_CONFIG: dict[ScanProfile, dict] = {
+PROFILE_CONFIG: dict[ScanProfile, dict[str, Any]] = {
     ScanProfile.PASSIVE: {
         "max_rps": 2,
         "max_total_requests": 200,
@@ -89,7 +89,7 @@ class ScanConfig:
     enable_attack_chain: bool = True
 
     @classmethod
-    def from_profile(cls, profile: ScanProfile, target: str = "", **overrides) -> "ScanConfig":
+    def from_profile(cls, profile: ScanProfile, target: str = "", **overrides: Any) -> "ScanConfig":
         defaults = PROFILE_CONFIG[profile].copy()
         defaults["profile"] = profile
         defaults["target"] = target
@@ -107,7 +107,7 @@ class ScanEngine:
         self._cancelled = threading.Event()
         self._start_time: float = 0.0
         self._seen_urls: set[str] = set()
-        self._request_log: list[dict] = []
+        self._request_log: list[dict[str, Any]] = []
         self._ratelimit_window_start: float = time.monotonic()
         self._ratelimit_count: int = 0
         self.adaptive_rate_limiting: bool = True
@@ -180,7 +180,7 @@ class ScanEngine:
                 return False
         return True
 
-    def handle_response(self, status: Optional[int], headers: Optional[dict] = None) -> None:
+    def handle_response(self, status: Optional[int], headers: Optional[dict[str, Any]] = None) -> None:
         """Adapta el ritmo de peticiones segun codigos de estado del servidor o WAF."""
         if not self.adaptive_rate_limiting or status is None:
             return
@@ -255,7 +255,7 @@ class ScanEngine:
             self._seen_urls.add(norm)
             return False
 
-    def get_summary(self) -> dict:
+    def get_summary(self) -> dict[str, Any]:
         return {
             "profile": self.config.profile.value,
             "total_requests": self._request_count,

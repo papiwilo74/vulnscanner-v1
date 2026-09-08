@@ -1,34 +1,37 @@
-# VulnScanner v2.3 (Enterprise Edition)
+# VulnScanner v2.4 (Enterprise Edition)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/VulnScanner-v2.3.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.3 Enterprise" />
+  <img src="https://img.shields.io/badge/VulnScanner-v2.4.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.4 Enterprise" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.3.0"><img src="https://img.shields.io/badge/Release-v2.3.0-007EC6.svg?logo=github" alt="Release v2.3.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.4.0"><img src="https://img.shields.io/badge/Release-v2.4.0-007EC6.svg?logo=github" alt="Release v2.4.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
-  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict-blue.svg" alt="Mypy" /></a>
+  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
   <a href="https://pypi.org/project/pip-audit/"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit" /></a>
+  <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-211%20passing-brightgreen.svg" alt="211 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-213%20passing-brightgreen.svg" alt="213 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.3** es una plataforma integral de ciberdefensa y auditoría web de nivel empresarial que combina **DAST + SAST + IAST/RASP + ML + API Security + DevSecOps Autónomo**. Incorpora generación de **Reportes Ejecutivos en PDF** para CISOs con matrices de cumplimiento (PCI-DSS v4.0, ISO/IEC 27001), un bot de **Auto-Remediación DevSecOps con GitHub Pull Requests**, un **Panel Web SOC en Tiempo Real** vía WebSockets, agente híbrido RASP con bloqueo en memoria, grafos de ataque y motor asíncrono ultra-rápido.
+> **VulnScanner v2.4** es una plataforma integral de ciberdefensa y auditoría web de nivel empresarial que combina **DAST + SAST + IAST/RASP + ML + API Security + DevSecOps Autónomo + Modo Lab Aislado**. Incorpora un **Servidor de Laboratorio Aislado (`--lab`)** para CI/CD hermético, tipado estricto `mypy --strict` al 100% en todos sus módulos, especificación formal **OpenAPI 3.1 & YAML**, catálogo granular **MITRE ATT&CK v3.1**, benchmark estandarizado de rendimiento (181.97 req/s, 1.46 MB RAM), registros formales de decisiones arquitecturales ([ADRs](docs/ARCHITECTURE_DECISIONS.md)), reportes ejecutivos en PDF y auto-remediación con GitHub Pull Requests.
 
 ---
 
 ## Tabla de Contenidos
 
 - [Que es VulnScanner?](#que-es-vulnscanner)
-- [Arquitectura y Diseno Tecnico](docs/architecture.md)
-- [Especificacion OpenAPI](docs/openapi.json)
+- [Arquitectura y Decisiones Técnicas (ADRs)](docs/ARCHITECTURE_DECISIONS.md)
+- [Especificacion OpenAPI 3.1 (JSON)](docs/openapi.json) | [Contrato YAML](docs/openapi.yaml)
+- [Benchmark de Rendimiento y Comparativa](tests/benchmark_performance.py)
 - [Caracteristicas](#caracteristicas)
 - [Instalacion](#instalacion)
 - [Uso Rapido](#uso-rapido)
 - [Opciones Avanzadas](#opciones-avanzadas)
+- [Modo Laboratorio Aislado (`--lab`)](#modo-laboratorio-aislado)
 - [Modulos de Deteccion](#modulos-de-deteccion)
 - [Reportes Generados](#reportes-generados)
 - [Validacion de Calidad](#validacion-de-calidad)
@@ -45,9 +48,9 @@
 
 - **DAST** (Dynamic Application Security Testing): escaneo activo de endpoints en vivo
 - **SAST** (Static Application Security Testing): analisis estatico de codigo JavaScript
-- **ML**: un modelo de Inteligencia Artificial (TF-IDF + Regresion Logistica) que clasifica parametros sospechosos
-
-Disenada con enfoque **defensivo y educativo**. El modo `--stealth` aplica rate-limiting con User-Agent rotativo y retardos aleatorios para reducir la carga en el servidor objetivo durante pruebas autorizadas.
+- **IAST / RASP**: instrumentación y defensa activa en memoria con bloqueo HTTP 403
+- **ML**: un modelo de Inteligencia Artificial (TF-IDF + Regresion Logistica) determinista y local
+- **Lab Mode**: entorno hermético local sin conexión para pipelines CI/CD aislados
 
 ---
 
@@ -55,6 +58,10 @@ Disenada con enfoque **defensivo y educativo**. El modo `--stealth` aplica rate-
 
 | Modulo | Descripcion |
 |---|---|
+| **Modo Laboratorio Hermético (`--lab`)** | Servidor web vulnerable simulado en memoria sobre puerto efímero local para pruebas y auditorías sin internet ni dependencias externas |
+| **Mypy Strict 100% Project-Wide** | Tipado estático exhaustivo verificado con `mypy --strict` en los 49 archivos fuente sin excepciones |
+| **OpenAPI 3.1 & YAML Contract** | Especificación formal y endpoint `/openapi.yaml` para integración con herramientas multi-lenguaje (Go, Rust, Java, TypeScript) |
+| **Catálogo MITRE ATT&CK v3.1** | Mapeo granular de cada vector de vulnerabilidad a técnicas oficiales (T1059.004, T1059.007, T1090.003, T1552.004, etc.) |
 | **Executive PDF Audit Report** | Reporte formal en PDF para comités CISO/Dirección con matrices de cumplimiento normativo (PCI-DSS v4.0, ISO/IEC 27001), calificación de seguridad (A+, A, B, C, F) y acta de firma |
 | **GitHub Auto-PR DevSecOps** | Bot autónomo que se conecta a la API de GitHub, crea ramas, aplica parches automáticos de seguridad y abre Pull Requests con análisis CVSS |
 | **Real-Time SOC Dashboard** | Consola web interactiva en vivo con WebSockets, velocímetro RPS, estado de Circuit Breaker, gráficas dinámicas y composición de Grafos de Ataque Mermaid |
@@ -191,6 +198,9 @@ python main.py https://tu-sitio.com/ --passive
 
 # 6. Escaneo de zona autenticada con cookies de sesión
 python main.py https://tu-sitio.com/dashboard/ --cookie "session=abc123; role=admin" --stealth
+
+# 7. Modo Laboratorio Hermético (ejecución sin conexión a internet en servidor de prueba aislado)
+python main.py --lab --full
 ```
 
 ---

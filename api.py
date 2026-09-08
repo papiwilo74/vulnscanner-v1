@@ -9,8 +9,9 @@ from threading import Lock
 from typing import Any, Optional
 
 import requests
+import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from main import scan
@@ -21,7 +22,7 @@ logger = logging.getLogger("VulnScannerAPI")
 app = FastAPI(
     title="VulnScanner Enterprise API",
     description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI y Dashboard SOC en tiempo real.",
-    version="2.3.0"
+    version="2.4.0"
 )
 
 
@@ -67,7 +68,7 @@ def broadcast_event_sync(task_id: str, event_data: dict[str, Any]) -> None:
 
     msg = json.dumps(event_data, ensure_ascii=False)
 
-    async def _send_all():
+    async def _send_all() -> None:
         for ws in sockets:
             with contextlib.suppress(Exception):
                 await ws.send_text(msg)
@@ -121,7 +122,7 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaratio
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
 
 
-def _save_task(conn: sqlite3.Connection, task_id: str, **fields) -> None:
+def _save_task(conn: sqlite3.Connection, task_id: str, **fields: Any) -> None:
     valid = {"task_id", "url", "status", "html_report_path", "json_report_path", "sarif_report_path", "pdf_report_path", "results"}
     updates = {k: fields[k] for k in fields if k in valid}
     if "results" in updates and not isinstance(updates["results"], str):
@@ -146,7 +147,7 @@ def _get_task(conn: sqlite3.Connection, task_id: str) -> Optional[dict[str, Any]
     return data
 
 
-def _list_tasks(conn: sqlite3.Connection) -> list:
+def _list_tasks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     rows = conn.execute("SELECT task_id, url, status, created_at FROM tasks ORDER BY created_at DESC").fetchall()
     return [{"task_id": r["task_id"], "url": r["url"], "status": r["status"], "created_at": r["created_at"]} for r in rows]
 
@@ -179,7 +180,7 @@ class ScanRequest(BaseModel):
     base_branch: str = "main"
 
 
-def run_scan_in_background(task_id: str, req: ScanRequest):
+def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
     """
     Ejecuta el escaneo en segundo plano, transmite telemetría por WebSockets,
     actualiza el estado de la tarea y envía notificación por Webhook si está configurada.
@@ -201,7 +202,7 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
         "waf_detected": False,
     })
 
-    def _progress_cb(evt: dict[str, Any]):
+    def _progress_cb(evt: dict[str, Any]) -> None:
         broadcast_event_sync(task_id, evt)
 
     try:
@@ -302,7 +303,7 @@ def run_scan_in_background(task_id: str, req: ScanRequest):
             send_webhook_notification(task_id, req.webhook_url, "failed", error_info)
 
 
-def send_webhook_notification(task_id: str, webhook_url: str, status: str, payload: Any):
+def send_webhook_notification(task_id: str, webhook_url: str, status: str, payload: Any) -> None:
     """Envía una petición POST con los resultados al Webhook especificado."""
     logger.info(f"Enviando notificación webhook para la tarea {task_id} a: {webhook_url}")
     try:
@@ -321,10 +322,10 @@ def send_webhook_notification(task_id: str, webhook_url: str, status: str, paylo
 
 
 @app.get("/")
-def read_root():
+def read_root() -> dict[str, Any]:
     return {
         "message": "Bienvenido a VulnScanner Enterprise API",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST"],
         "dashboard_url": "/dashboard",
         "docs_url": "/docs",
@@ -333,7 +334,7 @@ def read_root():
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def get_dashboard():
+def get_dashboard() -> HTMLResponse:
     """Sirve la consola interactiva en tiempo real del SOC Dashboard."""
     dashboard_path = os.path.join(os.path.dirname(__file__), "templates", "dashboard.html")
     if not os.path.exists(dashboard_path):
@@ -344,7 +345,7 @@ def get_dashboard():
 
 
 @app.websocket("/ws/scan/{task_id}")
-async def websocket_scan_stream(websocket: WebSocket, task_id: str):
+async def websocket_scan_stream(websocket: WebSocket, task_id: str) -> None:
     """Canal WebSocket para transmisión reactiva de telemetría, hallazgos y estado del escaneo."""
     await websocket.accept()
     past_events = broadcaster.connect(task_id, websocket)
@@ -365,7 +366,7 @@ async def websocket_scan_stream(websocket: WebSocket, task_id: str):
 
 
 @app.get("/download")
-def download_report(path: str):
+def download_report(path: str) -> FileResponse:
     """Permite la descarga segura de reportes generados (HTML, JSON, SARIF, PDF)."""
     normalized = os.path.abspath(path)
     reports_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "reports"))
@@ -379,7 +380,7 @@ def download_report(path: str):
 
 
 @app.post("/scan", status_code=202)
-def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
+def start_scan(request: ScanRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
     """
     Inicia un escaneo web en segundo plano y responde inmediatamente con un ID de tarea.
     """
@@ -401,7 +402,7 @@ def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
 
 
 @app.get("/scan/{task_id}")
-def get_scan_status(task_id: str):
+def get_scan_status(task_id: str) -> dict[str, Any]:
     """
     Retorna el estado actual de una tarea de escaneo específica y sus resultados si terminó.
     """
@@ -416,7 +417,7 @@ def get_scan_status(task_id: str):
 
 
 @app.get("/scans")
-def list_scans():
+def list_scans() -> dict[str, Any]:
     """
     Lista el historial de escaneos y sus estados correspondientes.
     """
@@ -429,3 +430,12 @@ def list_scans():
         "total_tasks": len(tasks),
         "tasks": tasks
     }
+
+
+@app.get("/openapi.yaml", response_class=PlainTextResponse)
+def get_openapi_yaml() -> PlainTextResponse:
+    """Retorna el esquema contractual oficial OpenAPI 3.1 en formato YAML."""
+    openapi_schema = app.openapi()
+    yaml_content = yaml.safe_dump(openapi_schema, sort_keys=False, allow_unicode=True)
+    return PlainTextResponse(content=yaml_content, media_type="text/yaml")
+

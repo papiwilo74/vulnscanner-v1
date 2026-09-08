@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import base64
 import logging
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -43,26 +43,26 @@ class GitHubPRClient:
         resp = requests.get(url, headers=self.headers, timeout=15)
         if resp.status_code >= 400:
             raise RuntimeError(f"GitHub API Error {resp.status_code}: {resp.text}")
-        return resp.json()
+        return cast(dict[str, Any], resp.json())
 
     def _post(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}/repos/{self.repo}/{endpoint.lstrip('/')}"
         resp = requests.post(url, headers=self.headers, json=payload, timeout=15)
         if resp.status_code >= 400:
             raise RuntimeError(f"GitHub API Error {resp.status_code}: {resp.text}")
-        return resp.json()
+        return cast(dict[str, Any], resp.json())
 
     def _put(self, endpoint: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}/repos/{self.repo}/{endpoint.lstrip('/')}"
         resp = requests.put(url, headers=self.headers, json=payload, timeout=15)
         if resp.status_code >= 400:
             raise RuntimeError(f"GitHub API Error {resp.status_code}: {resp.text}")
-        return resp.json()
+        return cast(dict[str, Any], resp.json())
 
     def get_default_branch_sha(self, branch: str = "main") -> str:
         """Obtiene el SHA del último commit de la rama base."""
         data = self._get(f"git/ref/heads/{branch}")
-        return data["object"]["sha"]
+        return cast(str, data["object"]["sha"])
 
     def create_branch(self, branch_name: str, base_sha: str) -> dict[str, Any]:
         """Crea una nueva referencia de rama en el repositorio."""
