@@ -161,17 +161,26 @@ python main.py <URL> [OPCIONES]
 | `--iast-url <url>` | Correlaciona con agente IAST/RASP en tiempo de ejecución (archivo y línea de código) | `--iast-url http://localhost:8000` |
 | `--no-attack-chain` | Desactiva el modelado de Grafos de Ataque y análisis de Choke Points | `--no-attack-chain` |
 
-### Ejemplos combinados
+### Ejemplos Prácticos de Escaneo
 
 ```bash
-# Escaneo completo con rate-limiting, crawling y subdominios
-python main.py https://ejemplo.com/ --stealth --crawl 10 --subdomains --no-open
+# 1. Escaneo completo recomendado (Stealth + Rastreo de 10 páginas + Subdominios)
+python main.py https://tu-sitio.com/ --stealth --crawl 10 --subdomains
 
-# Escaneo de area autenticada con cookies
-python main.py https://ejemplo.com/dashboard/ --cookie "session=abc; user=admin" --stealth
+# 2. Escaneo de alto rendimiento (Motor Asíncrono httpx/asyncio)
+python main.py https://tu-sitio.com/ --async-engine --crawl 15 --no-open
 
-# Escaneo con retardo fijo de 1.5 segundos
-python main.py https://ejemplo.com/ --delay 1.5 --no-open
+# 3. Auditoría de API REST guiada por contrato OpenAPI/Swagger
+python main.py https://api.tu-sitio.com/ --openapi https://api.tu-sitio.com/openapi.json
+
+# 4. Escaneo híbrido DAST + IAST en tiempo de ejecución (0% falsos positivos)
+python main.py https://tu-sitio.com/ --iast-url http://localhost:8000
+
+# 5. Escaneo no intrusivo (solo lectura pasiva de cabeceras, SSL y cookies)
+python main.py https://tu-sitio.com/ --passive
+
+# 6. Escaneo de zona autenticada con cookies de sesión
+python main.py https://tu-sitio.com/dashboard/ --cookie "session=abc123; role=admin" --stealth
 ```
 
 ---
