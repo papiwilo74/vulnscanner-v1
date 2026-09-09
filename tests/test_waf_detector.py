@@ -1,10 +1,12 @@
 """Pruebas unitarias para el detector de WAF y el Circuit Breaker de ScanEngine."""
 import time
 
-import responses
+import pytest
 
-from scanner.engine import ScanConfig, ScanEngine, ScanProfile
-from scanner.waf_detector import WAFDetector
+responses = pytest.importorskip("responses")
+
+from scanner.engine import ScanConfig, ScanEngine, ScanProfile  # noqa: E402
+from scanner.waf_detector import WAFDetector  # noqa: E402
 
 
 class TestWAFDetector:

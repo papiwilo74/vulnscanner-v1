@@ -10,6 +10,7 @@ Proporciona:
 from __future__ import annotations
 
 import builtins
+import contextlib
 import contextvars
 import inspect
 import json
@@ -163,7 +164,8 @@ class HookManager:
         self._orig_sqlite_connect = sqlite3.connect
 
         def hooked_connect(*args: Any, **kwargs: Any) -> Any:
-            assert self._orig_sqlite_connect is not None
+            if self._orig_sqlite_connect is None:
+                raise RuntimeError("sqlite3.connect hook original reference is None")
             real_conn = self._orig_sqlite_connect(*args, **kwargs)
             return HookedConnection(real_conn, self)
 
@@ -197,7 +199,8 @@ class HookManager:
                     telemetry.blocked_by_rasp = True
                     raise RASPBlockedException("command", f"Suspicious OS command blocked: {cmd_arg[:80]}", file, line)
 
-            assert self._orig_subprocess_popen is not None
+            if self._orig_subprocess_popen is None:
+                raise RuntimeError("subprocess.Popen hook original reference is None")
             return self._orig_subprocess_popen(*args, **kwargs)
 
         setattr(subprocess, "Popen", hooked_popen)  # noqa: B010
@@ -225,7 +228,8 @@ class HookManager:
                     telemetry.blocked_by_rasp = True
                     raise RASPBlockedException("file", f"Path traversal attempt blocked: {file_str[:80]}", src_file, line)
 
-            assert self._orig_builtin_open is not None
+            if self._orig_builtin_open is None:
+                raise RuntimeError("builtins.open hook original reference is None")
             return self._orig_builtin_open(file, *args, **kwargs)
 
         setattr(builtins, "open", hooked_open)  # noqa: B010
@@ -295,7 +299,7 @@ class VulnScannerASGI:
         self.hook_manager.install_hooks()
 
         if hasattr(app, "add_exception_handler"):
-            try:
+            with contextlib.suppress(Exception):
                 from starlette.responses import JSONResponse
 
                 def _handle_rasp_exc(request: Any, exc: RASPBlockedException) -> Any:
@@ -316,8 +320,6 @@ class VulnScannerASGI:
                     )
 
                 app.add_exception_handler(RASPBlockedException, _handle_rasp_exc)
-            except Exception:
-                pass
 
     def _handle_sink_event(self, telemetry: IASTTelemetry) -> bool:
         """Registra telemetría y decide si permitir o bloquear la ejecución."""

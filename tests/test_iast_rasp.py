@@ -140,7 +140,7 @@ class TestIASTRASP:
             affected_url="http://testserver/user",
         )
 
-        enriched = engine.correlate_iast([finding], session=MockSession())  # type: ignore[arg-type]
+        enriched = engine.correlate_iast([finding], session=MockSession())
         assert enriched == 1
         assert finding.iast_source_file == "app/views/user.py"
         assert finding.iast_source_line == 42

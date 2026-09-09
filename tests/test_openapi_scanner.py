@@ -1,9 +1,10 @@
-"""Pruebas unitarias para el módulo OpenAPIScanner de auditoría de APIs."""
 import json
 
-import responses
+import pytest
 
-from scanner.openapi_scanner import OpenAPIScanner
+responses = pytest.importorskip("responses")
+
+from scanner.openapi_scanner import OpenAPIScanner  # noqa: E402
 
 SAMPLE_OPENAPI_SPEC = {
     "openapi": "3.0.0",

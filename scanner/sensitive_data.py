@@ -43,7 +43,7 @@ def _is_valid_jwt(token_str: str) -> bool:
         header_obj = json.loads(header_bytes.decode("utf-8", errors="ignore"))
         if isinstance(header_obj, dict) and ("alg" in header_obj or header_obj.get("typ") == "JWT"):
             return True
-    except Exception:
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
         pass
     return False
 

@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+from typing import Any, Optional
 
 import pytest
 
@@ -130,13 +131,13 @@ def test_server():
     thread.join(timeout=2)
 
 
-def _assert_has_vuln(results: list, keyword: str, risk: str = None) -> dict:
+def _assert_has_vuln(results: list[dict[str, Any]], keyword: str, risk: Optional[str] = None) -> dict[str, Any]:
     """Helper: assert that results contain a finding matching keyword and optional risk level."""
-    matches = [r for r in results if keyword.lower() in r.get('vuln', '').lower()]
-    assert matches, f"Expected finding with '{keyword}', got vulns: {[r['vuln'] for r in results]}"
+    matches = [r for r in results if keyword.lower() in str(r.get('vuln', '')).lower()]
+    assert matches, f"Expected finding with '{keyword}', got vulns: {[r.get('vuln') for r in results]}"
     if risk:
-        assert any(r['risk'] == risk for r in matches), \
-            f"Expected risk '{risk}' for '{keyword}', got: {[(r['vuln'], r['risk']) for r in matches]}"
+        assert any(r.get('risk') == risk for r in matches), \
+            f"Expected risk '{risk}' for '{keyword}', got: {[(r.get('vuln'), r.get('risk')) for r in matches]}"
     return matches[0]
 
 

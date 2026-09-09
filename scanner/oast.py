@@ -81,8 +81,8 @@ class OASTClient:
                 data = resp.json()
                 if isinstance(data, list):
                     return data
-        except Exception:
-            # Si el servidor público no está disponible o estamos en red cerrada, degradar limpiamente
+        except (requests.RequestException, ValueError):
+            # Si el servidor público no está disponible o la respuesta no es JSON, degradar limpiamente
             pass
 
         return self._registered_interactions.get(token, [])

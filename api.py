@@ -169,21 +169,55 @@ def _save_task(conn: sqlite3.Connection, task_id: str, **fields: Any) -> None:
         updates["results"] = json.dumps(updates["results"], ensure_ascii=False)
 
     existing = conn.execute("SELECT task_id FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
-    if not existing:
-        updates["task_id"] = task_id
-        cols = list(updates.keys())
-        placeholders = ", ".join("?" for _ in cols)
-        col_clause = ", ".join(cols)
+    if existing:
         conn.execute(
-            f"INSERT INTO tasks ({col_clause}) VALUES ({placeholders})",
-            list(updates.values())
+            """
+            UPDATE tasks SET
+                url = COALESCE(?, url),
+                status = COALESCE(?, status),
+                html_report_path = COALESCE(?, html_report_path),
+                json_report_path = COALESCE(?, json_report_path),
+                sarif_report_path = COALESCE(?, sarif_report_path),
+                pdf_report_path = COALESCE(?, pdf_report_path),
+                results = COALESCE(?, results),
+                tenant_id = COALESCE(?, tenant_id),
+                region = COALESCE(?, region),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE task_id = ?
+            """,
+            (
+                updates.get("url"),
+                updates.get("status"),
+                updates.get("html_report_path"),
+                updates.get("json_report_path"),
+                updates.get("sarif_report_path"),
+                updates.get("pdf_report_path"),
+                updates.get("results"),
+                updates.get("tenant_id"),
+                updates.get("region"),
+                task_id,
+            ),
         )
     else:
-        set_clause = ", ".join(f"{k} = ?" for k in updates)
-        values = list(updates.values()) + [task_id]
         conn.execute(
-            f"UPDATE tasks SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE task_id = ?",
-            values
+            """
+            INSERT INTO tasks (
+                task_id, url, status, html_report_path, json_report_path,
+                sarif_report_path, pdf_report_path, results, tenant_id, region
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                task_id,
+                updates.get("url", ""),
+                updates.get("status", "queued"),
+                updates.get("html_report_path"),
+                updates.get("json_report_path"),
+                updates.get("sarif_report_path"),
+                updates.get("pdf_report_path"),
+                updates.get("results"),
+                updates.get("tenant_id", "org_default"),
+                updates.get("region", "local"),
+            ),
         )
     conn.commit()
 
@@ -239,6 +273,9 @@ def require_role(allowed_roles: list[Role]) -> Any:
             )
         return user
     return _dependency
+
+
+OAUTH2_BEARER_TYPE: str = "bearer"
 
 
 class ScanRequest(BaseModel):
@@ -746,7 +783,7 @@ def register_account(req: RegisterRequest) -> dict[str, Any]:
         "user": user.to_dict(),
         "organization": org.to_dict(),
         "access_token": token,
-        "token_type": "bearer",
+        "token_type": OAUTH2_BEARER_TYPE,
     }
 
 
@@ -763,7 +800,7 @@ def login_account(req: LoginRequest) -> dict[str, Any]:
         "user": user.to_dict(),
         "organization": org.to_dict() if org else None,
         "access_token": token,
-        "token_type": "bearer",
+        "token_type": OAUTH2_BEARER_TYPE,
     }
 
 

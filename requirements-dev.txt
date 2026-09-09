@@ -1,0 +1,25 @@
+# Dependencias base
+-r requirements.txt
+
+# Frameworks de testing y cobertura
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+responses>=0.23.0
+httpx>=0.25.0
+
+# Tipado estático y stubs oficiales
+mypy>=1.10.0
+types-requests>=2.31.0
+types-urllib3>=1.26.0
+types-colorama>=0.4.15
+
+# SAST, Linter y auditoría de seguridad
+bandit>=1.7.5
+pip-audit>=2.7.0
+ruff>=0.4.0
+
+# Dependencias opcionales para generación de reportes y parsers
+reportlab>=4.0.0
+defusedxml>=0.7.1
+PyYAML>=6.0

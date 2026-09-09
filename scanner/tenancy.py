@@ -383,7 +383,8 @@ class TenancyManager:
             id="user_default_admin",
             org_id="org_default",
             email="admin@vulnscanner.local",
-            password_hash="",
+            # Fallback en memoria con login por contraseña deshabilitado
+            password_hash="",  # nosec B106
             full_name="SecOps Admin",
             role=Role.ADMIN,
         )

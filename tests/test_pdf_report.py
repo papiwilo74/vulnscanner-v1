@@ -1,11 +1,15 @@
 import os
 import tempfile
 
-from scanner.models import Finding
-from utils.pdf_report import generate_pdf_report
+import pytest
+
+reportlab = pytest.importorskip("reportlab")
+
+from scanner.models import Finding  # noqa: E402
+from utils.pdf_report import generate_pdf_report  # noqa: E402
 
 
-def test_generate_pdf_report():
+def test_generate_pdf_report() -> None:
     findings = [
         Finding(
             title="Header faltante: Content-Security-Policy",

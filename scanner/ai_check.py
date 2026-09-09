@@ -1,4 +1,5 @@
 import os
+import warnings
 from urllib.parse import parse_qs, urlparse
 
 import joblib
@@ -20,8 +21,10 @@ def load_ai_model() -> bool:
         return False
 
     try:
-        _model = joblib.load(MODEL_PATH)
-        _vectorizer = joblib.load(VECTORIZER_PATH)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            _model = joblib.load(MODEL_PATH)
+            _vectorizer = joblib.load(VECTORIZER_PATH)
         return True
     except (OSError, ValueError):
         return False

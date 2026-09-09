@@ -57,13 +57,11 @@ class HeadlessCrawler:
 
                 # Interceptar peticiones de red salientes (XHR / Fetch)
                 def on_request(req: Any) -> None:
-                    try:
+                    with contextlib.suppress(Exception):
                         req_url = req.url
                         r_type = req.resource_type
                         if r_type in ["fetch", "xhr", "websocket"] or "/api/" in req_url.lower():
                             intercepted_apis.add(req_url.split("#")[0])
-                    except Exception:
-                        pass
 
                 page.on("request", on_request)
 

@@ -10,15 +10,29 @@ import os
 from datetime import datetime
 from typing import Any
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    colors = None
+    letter = None
+    ParagraphStyle = None
+    getSampleStyleSheet = None  # noqa: N816
+    HRFlowable = None
+    Paragraph = None
+    SimpleDocTemplate = None
+    Spacer = None
+    Table = None
+    TableStyle = None
 
 from scanner.models import Finding
 
 
-def _calculate_security_grade(findings: list[Finding]) -> tuple[str, colors.Color, str]:
+def _calculate_security_grade(findings: list[Finding]) -> tuple[str, Any, str]:
     """Calcula la calificación global de seguridad (A+, A, B, C, F) y su color."""
     crit_count = sum(1 for f in findings if f.severity == "critical")
     high_count = sum(1 for f in findings if f.severity == "high")
@@ -42,6 +56,8 @@ def generate_pdf_report(
     engine_summary: dict[str, Any] | None = None,
 ) -> str:
     """Genera un reporte ejecutivo en PDF formal y retorna la ruta del archivo generado."""
+    if not REPORTLAB_AVAILABLE or SimpleDocTemplate is None:
+        raise RuntimeError("reportlab no está instalado. Instálalo con 'pip install reportlab' o usa 'pip install -r requirements-dev.txt'")
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     doc = SimpleDocTemplate(
         output_path,

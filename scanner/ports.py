@@ -67,7 +67,7 @@ def check_ports(url: str) -> list[dict[str, str]]:
                 res = future.result()
                 if res:
                     results.append(res)
-            except Exception:
+            except (OSError, TimeoutError):
                 pass
 
     return results

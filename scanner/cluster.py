@@ -353,8 +353,8 @@ class ClusterCoordinator:
                             (w["id"],),
                         )
                         reaped_workers.append(w["id"])
-                except Exception:
-                    pass
+                except sqlite3.Error as reap_err:
+                    logger.warning("[CLUSTER] Error al procesar failover de worker %s: %s", w.get("id"), reap_err)
             if reaped_workers:
                 conn.commit()
                 logger.info("[CLUSTER FAILOVER] Workers desconectados detectados: %s. Tareas reencoladas.", reaped_workers)
@@ -461,8 +461,8 @@ class ScanningWorkerDaemon:
                     body = resp.json()
                     if body.get("claimed") and body.get("job"):
                         job_data = body["job"]
-            except Exception:
-                pass
+            except (requests.RequestException, ValueError, KeyError) as poll_err:
+                logger.debug("[WORKER] Error de comunicación al consultar tareas: %s", poll_err)
 
             if not job_data:
                 time.sleep(self.poll_interval)

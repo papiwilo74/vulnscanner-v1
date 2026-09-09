@@ -4,6 +4,7 @@ Analiza flujos de fuentes no confiables (Sources: location.search, location.hash
 hacia sumideros peligrosos (Sinks: innerHTML, eval, document.write, setTimeout) tanto
 en código JavaScript estático como dinámicamente en navegador.
 """
+import contextlib
 import re
 from typing import Any, Optional
 
@@ -72,7 +73,7 @@ def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict[str
         f"{target_url}?search={canary}&q={canary}"
     ]
 
-    try:
+    with contextlib.suppress(Exception):
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as p:
@@ -80,7 +81,7 @@ def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict[str
             page = browser.new_page()
 
             for test_url in test_urls:
-                try:
+                with contextlib.suppress(Exception):
                     page.goto(test_url, timeout=timeout, wait_until="domcontentloaded")
                     page.wait_for_timeout(1000)
 
@@ -105,12 +106,8 @@ def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict[str
                             "solution": "Sanitiza las variables obtenidas de window.location antes de insertarlas en el árbol DOM con DOMPurify.sanitize()."
                         })
                         break
-                except Exception:
-                    continue
 
             browser.close()
-    except Exception:
-        pass
 
     return findings
 

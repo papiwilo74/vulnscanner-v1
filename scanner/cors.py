@@ -76,8 +76,8 @@ def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dic
                         "detail": f"El servidor ({method}) expone Access-Control-Allow-Origin: * permitiendo peticiones desde cualquier origen sin credenciales."
                     })
                     break
-    except Exception:
-        # Silenciar excepciones de conexión general
+    except requests.RequestException:
+        # Silenciar excepciones de conexión de red esperadas en escaneo
         pass
 
     return results

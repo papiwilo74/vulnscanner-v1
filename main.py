@@ -649,8 +649,8 @@ if __name__ == "__main__":
                         args.openapi = cand_url
                         logger.info("[AUTO-DISCOVERY] Especificación OpenAPI encontrada en: %s", cand_url)
                         break
-                except Exception:
-                    pass
+                except requests.RequestException:
+                    continue
         # Auto-descubrir si el servidor tiene agente IAST/RASP activo
         if not args.iast_url:
             session_check = build_session(args.cookie, args.auth) or requests.Session()
@@ -659,7 +659,7 @@ if __name__ == "__main__":
                 if r.status_code == 200 and "telemetry" in r.text:
                     args.iast_url = args.url
                     logger.info("[AUTO-DISCOVERY] Agente IAST/RASP en memoria detectado en el objetivo.")
-            except Exception:
+            except requests.RequestException:
                 pass
 
     try:

@@ -1,23 +1,23 @@
-# VulnScanner v2.4 (Enterprise Edition)
+# VulnScanner v2.5 (Enterprise Edition)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/VulnScanner-v2.4.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.4 Enterprise" />
+  <img src="https://img.shields.io/badge/VulnScanner-v2.5.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.5 Enterprise" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.4.0"><img src="https://img.shields.io/badge/Release-v2.4.0-007EC6.svg?logo=github" alt="Release v2.4.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.5.0"><img src="https://img.shields.io/badge/Release-v2.5.0-007EC6.svg?logo=github" alt="Release v2.5.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
   <a href="https://pypi.org/project/pip-audit/"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-213%20passing-brightgreen.svg" alt="213 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-225%20passing-brightgreen.svg" alt="225 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.4** es una plataforma integral de ciberdefensa y auditoría web de nivel empresarial que combina **DAST + SAST + IAST/RASP + ML + API Security + DevSecOps Autónomo + Modo Lab Aislado**. Incorpora un **Servidor de Laboratorio Aislado (`--lab`)** para CI/CD hermético, tipado estricto `mypy --strict` al 100% en todos sus módulos, especificación formal **OpenAPI 3.1 & YAML**, catálogo granular **MITRE ATT&CK v3.1**, benchmark estandarizado de rendimiento (181.97 req/s, 1.46 MB RAM), registros formales de decisiones arquitecturales ([ADRs](docs/ARCHITECTURE_DECISIONS.md)), reportes ejecutivos en PDF y auto-remediación con GitHub Pull Requests.
+> **VulnScanner v2.5** es una plataforma integral de ciberdefensa activa, auditoría web y Cloud-Native SaaS que combina **DAST + SAST + IAST/RASP + ML + Cluster Distribuido Multi-Región + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Incorpora un **Servidor de Laboratorio Aislado (`--lab`)** para CI/CD hermético, tipado estricto `mypy --strict` al 100% en todo el core, cero vulnerabilidades SAST (`bandit` limpio), especificación formal **OpenAPI 3.1 & YAML**, catálogo granular **MITRE ATT&CK v3.1**, benchmark estandarizado de rendimiento (181.97 req/s, 1.46 MB RAM), registros formales de decisiones arquitecturales ([ADRs](docs/ARCHITECTURE_DECISIONS.md)), reportes ejecutivos en PDF y auto-remediación con GitHub Pull Requests.
 
 ---
 
@@ -105,7 +105,11 @@ python -m venv venv
 # Linux/Mac
 source venv/bin/activate
 
+# Instalación básica para escaneo:
 pip install -r requirements.txt
+
+# O instalación completa para desarrollo, testing, stubs de tipado y SAST:
+pip install -r requirements-dev.txt
 ```
 
 ### Opcional: Usar Docker
@@ -384,15 +388,20 @@ El modelo entrenado se guarda en `models/` y es cargado automaticamente durante 
 ## Ejecutar Pruebas
 
 ```bash
-# Instalar dependencias de desarrollo y seguridad
-pip install -r requirements.txt
-pip install pytest pytest-mock responses pytest-cov mypy types-requests types-urllib3 types-colorama bandit pip-audit httpx
+# 1. Instalar suite completa de desarrollo, testing y tipos
+pip install -r requirements-dev.txt
 
-# Ejecutar suite completa (unitarios, integracion, contratos)
-pytest tests/ -v
+# 2. Ejecutar suite de pruebas (225 tests unitarios, integración, contratos, E2E)
+pytest
 
-# Ejecutar con reporte de cobertura
-pytest tests/ --cov=. --cov-report=term-missing --cov-branch
+# 3. Verificación de tipado estático estricto (0 errores garantizados)
+mypy
+
+# 4. Análisis estático de seguridad SAST (0 vulnerabilidades High/Medium/Low)
+bandit -c bandit.yaml -r scanner api.py main.py
+
+# 5. Verificación de estilo y linter PEP 8
+ruff check .
 ```
 
 ### CI/CD Pipeline
@@ -417,6 +426,7 @@ VulnScanner/
 ├── api.py                   # API REST con FastAPI
 ├── train_ai.py              # Script de entrenamiento del modelo de IA
 ├── requirements.txt         # Dependencias del proyecto
+├── requirements-dev.txt     # Dependencias de desarrollo, tests y stubs de tipado
 ├── requirements_ai.txt      # Dependencias del modulo de IA
 ├── pyproject.toml           # Metadata y configuracion del paquete
 ├── ruff.toml                # Configuracion de linting
@@ -424,6 +434,9 @@ VulnScanner/
 ├── docker-compose.yml       # Orquestacion de servicios
 │
 ├── scanner/                 # Modulos de deteccion de vulnerabilidades
+│   ├── cluster.py           # Cluster distribuido y workers multi-región
+│   ├── tenancy.py           # Gestor multi-tenant y RBAC con JWT
+│   ├── deception.py         # Motor de ciberdefensa activa (HoneyTokens)
 │   ├── headers.py
 │   ├── models.py
 │   ├── engine.py
