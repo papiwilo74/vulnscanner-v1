@@ -70,6 +70,19 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+        <!-- Navigation Tabs -->
+        <div class="flex items-center space-x-3 border-b border-soc-border pb-3">
+            <button id="tab-btn-dast" onclick="switchTab('dast')" class="px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30">
+                <i class="fa-solid fa-radar"></i> Auditoría DAST & Telemetría
+            </button>
+            <button id="tab-btn-deception" onclick="switchTab('deception')" class="px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+                <i class="fa-solid fa-crosshairs text-rose-400"></i> Ciberdefensa Activa (HoneyTokens)
+                <span id="tab-badge-intrusions" class="hidden bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">0</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: DAST AUDIT VIEW -->
+        <div id="view-dast" class="space-y-6">
         <!-- Scan Launcher Card -->
         <section class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -217,6 +230,151 @@
                 </div>
             </div>
         </section>
+        </div><!-- End view-dast -->
+
+        <!-- TAB 2: CIBERDEFENSA ACTIVA & HONEYTOKENS VIEW -->
+        <div id="view-deception" class="space-y-6 hidden">
+            <!-- Banner -->
+            <div class="bg-gradient-to-r from-rose-950/40 via-soc-card to-indigo-950/40 border border-rose-500/30 rounded-2xl p-6 shadow-xl relative">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-rose-500/20 text-rose-400 text-xs px-2.5 py-0.5 rounded-full font-mono border border-rose-500/30 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-rose-500 live-dot"></span> CIBERDEFENSA ACTIVA
+                            </span>
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-mono border border-emerald-500/30">
+                                0.0% FALSOS POSITIVOS
+                            </span>
+                        </div>
+                        <h2 class="text-xl font-bold mt-2">Tecnología de Deception & HoneyTokens</h2>
+                        <p class="text-xs text-slate-400 mt-1 max-w-3xl">
+                            Siembra HoneyURLs invisibles, Fake API Keys y Tokens de Sesión señuelo en tu aplicación. Los atacantes que realizan reconocimiento y scraping muerden el anzuelo, revelando su IP, User-Agent y vectores de ataque en tiempo real.
+                        </p>
+                    </div>
+                    <button onclick="document.getElementById('trap-gen-form').scrollIntoView({behavior: 'smooth'})" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-sm font-semibold shadow-lg shadow-rose-600/30 transition flex items-center gap-2 whitespace-nowrap self-start md:self-auto">
+                        <i class="fa-solid fa-plus"></i> Sembrar Señuelo
+                    </button>
+                </div>
+            </div>
+
+            <!-- Deception Metrics Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Trampas Activas</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-indigo-400">
+                            <span id="dec-stat-traps">0</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Señuelos en producción</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl">
+                        <i class="fa-solid fa-spider"></i>
+                    </div>
+                </div>
+
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Intrusiones Detectadas</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-rose-500">
+                            <span id="dec-stat-intrusions">0</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Canarios detonados</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 text-xl">
+                        <i class="fa-solid fa-bell"></i>
+                    </div>
+                </div>
+
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Atacantes Únicos</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-amber-400">
+                            <span id="dec-stat-attackers">0</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Direcciones IP aisladas</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
+                        <i class="fa-solid fa-user-secret"></i>
+                    </div>
+                </div>
+
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Falsos Positivos</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-emerald-400">
+                            <span>0.0%</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Garantía matemática</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                        <i class="fa-solid fa-shield-check"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trap Generator Form Card -->
+            <div id="trap-gen-form" class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl">
+                <h3 class="font-bold text-sm mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-indigo-400"></i> Generar Nuevo Señuelo / HoneyToken
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label for="trap-type-select" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Tipo de Trampa</label>
+                        <select id="trap-type-select" class="w-full py-2.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500">
+                            <option value="url">HoneyURL (Enlace invisible HTML / robots.txt)</option>
+                            <option value="api_key">Fake API Key (Stripe / AWS en JS público)</option>
+                            <option value="jwt_token">JWT Superadmin (LocalStorage señuelo)</option>
+                            <option value="cookie">HoneyCookie (Cookie de sesión señuelo)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="trap-label-input" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Etiqueta Identificativa</label>
+                        <input type="text" id="trap-label-input" placeholder="Ej. Stripe Live Secret en checkout.js"
+                               class="w-full py-2.5 px-3 bg-slate-900 border border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <button onclick="createNewTrap()" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-bolt"></i> Forjar Trampa
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Workspace: Canary Intrusion Live Feed (Left) & Trap Catalog (Right) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Live Intrusion Feed (2 Cols) -->
+                <div class="lg:col-span-2 bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 live-dot"></span>
+                            <h3 class="font-bold text-base">Feed de Intrusiones en Vivo (Canary Alerts)</h3>
+                        </div>
+                        <button onclick="loadDeceptionData()" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-mono">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refrescar
+                        </button>
+                    </div>
+                    <div id="canary-events-list" class="overflow-y-auto flex-1 max-h-[460px] space-y-3 pr-1">
+                        <div class="text-center py-16 text-slate-500 text-sm">
+                            <i class="fa-solid fa-crosshairs text-3xl mb-2 block opacity-40"></i>
+                            No se han detectado intrusiones recientes. Los señuelos están vigilando 24/7.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Traps Catalog (1 Col) -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                    <h3 class="font-bold text-base mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-400"></i> Catálogo de Señuelos Activos
+                    </h3>
+                    <div id="traps-catalog-list" class="overflow-y-auto flex-1 max-h-[460px] space-y-3 pr-1">
+                        <div class="text-center py-16 text-slate-500 text-sm">
+                            <i class="fa-solid fa-box-open text-3xl mb-2 block opacity-40"></i>
+                            No hay trampas generadas aún. Usa el formulario superior para crear una.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- End view-deception -->
     </main>
 
     <!-- Footer -->
@@ -458,6 +616,267 @@
                 btn.innerHTML = '<i class="fa-solid fa-play"></i> Iniciar Escaneo';
             }
         }
+
+        // =====================================================================
+        // DECEPTION ENGINE JAVASCRIPT LOGIC
+        // =====================================================================
+        let deceptionWs = null;
+        let totalIntrusionsCounter = 0;
+
+        function switchTab(tab) {
+            const btnDast = document.getElementById('tab-btn-dast');
+            const btnDec = document.getElementById('tab-btn-deception');
+            const viewDast = document.getElementById('view-dast');
+            const viewDec = document.getElementById('view-deception');
+
+            if (tab === 'dast') {
+                btnDast.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30';
+                btnDec.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800';
+                viewDast.classList.remove('hidden');
+                viewDec.classList.add('hidden');
+            } else {
+                btnDec.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-rose-600 text-white shadow-lg shadow-rose-600/30';
+                btnDast.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800';
+                viewDec.classList.remove('hidden');
+                viewDast.classList.add('hidden');
+                loadDeceptionData();
+            }
+        }
+
+        function connectDeceptionWebSocket() {
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${proto}//${window.location.host}/ws/deception`;
+            deceptionWs = new WebSocket(wsUrl);
+
+            deceptionWs.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.event === 'deception_alert') {
+                        handleDeceptionAlert(msg.data, msg.stats);
+                    }
+                } catch(e) {
+                    console.error("Error en WebSocket de Deception:", e);
+                }
+            };
+
+            deceptionWs.onclose = () => {
+                setTimeout(connectDeceptionWebSocket, 5000);
+            };
+        }
+
+        function handleDeceptionAlert(ev, stats) {
+            totalIntrusionsCounter++;
+            const badge = document.getElementById('tab-badge-intrusions');
+            if (badge) {
+                badge.textContent = totalIntrusionsCounter;
+                badge.classList.remove('hidden');
+            }
+
+            if (stats) {
+                const trEl = document.getElementById('dec-stat-traps');
+                const inEl = document.getElementById('dec-stat-intrusions');
+                const atEl = document.getElementById('dec-stat-attackers');
+                if (trEl) trEl.textContent = stats.active_traps || stats.total_traps || '0';
+                if (inEl) inEl.textContent = stats.total_intrusions_detected || '0';
+                if (atEl) atEl.textContent = stats.unique_attackers || '0';
+            }
+
+            appendCanaryEvent(ev, true);
+            showToast(`🚨 ¡Intrusión detectada! IP: ${ev.attacker_ip} accedió a trampa '${ev.trap_label}'`, true);
+        }
+
+        function appendCanaryEvent(ev, isNew = false) {
+            const container = document.getElementById('canary-events-list');
+            if (!container) return;
+            if (container.querySelector('.fa-crosshairs')) {
+                container.innerHTML = '';
+            }
+
+            const card = document.createElement('div');
+            const highlightClass = isNew ? 'border-rose-500 bg-rose-950/30 animate-pulse' : 'border-slate-800 bg-slate-900/80';
+            card.className = `p-4 rounded-xl border ${highlightClass} space-y-2 transition-all hover:bg-slate-800/80`;
+            card.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded text-[11px] font-bold font-mono bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                            ${ev.http_method || 'GET'}
+                        </span>
+                        <span class="font-semibold text-sm text-slate-200">${ev.requested_path || '/'}</span>
+                    </div>
+                    <span class="text-xs text-slate-400 font-mono">${ev.timestamp ? ev.timestamp.substring(11, 19) : ''}</span>
+                </div>
+                <p class="text-xs text-slate-400">
+                    Trampa detonada: <strong class="text-rose-300">${ev.trap_label}</strong> (${ev.trap_type})
+                </p>
+                <div class="flex flex-wrap gap-3 text-[11px] text-slate-500 font-mono pt-1 border-t border-slate-800/60">
+                    <span>IP Atacante: <b class="text-rose-400">${ev.attacker_ip}</b></span>
+                    <span>User-Agent: <b class="text-slate-400" title="${ev.user_agent}">${(ev.user_agent || '').substring(0, 45)}...</b></span>
+                </div>
+                ${ev.payload_sample ? `<div class="bg-black/40 p-2 rounded text-[11px] font-mono text-amber-300 truncate">Payload: ${ev.payload_sample}</div>` : ''}
+            `;
+            container.prepend(card);
+            if (isNew) {
+                setTimeout(() => {
+                    card.classList.remove('animate-pulse', 'border-rose-500', 'bg-rose-950/30');
+                    card.classList.add('border-slate-800', 'bg-slate-900/80');
+                }, 4000);
+            }
+        }
+
+        async function loadDeceptionData() {
+            try {
+                const [trapsRes, eventsRes] = await Promise.all([
+                    fetch('/api/deception/traps'),
+                    fetch('/api/deception/events')
+                ]);
+                const trapsData = await trapsRes.json();
+                const eventsData = await eventsRes.json();
+
+                if (trapsData.stats) {
+                    const trEl = document.getElementById('dec-stat-traps');
+                    const inEl = document.getElementById('dec-stat-intrusions');
+                    const atEl = document.getElementById('dec-stat-attackers');
+                    if (trEl) trEl.textContent = trapsData.stats.active_traps;
+                    if (inEl) inEl.textContent = trapsData.stats.total_intrusions_detected;
+                    if (atEl) atEl.textContent = trapsData.stats.unique_attackers;
+                }
+
+                // Render Traps Catalog
+                const trapList = document.getElementById('traps-catalog-list');
+                if (trapList && trapsData.traps && trapsData.traps.length > 0) {
+                    trapList.innerHTML = '';
+                    trapsData.traps.forEach(t => {
+                        const item = document.createElement('div');
+                        item.className = 'p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5';
+                        item.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-slate-200">${t.label}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded font-mono uppercase bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">${t.trap_type}</span>
+                            </div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate bg-slate-950 p-1.5 rounded border border-slate-800/80">${t.token_value}</div>
+                            <div class="flex items-center justify-between pt-1 text-[11px]">
+                                <span class="text-slate-500 font-mono">Disparos: <strong class="${t.trigger_count > 0 ? 'text-rose-400' : 'text-slate-400'}">${t.trigger_count}</strong></span>
+                                <button onclick="viewTrapSnippet('${t.id}')" class="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                                    <i class="fa-solid fa-code text-[10px]"></i> Ver Snippet
+                                </button>
+                            </div>
+                        `;
+                        trapList.appendChild(item);
+                    });
+                }
+
+                // Render Events
+                const eventsList = document.getElementById('canary-events-list');
+                if (eventsList && eventsData.events && eventsData.events.length > 0) {
+                    eventsList.innerHTML = '';
+                    eventsData.events.slice().reverse().forEach(ev => appendCanaryEvent(ev, false));
+                }
+            } catch(e) {
+                console.error("Error cargando datos de deception:", e);
+            }
+        }
+
+        async function createNewTrap() {
+            const typeSelect = document.getElementById('trap-type-select');
+            const labelInput = document.getElementById('trap-label-input');
+            const trapType = typeSelect.value;
+            const label = labelInput.value.trim() || `Señuelo ${trapType.toUpperCase()}`;
+
+            try {
+                const res = await fetch('/api/deception/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trap_type: trapType, label: label })
+                });
+                const data = await res.json();
+                labelInput.value = '';
+                showSnippetModal(data.snippet.format, data.snippet.placement, data.snippet.code);
+                loadDeceptionData();
+                showToast("¡Señuelo generado exitosamente!", false);
+            } catch(e) {
+                alert("Error generando trampa: " + e.message);
+            }
+        }
+
+        async function viewTrapSnippet(trapId) {
+            try {
+                const res = await fetch('/api/deception/snippet/' + trapId);
+                const data = await res.json();
+                showSnippetModal(data.snippet.format, data.snippet.placement, data.snippet.code);
+            } catch(e) {
+                alert("Error obteniendo snippet: " + e.message);
+            }
+        }
+
+        function showSnippetModal(title, desc, code) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-desc').textContent = desc;
+            document.getElementById('modal-code').textContent = code;
+            document.getElementById('snippet-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('snippet-modal').classList.add('hidden');
+        }
+
+        function copyModalCode() {
+            const code = document.getElementById('modal-code').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const btn = document.getElementById('modal-copy-btn');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+                btn.className = 'absolute top-3 right-3 px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow';
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.className = 'absolute top-3 right-3 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow';
+                }, 2000);
+            });
+        }
+
+        function showToast(msg, isAlert = false) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.className = `p-4 rounded-xl shadow-2xl border text-xs font-semibold pointer-events-auto transition-all flex items-center gap-3 ${isAlert ? 'bg-rose-950/90 text-rose-200 border-rose-500 shadow-rose-900/40' : 'bg-slate-900/95 text-slate-100 border-slate-700'}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${isAlert ? 'fa-triangle-exclamation text-rose-400 text-base' : 'fa-circle-check text-emerald-400 text-base'}"></i>
+                <span class="flex-1">${msg}</span>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+
+        // Iniciar WebSocket de Deception y cargar datos al inicio
+        connectDeceptionWebSocket();
+        loadDeceptionData();
     </script>
+
+    <!-- Snippet Modal -->
+    <div id="snippet-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-soc-card border border-soc-border rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
+            <div class="flex items-center justify-between border-b border-soc-border pb-3 mb-4">
+                <h3 class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-code text-indigo-400"></i>
+                    <span id="modal-title">Snippet de Integración Señuelo</span>
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p id="modal-desc" class="text-xs text-slate-400 mb-3"></p>
+            <div class="relative">
+                <pre id="modal-code" class="bg-slate-950 p-4 rounded-xl text-xs font-mono text-emerald-400 overflow-x-auto border border-slate-800 select-all"></pre>
+                <button id="modal-copy-btn" onclick="copyModalCode()" class="absolute top-3 right-3 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-copy"></i> Copiar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-3 pointer-events-none"></div>
 </body>
 </html>

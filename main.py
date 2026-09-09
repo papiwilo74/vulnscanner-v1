@@ -527,8 +527,56 @@ if __name__ == "__main__":
                         help="Deshabilita el modelado de Grafos de Ataque y análisis de Choke Points defensivos")
     parser.add_argument("--full", "--all", dest="full", action="store_true",
                         help="Modo Todo-en-Uno: activa crawling (10 páginas), subdominios, stealth, detección WAF, grafos de ataque y auto-detección de OpenAPI e IAST")
+    parser.add_argument("--deception-generate", action="store_true",
+                        help="Genera un pack de señuelos HoneyTokens / Canaries activos (URLs, API Keys, JWT)")
+    parser.add_argument("--deception-alerts", action="store_true",
+                        help="Consulta y lista las alertas de intrusión y detonaciones de trampas activas")
 
     args = parser.parse_args()
+
+    if args.deception_generate:
+        from scanner.deception import DeceptionManager, SnippetGenerator
+        mgr = DeceptionManager()
+        t1 = mgr.create_trap("url", "Ruta Secreta Admin Vault")
+        t2 = mgr.create_trap("api_key", "Stripe Production Live Secret")
+        t3 = mgr.create_trap("jwt_token", "JWT Superadmin Token")
+        print("\n" + "=" * 70)
+        print(" [🛡️ DECEPTION ENGINE] PACK DE SEÑUELOS GENERADO EXITOSAMENTE")
+        print("=" * 70)
+        for t in [t1, t2, t3]:
+            s = SnippetGenerator.generate_snippet(t)
+            print(f"\n📌 Tipo: {t.trap_type.upper()} | Etiqueta: {t.label}")
+            print(f"   ID Trampa: {t.id}")
+            print(f"   Valor Señuelo: {t.token_value}")
+            print(f"   Dónde colocar: {s['placement']}")
+            print(f"   Código a insertar:\n{s['code']}")
+            print("-" * 70)
+        print("\n💡 Cualquier acceso a estos señuelos generará alertas inmediatas en tiempo real.")
+        print(f"   Base de datos de trampas: {mgr.db_path}\n")
+        sys.exit(0)
+
+    if args.deception_alerts:
+        from scanner.deception import DeceptionManager
+        mgr = DeceptionManager()
+        events = mgr.list_events(limit=50)
+        stats = mgr.get_stats()
+        print("\n" + "=" * 70)
+        print(" [🚨 DECEPTION ENGINE] HISTORIAL DE INTRUSIONES & CANARIOS DETONADOS")
+        print("=" * 70)
+        print(f" Trampas Activas: {stats['active_traps']}/{stats['total_traps']} | Intrusiones Totales: {stats['total_intrusions_detected']} | IPs Únicas: {stats['unique_attackers']}")
+        print("-" * 70)
+        if not events:
+            print(" ✅ No se han detectado intrusiones ni accesos a señuelos todavía.")
+        else:
+            for ev in events:
+                print(f" [!] {ev.timestamp} | {ev.http_method} {ev.requested_path}")
+                print(f"     IP Atacante: {ev.attacker_ip} | Trampa: {ev.trap_label} ({ev.trap_type})")
+                print(f"     User-Agent: {ev.user_agent}")
+                if ev.payload_sample:
+                    print(f"     Payload: {ev.payload_sample[:120]}")
+                print("-" * 70)
+        print()
+        sys.exit(0)
 
     if args.web_mode:
         import webbrowser

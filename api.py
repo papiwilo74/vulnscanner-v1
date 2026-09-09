@@ -10,21 +10,23 @@ from typing import Any, Optional
 
 import requests
 import yaml
-from fastapi import BackgroundTasks, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from main import scan
+from scanner.deception import DeceptionManager, SnippetGenerator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VulnScannerAPI")
 
 app = FastAPI(
     title="VulnScanner Enterprise API",
-    description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI y Dashboard SOC en tiempo real.",
+    description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens) y Dashboard SOC en tiempo real.",
     version="2.4.0"
 )
 
+deception_mgr = DeceptionManager()
 
 _db_path = os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db"))
 _db_lock = Lock()
@@ -56,8 +58,40 @@ class EventBroadcaster:
             self.event_history.setdefault(task_id, []).append(event_data)
             return list(self.active_connections.get(task_id, []))
 
+    def get_all_targets(self) -> list[WebSocket]:
+        with self.lock:
+            targets: list[WebSocket] = []
+            for sockets in self.active_connections.values():
+                targets.extend(sockets)
+            return targets
+
 
 broadcaster = EventBroadcaster()
+
+
+def broadcast_deception_alert(event_data: dict[str, Any]) -> None:
+    """Envía alerta de canario detonado a todas las conexiones activas y al canal 'deception'."""
+    sockets = broadcaster.record_and_get_targets("deception", event_data)
+    all_targets = set(sockets).union(broadcaster.get_all_targets())
+    if not all_targets:
+        return
+
+    msg = json.dumps(event_data, ensure_ascii=False)
+
+    async def _send_all() -> None:
+        for ws in all_targets:
+            with contextlib.suppress(Exception):
+                await ws.send_text(msg)
+
+    try:
+        loop = asyncio.get_running_loop()
+        asyncio.run_coroutine_threadsafe(_send_all(), loop)
+    except RuntimeError:
+        new_loop = asyncio.new_event_loop()
+        try:
+            new_loop.run_until_complete(_send_all())
+        finally:
+            new_loop.close()
 
 
 def broadcast_event_sync(task_id: str, event_data: dict[str, Any]) -> None:
@@ -438,4 +472,153 @@ def get_openapi_yaml() -> PlainTextResponse:
     openapi_schema = app.openapi()
     yaml_content = yaml.safe_dump(openapi_schema, sort_keys=False, allow_unicode=True)
     return PlainTextResponse(content=yaml_content, media_type="text/yaml")
+
+
+# =====================================================================
+# CIBERDEFENSA ACTIVA & TECNOLOGÍA DE SEÑUELOS (DECEPTION ENGINE)
+# =====================================================================
+
+class DeceptionGenerateRequest(BaseModel):
+    trap_type: str = "url"
+    label: str = "Señuelo de Detección"
+    target_url: str = ""
+
+
+@app.websocket("/ws/deception")
+async def websocket_deception_stream(websocket: WebSocket) -> None:
+    """Canal WebSocket para transmisión en tiempo real de alertas de intrusión HoneyTokens."""
+    await websocket.accept()
+    past_events = broadcaster.connect("deception", websocket)
+    for evt in past_events[-25:]:
+        try:
+            await websocket.send_text(json.dumps(evt, ensure_ascii=False))
+        except Exception:
+            break
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        broadcaster.disconnect("deception", websocket)
+
+
+@app.post("/api/deception/generate")
+def generate_honey_trap(req: DeceptionGenerateRequest, request: Request) -> dict[str, Any]:
+    """Genera un nuevo HoneyToken / Señuelo (URL, API Key, JWT, Cookie) con snippet de integración."""
+    trap = deception_mgr.create_trap(
+        trap_type=req.trap_type,
+        label=req.label,
+        target_url=req.target_url
+    )
+    base_url = str(request.base_url).rstrip("/")
+    snippet = SnippetGenerator.generate_snippet(trap, server_base_url=base_url)
+    return {
+        "trap": trap.to_dict(),
+        "snippet": snippet,
+        "stats": deception_mgr.get_stats(),
+    }
+
+
+@app.get("/api/deception/traps")
+def list_honey_traps() -> dict[str, Any]:
+    """Lista todas las trampas señuelo configuradas y estadísticas agregadas."""
+    traps = deception_mgr.list_traps()
+    stats = deception_mgr.get_stats()
+    return {
+        "total": len(traps),
+        "traps": [t.to_dict() for t in traps],
+        "stats": stats,
+    }
+
+
+@app.get("/api/deception/events")
+def list_canary_events(limit: int = 50) -> dict[str, Any]:
+    """Lista el historial de detonaciones e intrusiones detectadas por los señuelos."""
+    events = deception_mgr.list_events(limit=limit)
+    return {
+        "total": len(events),
+        "events": [e.to_dict() for e in events],
+    }
+
+
+@app.get("/api/deception/stats")
+def get_deception_stats() -> dict[str, Any]:
+    """Retorna métricas cuantitativas del motor de deception."""
+    return deception_mgr.get_stats()
+
+
+@app.get("/api/deception/snippet/{trap_id}")
+def get_trap_snippet(trap_id: str, request: Request) -> dict[str, Any]:
+    """Genera el snippet de código específico para insertar una trampa en producción."""
+    trap = deception_mgr.get_trap(trap_id)
+    if not trap:
+        raise HTTPException(status_code=404, detail="Trampa señuelo no encontrada")
+    base_url = str(request.base_url).rstrip("/")
+    return {
+        "trap": trap.to_dict(),
+        "snippet": SnippetGenerator.generate_snippet(trap, server_base_url=base_url),
+    }
+
+
+@app.api_route("/deception/trap/{trap_id}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"], include_in_schema=False)
+async def trigger_honey_trap(trap_id: str, request: Request) -> JSONResponse:
+    """
+    Receptor trampa (HoneyTrap Sink). Captura la intrusión del atacante o bot malicioso,
+    registra telemetría completa, alerta al SOC por WebSocket y responde con un error decepcionante (401).
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        attacker_ip = forwarded.split(",")[0].strip()
+    elif request.client:
+        attacker_ip = request.client.host
+    else:
+        attacker_ip = "127.0.0.1"
+
+    user_agent = request.headers.get("user-agent", "Unknown")
+    headers_dict = dict(request.headers)
+
+    payload_sample: Optional[str] = None
+    if request.method in ["POST", "PUT", "PATCH"]:
+        with contextlib.suppress(Exception):
+            body_bytes = await request.body()
+            if body_bytes:
+                payload_sample = body_bytes[:1024].decode(errors="replace")
+
+    trap = deception_mgr.get_trap(trap_id)
+    if not trap:
+        trap = deception_mgr.find_trap_by_token(trap_id)
+
+    if not trap:
+        trap = deception_mgr.create_trap(
+            trap_type="url",
+            label=f"Exploración Señuelo /deception/trap/{trap_id}",
+            target_url=str(request.url)
+        )
+
+    event = deception_mgr.record_event(
+        trap=trap,
+        attacker_ip=attacker_ip,
+        user_agent=user_agent,
+        http_method=request.method,
+        requested_path=str(request.url.path),
+        headers=headers_dict,
+        payload_sample=payload_sample
+    )
+
+    broadcast_deception_alert({
+        "event": "deception_alert",
+        "data": event.to_dict(),
+        "stats": deception_mgr.get_stats(),
+    })
+
+    return JSONResponse(
+        status_code=401,
+        content={
+            "error": "Unauthorized",
+            "message": "Invalid authentication credentials or expired canary token.",
+            "code": "AUTH_TOKEN_EXPIRED",
+            "timestamp": event.timestamp,
+        },
+        headers={"WWW-Authenticate": 'Bearer error="invalid_token"'}
+    )
+
 
