@@ -17,7 +17,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.5** es una plataforma integral de ciberdefensa activa, auditoría web y Cloud-Native SaaS que combina **DAST + SAST + IAST/RASP + ML + Cluster Distribuido Multi-Región + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Incorpora un **Servidor de Laboratorio Aislado (`--lab`)** para CI/CD hermético, tipado estricto `mypy --strict` al 100% en todo el core, cero vulnerabilidades SAST (`bandit` limpio), especificación formal **OpenAPI 3.1 & YAML**, catálogo granular **MITRE ATT&CK v3.1**, benchmark estandarizado de rendimiento (181.97 req/s, 1.46 MB RAM), registros formales de decisiones arquitecturales ([ADRs](docs/ARCHITECTURE_DECISIONS.md)), reportes ejecutivos en PDF y auto-remediación con GitHub Pull Requests.
+> **VulnScanner v2.5** es una plataforma de análisis de seguridad web y ciberdefensa en Python que integra **DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict`, análisis SAST con `bandit`, especificación OpenAPI 3.1 & YAML, reportes ejecutivos en PDF y suites de pruebas automatizadas listas out-of-the-box.
 
 ---
 
@@ -105,11 +105,8 @@ python -m venv venv
 # Linux/Mac
 source venv/bin/activate
 
-# Instalación básica para escaneo:
+# Instalación completa (runtime, stubs de tipado y librerías de test out-of-the-box):
 pip install -r requirements.txt
-
-# O instalación completa para desarrollo, testing, stubs de tipado y SAST:
-pip install -r requirements-dev.txt
 ```
 
 ### Opcional: Usar Docker

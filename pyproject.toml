@@ -32,6 +32,12 @@ dependencies = [
     "joblib>=1.1",
     "fastapi>=0.100.0",
     "uvicorn>=0.20.0",
+    "reportlab>=4.0.0",
+    "responses>=0.23.0",
+    "httpx>=0.25.0",
+    "types-requests>=2.31.0",
+    "types-urllib3>=1.26.0",
+    "types-colorama>=0.4.15",
 ]
 
 [project.urls]
