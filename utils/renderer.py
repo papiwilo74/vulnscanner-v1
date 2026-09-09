@@ -1,6 +1,6 @@
 import contextlib
 import importlib
-from typing import Optional
+from typing import Any, Optional, cast
 
 _playwright_available: Optional[bool] = None
 _playwright_checked = False
@@ -49,7 +49,7 @@ def render_page(url: str, wait_until: str = "networkidle", timeout: int = 15000,
                 viewport={"width": 1280, "height": 800},
             )
             page = context.new_page()
-            page.goto(url, wait_until=wait_until, timeout=nav_timeout)
+            page.goto(url, wait_until=cast(Any, wait_until), timeout=nav_timeout)
             # Esperar un poco más para que el JS de la SPA pinte formularios
             with contextlib.suppress(TimeoutError, Exception):
                 page.wait_for_load_state("networkidle", timeout=timeout)

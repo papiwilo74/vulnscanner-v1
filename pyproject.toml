@@ -119,6 +119,7 @@ disallow_untyped_calls = false
 module = [
     "requests.*",
     "urllib3.*",
+    "colorama.*",
     "joblib.*",
     "playwright.*",
     "defusedxml.*",

@@ -414,7 +414,7 @@ class ScanningWorkerDaemon:
                 },
                 timeout=5,
             )
-            return resp.status_code == 200
+            return bool(resp.status_code == 200)
         except Exception as e:
             logger.warning("[WORKER] No se pudo registrar ante el coordinador (%s): %s", self.coordinator_url, e)
             return False

@@ -71,7 +71,7 @@ def _is_valid_exposed_file(path: str, response: requests.Response) -> bool:
         if p_lower.endswith("/head"):
             return "ref: refs/" in text_sample or len(text.strip()) == 40
         if p_lower.endswith("/index"):
-            return response.content.startswith(b"DIRC")
+            return bool(response.content.startswith(b"DIRC"))
         return True
 
     # 3. Bases de datos (.sql)
@@ -87,7 +87,7 @@ def _is_valid_exposed_file(path: str, response: requests.Response) -> bool:
             return False
         if p_lower.endswith(".zip") and not response.content.startswith(b"PK\x03\x04"):
             return False
-        return not (p_lower.endswith(".gz") or p_lower.endswith(".tar.gz")) or response.content.startswith(b"\x1f\x8b")
+        return bool(not (p_lower.endswith(".gz") or p_lower.endswith(".tar.gz")) or response.content.startswith(b"\x1f\x8b"))
 
     # 5. Configuración JSON / YML
     if p_lower.endswith(".json"):
@@ -95,7 +95,7 @@ def _is_valid_exposed_file(path: str, response: requests.Response) -> bool:
             return False
         if p_lower == "package.json":
             return '"name"' in text or '"dependencies"' in text or '"version"' in text
-        return text.strip().startswith("{") or text.strip().startswith("[")
+        return bool(text.strip().startswith("{") or text.strip().startswith("["))
 
     if p_lower.endswith(".yml") or p_lower.endswith(".yaml"):
         if is_html_content:
