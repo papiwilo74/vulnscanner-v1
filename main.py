@@ -531,8 +531,39 @@ if __name__ == "__main__":
                         help="Genera un pack de señuelos HoneyTokens / Canaries activos (URLs, API Keys, JWT)")
     parser.add_argument("--deception-alerts", action="store_true",
                         help="Consulta y lista las alertas de intrusión y detonaciones de trampas activas")
+    parser.add_argument("--worker", action="store_true",
+                        help="Inicia la instancia como un nodo worker de escaneo distribuido")
+    parser.add_argument("--coordinator", type=str, default="http://localhost:8000",
+                        help="URL del servidor API coordinador para workers (defecto: http://localhost:8000)")
+    parser.add_argument("--region", type=str, default="local",
+                        help="Identificador geográfico o cloud de la región del worker (ej. us-east-1, eu-central-1, local)")
+    parser.add_argument("--tenant", type=str, default="org_default",
+                        help="ID de organización tenant para el escaneo (defecto: org_default)")
 
     args = parser.parse_args()
+
+    if args.worker:
+        from scanner.cluster import ScanningWorkerDaemon
+        worker = ScanningWorkerDaemon(
+            coordinator_url=args.coordinator,
+            region=args.region,
+        )
+        print("\n" + "=" * 70)
+        print(" [🌐 CLUSTER DISTRIBUIDO] INICIANDO NODO WORKER DE ESCANEO")
+        print("=" * 70)
+        print(f" ID Worker: {worker.worker_id} | Región: {worker.region}")
+        print(f" Coordinador: {worker.coordinator_url}")
+        print(" Esperando y procesando tareas de escaneo en segundo plano (Ctrl+C para salir)...")
+        print("=" * 70 + "\n")
+        worker.start()
+        try:
+            import time
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            worker.stop()
+            print("\n[WORKER] Nodo detenido limpiamente.")
+            sys.exit(0)
 
     if args.deception_generate:
         from scanner.deception import DeceptionManager, SnippetGenerator

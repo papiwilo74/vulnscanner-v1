@@ -15,18 +15,22 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from pydantic import BaseModel
 
 from main import scan
+from scanner.cluster import ClusterCoordinator
 from scanner.deception import DeceptionManager, SnippetGenerator
+from scanner.tenancy import ROLE_PERMISSIONS, Role, TenancyManager, User
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("VulnScannerAPI")
 
 app = FastAPI(
     title="VulnScanner Enterprise API",
-    description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens) y Dashboard SOC en tiempo real.",
+    description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens), Cluster Distribuido y Multi-Tenancy con RBAC.",
     version="2.4.0"
 )
 
 deception_mgr = DeceptionManager()
+tenancy_mgr = TenancyManager()
+cluster_mgr = ClusterCoordinator()
 
 _db_path = os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db"))
 _db_lock = Lock()
@@ -144,6 +148,8 @@ def _init_db(conn: sqlite3.Connection) -> None:
     """)
     _ensure_column(conn, "tasks", "sarif_report_path", "TEXT")
     _ensure_column(conn, "tasks", "pdf_report_path", "TEXT")
+    _ensure_column(conn, "tasks", "tenant_id", "TEXT DEFAULT 'org_default'")
+    _ensure_column(conn, "tasks", "region", "TEXT DEFAULT 'local'")
     conn.commit()
 
 
@@ -157,16 +163,28 @@ def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaratio
 
 
 def _save_task(conn: sqlite3.Connection, task_id: str, **fields: Any) -> None:
-    valid = {"task_id", "url", "status", "html_report_path", "json_report_path", "sarif_report_path", "pdf_report_path", "results"}
+    valid = {"task_id", "url", "status", "html_report_path", "json_report_path", "sarif_report_path", "pdf_report_path", "results", "tenant_id", "region"}
     updates = {k: fields[k] for k in fields if k in valid}
     if "results" in updates and not isinstance(updates["results"], str):
         updates["results"] = json.dumps(updates["results"], ensure_ascii=False)
-    set_clause = ", ".join(f"{k} = ?" for k in updates)
-    values = list(updates.values()) + [task_id]
-    conn.execute(
-        f"UPDATE tasks SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE task_id = ?",
-        values
-    )
+
+    existing = conn.execute("SELECT task_id FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
+    if not existing:
+        updates["task_id"] = task_id
+        cols = list(updates.keys())
+        placeholders = ", ".join("?" for _ in cols)
+        col_clause = ", ".join(cols)
+        conn.execute(
+            f"INSERT INTO tasks ({col_clause}) VALUES ({placeholders})",
+            list(updates.values())
+        )
+    else:
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        values = list(updates.values()) + [task_id]
+        conn.execute(
+            f"UPDATE tasks SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE task_id = ?",
+            values
+        )
     conn.commit()
 
 
@@ -181,9 +199,46 @@ def _get_task(conn: sqlite3.Connection, task_id: str) -> Optional[dict[str, Any]
     return data
 
 
-def _list_tasks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    rows = conn.execute("SELECT task_id, url, status, created_at FROM tasks ORDER BY created_at DESC").fetchall()
-    return [{"task_id": r["task_id"], "url": r["url"], "status": r["status"], "created_at": r["created_at"]} for r in rows]
+def _list_tasks(conn: sqlite3.Connection, tenant_id: Optional[str] = None) -> list[dict[str, Any]]:
+    if tenant_id:
+        rows = conn.execute("SELECT task_id, url, status, created_at, tenant_id, region FROM tasks WHERE tenant_id = ? ORDER BY created_at DESC", (tenant_id,)).fetchall()
+    else:
+        rows = conn.execute("SELECT task_id, url, status, created_at, tenant_id, region FROM tasks ORDER BY created_at DESC").fetchall()
+    result: list[dict[str, Any]] = []
+    for r in rows:
+        r_dict = dict(r)
+        result.append({
+            "task_id": r_dict.get("task_id"),
+            "url": r_dict.get("url"),
+            "status": r_dict.get("status"),
+            "created_at": r_dict.get("created_at"),
+            "tenant_id": r_dict.get("tenant_id", "org_default"),
+            "region": r_dict.get("region", "local"),
+        })
+    return result
+
+
+def get_current_user_optional(request: Request) -> User:
+    """Extrae el usuario autenticado desde la cabecera Authorization Bearer token, o retorna el usuario default."""
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        user = tenancy_mgr.get_user_from_token(token)
+        if user:
+            return user
+    return tenancy_mgr.get_default_user()
+
+
+def require_role(allowed_roles: list[Role]) -> Any:
+    def _dependency(request: Request) -> User:
+        user = get_current_user_optional(request)
+        if user.role not in allowed_roles and user.role != Role.ADMIN:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Acceso denegado: El rol '{user.role.value}' no tiene permisos para esta acción."
+            )
+        return user
+    return _dependency
 
 
 class ScanRequest(BaseModel):
@@ -212,6 +267,8 @@ class ScanRequest(BaseModel):
     github_repo: Optional[str] = None
     github_token: Optional[str] = None
     base_branch: str = "main"
+    region: Optional[str] = None
+    dispatch_to_cluster: bool = False
 
 
 def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
@@ -414,32 +471,52 @@ def download_report(path: str) -> FileResponse:
 
 
 @app.post("/scan", status_code=202)
-def start_scan(request: ScanRequest, background_tasks: BackgroundTasks) -> dict[str, Any]:
+def start_scan(request: ScanRequest, background_tasks: BackgroundTasks, req_http: Request) -> dict[str, Any]:
     """
-    Inicia un escaneo web en segundo plano y responde inmediatamente con un ID de tarea.
+    Inicia un escaneo web (localmente o despachado al cluster distribuido de workers).
     """
+    user = get_current_user_optional(req_http)
     task_id = str(uuid.uuid4())
+    region_val = request.region or "local"
+
     with _db_lock:
         conn = _get_db()
         _init_db(conn)
-        _save_task(conn, task_id, url=request.url, status="queued")
+        _save_task(conn, task_id, url=request.url, status="queued", tenant_id=user.org_id, region=region_val)
         conn.close()
 
-    background_tasks.add_task(run_scan_in_background, task_id, request)
+    if request.dispatch_to_cluster:
+        req_cfg = request.model_dump() if hasattr(request, "model_dump") else (request.dict() if hasattr(request, "dict") else dict(request))
+        cluster_mgr.enqueue_job(
+            task_id=task_id,
+            tenant_id=user.org_id,
+            url=request.url,
+            profile=request.profile,
+            config=req_cfg,
+            region_preference=request.region,
+        )
+        mode = "cluster"
+    else:
+        background_tasks.add_task(run_scan_in_background, task_id, request)
+        mode = "local"
 
     return {
         "message": "Escaneo encolado correctamente",
         "task_id": task_id,
+        "execution_mode": mode,
+        "region": region_val,
+        "tenant_id": user.org_id,
         "status_url": f"/scan/{task_id}",
         "websocket_url": f"/ws/scan/{task_id}"
     }
 
 
 @app.get("/scan/{task_id}")
-def get_scan_status(task_id: str) -> dict[str, Any]:
+def get_scan_status(task_id: str, request: Request) -> dict[str, Any]:
     """
     Retorna el estado actual de una tarea de escaneo específica y sus resultados si terminó.
     """
+    user = get_current_user_optional(request)
     with _db_lock:
         conn = _get_db()
         task = _get_task(conn, task_id)
@@ -447,22 +524,30 @@ def get_scan_status(task_id: str) -> dict[str, Any]:
 
     if task is None:
         raise HTTPException(status_code=404, detail="Tarea de escaneo no encontrada")
+
+    task_tenant = task.get("tenant_id", "org_default")
+    if user.role != Role.ADMIN and task_tenant != user.org_id:
+        raise HTTPException(status_code=403, detail="Acceso denegado: Esta auditoría pertenece a otra organización.")
+
     return task
 
 
 @app.get("/scans")
-def list_scans() -> dict[str, Any]:
+def list_scans(request: Request) -> dict[str, Any]:
     """
-    Lista el historial de escaneos y sus estados correspondientes.
+    Lista el historial de escaneos y sus estados correspondientes con aislamiento de organización.
     """
+    user = get_current_user_optional(request)
+    filter_tenant = None if user.role == Role.ADMIN else user.org_id
     with _db_lock:
         conn = _get_db()
-        tasks = _list_tasks(conn)
+        tasks = _list_tasks(conn, tenant_id=filter_tenant)
         conn.close()
 
     return {
         "total_tasks": len(tasks),
-        "tasks": tasks
+        "tasks": tasks,
+        "tenant_id": user.org_id,
     }
 
 
@@ -620,5 +705,203 @@ async def trigger_honey_trap(trap_id: str, request: Request) -> JSONResponse:
         },
         headers={"WWW-Authenticate": 'Bearer error="invalid_token"'}
     )
+
+
+# =====================================================================
+# GESTOR MULTI-TENANT & CONTROL DE ACCESO RBAC
+# =====================================================================
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    org_name: str = "Mi Organización"
+    role: str = "developer"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/register")
+def register_account(req: RegisterRequest) -> dict[str, Any]:
+    """Registra una nueva cuenta de usuario y crea o enlaza su organización tenant."""
+    org = tenancy_mgr.create_organization(name=req.org_name)
+    try:
+        user_role = Role(req.role.lower())
+    except Exception:
+        user_role = Role.DEVELOPER
+
+    user = tenancy_mgr.register_user(
+        org_id=org.id,
+        email=req.email,
+        password=req.password,
+        full_name=req.full_name,
+        role=user_role,
+    )
+    token = tenancy_mgr.jwt.create_token(user)
+    return {
+        "message": "Usuario y organización registrados exitosamente",
+        "user": user.to_dict(),
+        "organization": org.to_dict(),
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
+@app.post("/api/auth/login")
+def login_account(req: LoginRequest) -> dict[str, Any]:
+    """Autentica a un usuario y genera un token JWT de acceso para su tenant."""
+    result = tenancy_mgr.authenticate_user(req.email, req.password)
+    if not result:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas o usuario inactivo")
+    user, token = result
+    org = tenancy_mgr.get_organization(user.org_id)
+    return {
+        "message": "Inicio de sesión exitoso",
+        "user": user.to_dict(),
+        "organization": org.to_dict() if org else None,
+        "access_token": token,
+        "token_type": "bearer",
+    }
+
+
+@app.get("/api/auth/me")
+def get_my_profile(request: Request) -> dict[str, Any]:
+    """Retorna el perfil del usuario autenticado, su organización y permisos RBAC."""
+    user = get_current_user_optional(request)
+    org = tenancy_mgr.get_organization(user.org_id)
+    perms = list(ROLE_PERMISSIONS.get(user.role, set()))
+    return {
+        "user": user.to_dict(),
+        "organization": org.to_dict() if org else None,
+        "permissions": perms,
+    }
+
+
+# =====================================================================
+# CLUSTER DE ESCANEO DISTRIBUIDO & COORDINACIÓN DE WORKERS
+# =====================================================================
+
+class WorkerRegisterRequest(BaseModel):
+    name: str
+    worker_id: Optional[str] = None
+    region: str = "local"
+    max_concurrency: int = 2
+    tags: list[str] = []
+
+
+class WorkerHeartbeatRequest(BaseModel):
+    active_jobs: int = 0
+    status: str = "online"
+
+
+class JobClaimRequest(BaseModel):
+    worker_id: str
+    region: str = "local"
+
+
+class JobCompleteRequest(BaseModel):
+    worker_id: str
+    results: dict[str, Any] = {}
+    html_path: Optional[str] = None
+    json_path: Optional[str] = None
+    sarif_path: Optional[str] = None
+    pdf_path: Optional[str] = None
+
+
+class JobFailRequest(BaseModel):
+    worker_id: str
+    error: str
+
+
+@app.post("/api/cluster/workers/register")
+def register_cluster_worker(req: WorkerRegisterRequest) -> dict[str, Any]:
+    """Registra un nodo worker en el cluster distribuido."""
+    worker = cluster_mgr.register_worker(
+        name=req.name,
+        region=req.region,
+        max_concurrency=req.max_concurrency,
+        tags=req.tags,
+        worker_id=req.worker_id,
+    )
+    return {"message": "Worker registrado exitosamente", "worker": worker.to_dict()}
+
+
+@app.post("/api/cluster/workers/{worker_id}/heartbeat")
+def worker_heartbeat(worker_id: str, req: WorkerHeartbeatRequest) -> dict[str, Any]:
+    """Actualiza el heartbeat y telemetría de salud de un worker."""
+    ok = cluster_mgr.heartbeat(worker_id, active_jobs=req.active_jobs, status=req.status)
+    return {"status": "ok" if ok else "unknown_worker"}
+
+
+@app.get("/api/cluster/workers")
+def list_cluster_workers() -> dict[str, Any]:
+    """Lista los workers del cluster, sus regiones cloud y estadísticas agregadas."""
+    workers = cluster_mgr.list_workers()
+    stats = cluster_mgr.get_stats()
+    return {
+        "total_workers": len(workers),
+        "workers": [w.to_dict() for w in workers],
+        "stats": stats,
+    }
+
+
+@app.post("/api/cluster/jobs/claim")
+def claim_cluster_job(req: JobClaimRequest) -> dict[str, Any]:
+    """Un worker reclama la siguiente tarea de escaneo pendiente compatible con su región."""
+    job = cluster_mgr.claim_job(worker_id=req.worker_id, worker_region=req.region)
+    if not job:
+        return {"claimed": False, "job": None}
+    return {"claimed": True, "job": job.to_dict()}
+
+
+@app.post("/api/cluster/jobs/{task_id}/complete")
+def complete_cluster_job(task_id: str, req: JobCompleteRequest) -> dict[str, Any]:
+    """Registra la finalización de una tarea ejecutada por un worker remoto y actualiza reportes."""
+    cluster_mgr.complete_job(task_id=task_id, worker_id=req.worker_id, results=req.results)
+    with _db_lock:
+        conn = _get_db()
+        _save_task(
+            conn,
+            task_id,
+            status="completed",
+            html_report_path=req.html_path,
+            json_report_path=req.json_path,
+            sarif_report_path=req.sarif_path,
+            pdf_report_path=req.pdf_path,
+            results=req.results,
+        )
+        conn.close()
+
+    broadcast_event_sync(task_id, {
+        "event": "completed",
+        "percent": 100,
+        "step": "¡Auditoría distribuida completada exitosamente!",
+        "html_path": req.html_path,
+        "json_path": req.json_path,
+        "sarif_path": req.sarif_path,
+        "pdf_path": req.pdf_path,
+    })
+    return {"message": "Trabajo completado registrado correctamente"}
+
+
+@app.post("/api/cluster/jobs/{task_id}/fail")
+def fail_cluster_job(task_id: str, req: JobFailRequest) -> dict[str, Any]:
+    """Registra el fallo de una tarea en el cluster distribuido."""
+    cluster_mgr.fail_job(task_id=task_id, worker_id=req.worker_id, error_message=req.error)
+    with _db_lock:
+        conn = _get_db()
+        _save_task(conn, task_id, status="failed", results={"error": req.error})
+        conn.close()
+
+    broadcast_event_sync(task_id, {
+        "event": "failed",
+        "error": req.error,
+        "step": f"Fallo en worker {req.worker_id}: {req.error}",
+    })
+    return {"message": "Fallo registrado correctamente"}
+
 
 
