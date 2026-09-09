@@ -468,6 +468,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.4.0")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
+    parser.add_argument("--web", "--dashboard", "--gui", dest="web_mode", action="store_true",
+                        help="Inicia la interfaz web interactiva en tiempo real (SOC Dashboard) en el navegador")
     parser.add_argument("--lab", "--offline", dest="lab_mode", action="store_true",
                         help="Modo Laboratorio Aislado: ejecuta un servidor de prueba local hermético para escaneo sin conexión")
     parser.add_argument("--no-open", action="store_true",
@@ -527,6 +529,17 @@ if __name__ == "__main__":
                         help="Modo Todo-en-Uno: activa crawling (10 páginas), subdominios, stealth, detección WAF, grafos de ataque y auto-detección de OpenAPI e IAST")
 
     args = parser.parse_args()
+
+    if args.web_mode:
+        import webbrowser
+
+        import uvicorn
+        web_url = "http://localhost:8000/dashboard"
+        logger.info("[WEB] Iniciando Servidor Web y Panel SOC en %s ...", web_url)
+        with contextlib.suppress(Exception):
+            webbrowser.open(web_url)
+        uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=False)
+        sys.exit(0)
 
     lab_server = None
     if args.lab_mode:
