@@ -24,9 +24,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OmniBreachAPI")
 
 app = FastAPI(
-    title="OmniBreach Enterprise API",
+    title="OmniBreach API",
     description="Microservicio web para automatización de auditorías de ciberdefensa, Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens), Cluster Distribuido y Multi-Tenancy con RBAC.",
-    version="2.5.0"
+    version="2.5"
 )
 
 # Soporte CORS para despliegue distribuido (Frontend Vercel <-> Backend Render)
@@ -468,8 +468,8 @@ def health_check() -> dict[str, Any]:
     is_postgres = bool(os.environ.get("DATABASE_URL", "").startswith(("postgres://", "postgresql://")))
     return {
         "status": "healthy",
-        "service": "OmniBreach Enterprise API",
-        "version": "2.5.0",
+        "service": "OmniBreach API",
+        "version": "2.5",
         "database": "neon-postgresql" if is_postgres else "sqlite",
         "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
     }
@@ -478,8 +478,8 @@ def health_check() -> dict[str, Any]:
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a OmniBreach Enterprise API",
-        "version": "2.5.0",
+        "message": "Bienvenido a OmniBreach API",
+        "version": "2.5",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST"],
         "dashboard_url": "/dashboard",
         "health_url": "/health",

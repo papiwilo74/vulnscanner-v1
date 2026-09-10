@@ -1,11 +1,11 @@
-# OmniBreach Enterprise v2.5.0
+# OmniBreach v2.5
 
 <p align="center">
-  <img src="https://img.shields.io/badge/OmniBreach-v2.5.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="OmniBreach v2.5 Enterprise" />
+  <img src="https://img.shields.io/badge/OmniBreach-v2.5-blue?style=for-the-badge&logo=shield" alt="OmniBreach v2.5" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.5.0"><img src="https://img.shields.io/badge/Release-v2.5.0-007EC6.svg?logo=github" alt="Release v2.5.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.5"><img src="https://img.shields.io/badge/Release-v2.5-007EC6.svg?logo=github" alt="Release v2.5" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
@@ -18,7 +18,7 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach Enterprise v2.5.0** es una plataforma integral de ciberdefensa y análisis de seguridad web en Python que combina **DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict`, análisis SAST con `bandit`, especificación OpenAPI 3.1, reportes ejecutivos en PDF, panel SOC interactivo en tiempo real y soporte nativo para despliegue en la nube (**Vercel + Render + Neon**).
+> **OmniBreach v2.5** es una plataforma integral de ciberdefensa y análisis de seguridad web en Python que combina **DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict`, análisis SAST con `bandit`, especificación OpenAPI 3.1, reportes ejecutivos en PDF, panel SOC interactivo en tiempo real y soporte nativo para despliegue en la nube (**Vercel + Render + Neon**).
 
 ---
 

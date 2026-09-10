@@ -12,7 +12,7 @@ def test_api_root_and_dashboard():
     res_root = client.get("/")
     assert res_root.status_code == 200
     data = res_root.json()
-    assert data["version"] == "2.5.0"
+    assert data["version"] == "2.5"
     assert data["dashboard_url"] == "/dashboard"
 
     # 1.1 Test Health

@@ -65,7 +65,7 @@ OMNIBREACH_BANNER = (
     r" / / / / __ `__ \/ __ \/ / __  / ___/ _ \/ __ `/ ___/ __ \ " + "\n"
     r"/ /_/ / / / / / / / / / / /_/ / /  /  __/ /_/ / /__/ / / / " + "\n"
     r"\____/_/ /_/ /_/_/ /_/_/_____/_/   \___/\__,_/\___/_/ /_/  " + "\n"
-    "              ENTERPRISE EDITION v2.5.0\n"
+    "                         v2.5\n"
 )
 
 CATEGORY_MAP: dict[str, str] = {
@@ -473,10 +473,10 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="OmniBreach Enterprise v2.5.0 — Suite Defensiva & Ofensiva de Ciberseguridad con Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Modo Lab",
+        description="OmniBreach v2.5 — Suite Defensiva & Ofensiva de Ciberseguridad con Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Modo Lab",
         epilog="Ejemplo: python main.py --lab --full"
     )
-    parser.add_argument("--version", "-V", action="version", version="OmniBreach Enterprise v2.5.0")
+    parser.add_argument("--version", "-V", action="version", version="OmniBreach v2.5")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--web", "--dashboard", "--gui", dest="web_mode", action="store_true",
                         help="Inicia la interfaz web interactiva en tiempo real (SOC Dashboard) en el navegador")
