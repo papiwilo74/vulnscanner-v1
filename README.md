@@ -14,14 +14,14 @@
   <a href="docs/DEPLOYMENT_GUIDE.md"><img src="https://img.shields.io/badge/Cloud-Vercel%20%7C%20Render%20%7C%20Neon-blueviolet.svg" alt="Deploy to Vercel Render Neon" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-258%20passing-brightgreen.svg" alt="258 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-259%20passing-brightgreen.svg" alt="259 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
 > **OmniBreach v3.0** es un **Framework Unificado de Integración CTEM (Continuous Threat Exposure Management) y Orquestador Ligero de Pruebas de Seguridad**. Diseñado como una plataforma integral de ingeniería de ciberseguridad, combina **Cartografía Perimetral EASM + Modelado de Amenazas con Grafos de Ataque Probabilísticos (Centralidad de Brandes & Simulación What-If) + Generación de SBOM (CycloneDX 1.5 / SPDX 2.3) + Auditoría Estática de Contenedores + Detección de Subdomain Takeover + DAST Ligero + Telemetría ASGI en Memoria (PoC IAST/RASP) + Tecnología de Engaño (HoneyTokens)**.
 > 
-> Todo construido con rigor de ingeniería de software: tipado estricto `mypy --strict` en el 100% del código, SAST limpio con `bandit`, 258 pruebas automatizadas, correlación con el catálogo **CISA KEV**, especificación OpenAPI 3.1 y reportes ejecutivos en PDF.
+> Todo construido con rigor de ingeniería de software: tipado estricto `mypy --strict` en el 100% del código (93 archivos fuente), SAST de código limpio con `bandit`, 259 pruebas automatizadas (0 omitidas), correlación con el catálogo **CISA KEV**, especificación OpenAPI 3.1 y reportes ejecutivos en PDF.
 
 ---
 
@@ -29,6 +29,7 @@
 
 - [¿Qué es OmniBreach?](#que-es-omnibreach)
 - [Enfoque de Ingeniería y Propósito](#enfoque-de-ingenieria-y-proposito)
+- [Modelado de Ataques y Choke Points (Brandes Centrality)](#modelado-de-ataques-y-choke-points-el-nucleo-diferencial)
 - [Gestión de Superficie Externa (EASM)](#gestion-de-superficie-externa-easm)
 - [Guía Oficial de Despliegue en la Nube (Vercel + Render + Neon)](docs/DEPLOYMENT_GUIDE.md)
 - [Arquitectura y Decisiones Técnicas (ADRs)](docs/ARCHITECTURE_DECISIONS.md)
@@ -66,11 +67,76 @@
 
 ## Enfoque de Ingeniería y Propósito
 
-OmniBreach está concebido como una **plataforma unificada de investigación y evaluación de seguridad perimetral**. No pretende reemplazar soluciones corporativas comerciales multimillonarias que requieren cientos de analistas humanos (como Qualys, Rapid7 o Checkmarx), sino resolver un problema concreto de ingeniería:
+OmniBreach está concebido como una **plataforma unificada de investigación y evaluación de seguridad perimetral**. No pretende reemplazar soluciones comerciales propietarias multimillonarias que requieren cientos de analistas humanos (como Qualys, Rapid7 o Checkmarx), sino resolver un problema concreto de ingeniería:
 
-> **El problema:** La fragmentación de herramientas en equipos medianos. Habitualmente se requiere una herramienta para subdominios, otra para puertos, otra para SBOM, otra para DAST y hojas de cálculo manuales para entender cómo se relacionan las vulnerabilidades.
+> **El problema:** La fragmentación de herramientas en equipos medianos y de investigación. Habitualmente se requiere una herramienta para subdominios, otra para puertos, otra para SBOM, otra para DAST y hojas de cálculo manuales para intentar correlacionar cómo se encadenan los riesgos.
 >
-> **La solución de OmniBreach:** Unificar la cartografía perimetral, la correlación causal con **Grafos de Ataque Matemáticos**, el cumplimiento de **Supply Chain (SBOM)** y la telemetría en un único motor reproducible, auditable y con **calidad de código verificable (100% mypy strict, SAST limpio y suite exhaustiva de tests)**.
+> **La propuesta de OmniBreach:** Unificar la cartografía perimetral, la correlación causal con **Grafos de Ataque Probabilísticos**, el cumplimiento de **Supply Chain (SBOM CycloneDX/SPDX)** y la telemetría en un único motor de orquestación reproducible, auditable y con estándares estrictos de desarrollo.
+
+### Distinción Fundamental: Calidad de Software vs. Efectividad de Detección
+
+Es esencial diferenciar dos dimensiones que a menudo se confunden en seguridad:
+
+1. **Calidad e Higiene de Ingeniería de Software:**
+   - **Tipado Estático Estricto:** 100% de cobertura con `mypy --strict` a través de los 93 módulos del proyecto, garantizando consistencia de contratos, tipos explícitos y ausencia de errores de tipo en tiempo de ejecución.
+   - **SAST del Código Fuente:** Cero alertas o patrones de código inseguro en auditorías con `bandit` sobre más de 10,300 líneas de código.
+   - **Suite de Regresión:** 259 pruebas automatizadas pasando al 100% (0 omitidas) que validan algoritmos, parsers, contratos de API y resiliencia de red.
+2. **Efectividad y Precisión del Escáner:**
+   - Que el código esté bien estructurado y tipado no significa automáticamente que detecte cualquier vulnerabilidad en cualquier aplicación arbitraria. Las capacidades de escaneo de OmniBreach se basan en analizadores no destructivos, reglas heurísticas y firmas de patrones.
+   - **Validación Empírica:** Para evaluar la tasa real de verdaderos positivos vs. falsos positivos, el motor está diseñado para someterse a bancos de prueba estándar y aplicaciones vulnerables controladas (como OWASP Juice Shop, DVWA y el entorno local integrado `--lab`).
+
+---
+
+## Modelado de Ataques y Choke Points: El Núcleo Diferencial
+
+La mayoría de escáneres generan listas planas de vulnerabilidades ordenadas por severidad CVSS estática. Este enfoque ignora una realidad crítica: **un atacante no explota vulnerabilidades aisladas, sino caminos de explotación (*attack paths*)**. Una vulnerabilidad de severidad Media en un punto pivote puede ser mucho más letal que una vulnerabilidad Crítica en un host aislado.
+
+### 1. Grafo Dirigido Acíclico (DAG) y Probabilidades de Explotación
+OmniBreach construye dinámicamente un grafo $G = (V, E)$ donde los nodos $V$ representan activos, estados de compromiso o hallazgos (e.g. Subdomain Takeover, Credencial expuesta, Puerto vulnerable) y las aristas dirigidas $E$ representan transiciones con un peso probabilístico $P(e)$ basado en la explotabilidad real (correlacionado con el catálogo CISA KEV).
+
+### 2. Centralidad de Intermediación de Brandes (*Betweenness Centrality*)
+Para identificar qué nodo actúa como puente neurálgico en la infraestructura, OmniBreach aplica el algoritmo determinista de Brandes ($O(|V| \cdot |E|)$):
+
+$$C_B(v) = \sum_{s \ne v \ne t \in V} \frac{\sigma_{st}(v)}{\sigma_{st}}$$
+
+Donde:
+- $\sigma_{st}$ es el número total de caminos mínimos desde el nodo inicial de ataque $s$ hasta el impacto crítico $t$.
+- $\sigma_{st}(v)$ es el número de esos caminos mínimos que atraviesan obligatoriamente el nodo intermedio $v$.
+
+El nodo con el mayor $C_B(v)$ representa el **Choke Point (Punto de Estrangulamiento)** defensivo más eficiente: parcharlo o aislarlo neutraliza el mayor volumen de vectores de ataque con el menor esfuerzo operativo.
+
+```mermaid
+graph LR
+    subgraph Entrada["Fase 1: Entrada Externa"]
+        A["Subdomain Takeover (CNAME huérfano)"]
+        B["Secret Leak (API Key en repo público)"]
+    end
+
+    subgraph Choke["Fase 2: Choke Point Crítico"]
+        C{"Servicio Interno / DB Sin Auth<br/><b>Choke Point (Max Brandes CB)</b>"}
+    end
+
+    subgraph Impacto["Fase 3: Impacto Crítico"]
+        D["Ejecución Remota de Código (RCE)"]
+        E["Exfiltración Masiva de Datos"]
+    end
+
+    A -->|p=0.85| C
+    B -->|p=0.90| C
+    C -->|p=0.95| D
+    C -->|p=0.80| E
+
+    style C fill:#d9534f,stroke:#333,stroke-width:3px,color:#fff
+    style A fill:#f0ad4e,stroke:#333,stroke-width:1px,color:#fff
+    style B fill:#f0ad4e,stroke:#333,stroke-width:1px,color:#fff
+    style D fill:#5bc0de,stroke:#333,stroke-width:1px,color:#fff
+    style E fill:#5bc0de,stroke:#333,stroke-width:1px,color:#fff
+```
+
+### 3. Simulación Predictiva *What-If*
+El módulo permite a los analistas ejecutar escenarios contrafácticos: *"¿Qué sucede con el riesgo global si mitigamos el nodo $v_k$?"*. El motor recalcula instantáneamente la métrica de riesgo acumulado y reporta la reducción porcentual:
+
+$$\Delta\text{Risk}\% = \frac{\text{Riesgo}_{\text{actual}} - \text{Riesgo}_{\text{post-parche}}}{\text{Riesgo}_{\text{actual}}} \times 100$$
 
 ---
 

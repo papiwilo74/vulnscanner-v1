@@ -628,9 +628,15 @@ class TestXXE:
         from scanner.xxe import XXE_SIGNATURES
         assert len(XXE_SIGNATURES) > 0
 
-    @pytest.mark.skip(reason="Requiere mocking de requests - se valida en tests de integracion")
-    def test_empty_html_returns_empty(self):
+    def test_empty_html_returns_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import unittest.mock
+
         from scanner.xxe import check_xxe
+        mock_resp = unittest.mock.MagicMock()
+        mock_resp.status_code = 404
+        mock_resp.text = ""
+        monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
+        monkeypatch.setattr("requests.post", lambda *a, **kw: mock_resp)
         result = check_xxe("https://example.com", "")
         assert result == []
 
