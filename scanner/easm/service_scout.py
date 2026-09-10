@@ -262,23 +262,26 @@ class ServiceScout:
         Escanea la lista completa de activos descubiertos en el perímetro digital.
         """
         all_exposed: list[ExposedService] = []
-        scanned_ips: set[str] = set()
+        if not assets:
+            return all_exposed
 
-        def _scan_asset(asset: Any) -> list[ExposedService]:
+        # Deduplicar por dirección IP previamente para evitar carreras entre hilos y trabajo duplicado
+        unique_targets: dict[str, str] = {}
+        for asset in assets:
             raw_ip = getattr(asset, "ip_address", None) or (asset if isinstance(asset, str) else None)
-            if not raw_ip or not isinstance(raw_ip, str):
-                return []
-            ip_str: str = raw_ip
-            if ip_str in scanned_ips:
-                return []
-            scanned_ips.add(ip_str)
+            if raw_ip and isinstance(raw_ip, str) and raw_ip not in unique_targets:
+                raw_host = getattr(asset, "subdomain", None) or raw_ip
+                unique_targets[raw_ip] = str(raw_host)
 
-            raw_host = getattr(asset, "subdomain", None) or ip_str
-            host_str: str = str(raw_host)
+        if not unique_targets:
+            return all_exposed
+
+        def _scan_target(target: tuple[str, str]) -> list[ExposedService]:
+            ip_str, host_str = target
             return self.scan_host_services(host_str, ip_str, ports=ports)
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_scan_asset, a) for a in assets]
+            futures = [executor.submit(_scan_target, (ip, host)) for ip, host in unique_targets.items()]
             for fut in as_completed(futures):
                 try:
                     res = fut.result()

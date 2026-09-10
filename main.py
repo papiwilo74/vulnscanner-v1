@@ -582,45 +582,57 @@ if __name__ == "__main__":
             sys.exit(0)
 
     if args.easm:
-        from scanner.easm.engine import EASMEngine
-        easm_engine = EASMEngine()
-        print("\n" + "=" * 75)
-        print(f" [🌐 EASM SCOUT] CARTOGRAFÍA & SUPERFICIE DE ATAQUE EXTERNA: {args.easm}")
-        print("=" * 75)
-        report = easm_engine.run_full_surface_assessment(
-            args.easm,
-            include_bruteforce=not args.no_bruteforce
-        )
-        print(f"\n Calificación de Exposición: {report.exposure_grade} ({report.exposure_score}/100)")
-        print(f" Activos Totales Descubiertos: {report.total_assets}")
-        print(f" Servicios Expuestos: {report.total_exposed_services}")
-        print(f" Vectores de Ransomware (RDP, SMB, DBs): {report.critical_ransomware_vectors}")
-        print(f" Alertas CISA KEV (Exploits Activos): {report.cisa_kev_alerts}")
-        print("-" * 75)
-        if report.services:
-            print(" SERVICIOS Y PUERTOS CRÍTICOS EXPUESTOS:")
-            for s in report.services:
-                crit_flag = "🚨 [CRÍTICO]" if s["severity"] == "CRITICAL" else f"[{s['severity']}]"
-                print(f"   * {crit_flag} {s['host']} ({s['ip']}) -> Puerto {s['port']} ({s['service_name']})")
-                if s["unauthenticated_access"]:
-                    print(f"     ⚠️ ACCESO NO AUTENTICADO DETECTADO: {s['evidence']}")
-                elif s["banner"]:
-                    print(f"     Banner: {s['banner'][:80]}")
+        clean_target = args.easm.strip()
+        if not clean_target or " " in clean_target:
+            print("\n[EASM ERROR] Debes proporcionar un dominio corporativo válido (ej: python main.py --easm empresa.com.co)")
+            sys.exit(1)
+
+        try:
+            from scanner.easm.engine import EASMEngine
+            easm_engine = EASMEngine()
+            print("\n" + "=" * 75)
+            print(f" [🌐 EASM SCOUT] CARTOGRAFÍA & SUPERFICIE DE ATAQUE EXTERNA: {clean_target}")
+            print("=" * 75)
+            report = easm_engine.run_full_surface_assessment(
+                clean_target,
+                include_bruteforce=not args.no_bruteforce
+            )
+            print(f"\n Calificación de Exposición: {report.exposure_grade} ({report.exposure_score}/100)")
+            print(f" Activos Totales Descubiertos: {report.total_assets}")
+            print(f" Servicios Expuestos: {report.total_exposed_services}")
+            print(f" Vectores de Ransomware (RDP, SMB, DBs): {report.critical_ransomware_vectors}")
+            print(f" Alertas CISA KEV (Exploits Activos): {report.cisa_kev_alerts}")
             print("-" * 75)
-        if report.cves:
-            print(" ALERTA CISA KEV — VULNERABILIDADES ACTIVAMENTE EXPLOTADAS:")
-            for c in report.cves:
-                print(f"   * 💥 {c['cve_id']} - {c['vulnerability_name']}")
-                print(f"     Afecta: {c['affected_product']} (Campaña: {c['ransomware_campaign']})")
-                print(f"     Remediación: {c['remediation_steps']}")
-            print("-" * 75)
-        if report.identity_risk.get("typosquatting_detected"):
-            print(" RIESGO DE IDENTIDAD & TYPOSQUATTING (Phishing):")
-            for typo in report.identity_risk["typosquatting_detected"]:
-                print(f"   * ⚠️ Dominio suplantador activo: {typo['domain']} ({typo['ip']})")
-            print("-" * 75)
-        print()
-        sys.exit(0)
+            if report.services:
+                print(" SERVICIOS Y PUERTOS CRÍTICOS EXPUESTOS:")
+                for s in report.services:
+                    crit_flag = "🚨 [CRÍTICO]" if s["severity"] == "CRITICAL" else f"[{s['severity']}]"
+                    print(f"   * {crit_flag} {s['host']} ({s['ip']}) -> Puerto {s['port']} ({s['service_name']})")
+                    if s["unauthenticated_access"]:
+                        print(f"     ⚠️ ACCESO NO AUTENTICADO DETECTADO: {s['evidence']}")
+                    elif s["banner"]:
+                        print(f"     Banner: {s['banner'][:80]}")
+                print("-" * 75)
+            if report.cves:
+                print(" ALERTA CISA KEV — VULNERABILIDADES ACTIVAMENTE EXPLOTADAS:")
+                for c in report.cves:
+                    print(f"   * 💥 {c['cve_id']} - {c['vulnerability_name']}")
+                    print(f"     Afecta: {c['affected_product']} (Campaña: {c['ransomware_campaign']})")
+                    print(f"     Remediación: {c['remediation_steps']}")
+                print("-" * 75)
+            if report.identity_risk.get("typosquatting_detected"):
+                print(" RIESGO DE IDENTIDAD & TYPOSQUATTING (Phishing):")
+                for typo in report.identity_risk["typosquatting_detected"]:
+                    print(f"   * ⚠️ Dominio suplantador activo: {typo['domain']} ({typo['ip']})")
+                print("-" * 75)
+            print()
+            sys.exit(0)
+        except KeyboardInterrupt:
+            print("\n\n[EASM] Auditoría cancelada por el usuario.")
+            sys.exit(130)
+        except Exception as err:
+            print(f"\n[EASM ERROR] Fallo inesperado durante la auditoría: {err}")
+            sys.exit(1)
 
     if args.deception_generate:
         from scanner.deception import DeceptionManager, SnippetGenerator

@@ -83,7 +83,7 @@ class DarkWebIntel:
                     "ip": ip,
                     "threat": "Posible dominio señuelo o phishing suplantando la marca de la organización."
                 })
-            except (socket.gaierror, socket.herror, TimeoutError):
+            except (socket.gaierror, socket.herror, TimeoutError, OSError):
                 pass
 
         return suspicious

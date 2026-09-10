@@ -190,3 +190,32 @@ def test_api_easm_scan_endpoint(mock_assess: MagicMock) -> None:
     assert data["status"] == "completed"
     assert data["domain"] == "testbank.com.co"
     assert data["report"]["exposure_grade"] == "A+"
+
+
+def test_api_easm_scan_invalid_domain() -> None:
+    # 1. Dominio vacío
+    res_empty = client.post("/api/v1/easm/scan", json={"domain": "   "})
+    assert res_empty.status_code == 400
+    assert "Debe especificar un dominio corporativo válido" in res_empty.json()["detail"]
+
+    # 2. Dominio con espacios internos
+    res_spaces = client.post("/api/v1/easm/scan", json={"domain": "empresa invalida.com"})
+    assert res_spaces.status_code == 400
+
+
+@patch.object(EASMEngine, "run_full_surface_assessment")
+def test_api_easm_scan_internal_error(mock_assess: MagicMock) -> None:
+    mock_assess.side_effect = RuntimeError("Conexión DNS rota")
+    res = client.post("/api/v1/easm/scan", json={"domain": "errorbank.com.co"})
+    assert res.status_code == 500
+    assert "Error durante la auditoría EASM" in res.json()["detail"]
+
+
+def test_recon_and_scout_empty_inputs() -> None:
+    mapper = DigitalPerimeterMapper()
+    assert mapper.sanitize_domain("") == ""
+    assert mapper.map_perimeter("") == []
+    assert mapper.fetch_ct_logs("") == set()
+
+    scout = ServiceScout()
+    assert scout.scout_perimeter([]) == []

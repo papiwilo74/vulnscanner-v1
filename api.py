@@ -472,18 +472,32 @@ class EASMScanRequest(BaseModel):
 def trigger_easm_scan(req: EASMScanRequest, request: Request) -> dict[str, Any]:
     """Ejecuta una auditoría completa de superficie externa (EASM) para el dominio especificado."""
     _ = get_current_user_optional(request)
-    from scanner.easm.engine import EASMEngine
-    engine = EASMEngine()
-    report = engine.run_full_surface_assessment(
-        req.domain,
-        include_bruteforce=req.include_bruteforce,
-        max_workers=min(req.max_workers, 30)
-    )
-    return {
-        "status": "completed",
-        "domain": req.domain,
-        "report": report.to_dict()
-    }
+    domain_clean = req.domain.strip() if req.domain else ""
+    if not domain_clean or len(domain_clean) < 3 or " " in domain_clean:
+        raise HTTPException(
+            status_code=400,
+            detail="Debe especificar un dominio corporativo válido (ej. empresa.com.co)."
+        )
+
+    try:
+        from scanner.easm.engine import EASMEngine
+        engine = EASMEngine()
+        report = engine.run_full_surface_assessment(
+            domain_clean,
+            include_bruteforce=req.include_bruteforce,
+            max_workers=min(max(req.max_workers, 1), 30)
+        )
+        return {
+            "status": "completed",
+            "domain": domain_clean,
+            "report": report.to_dict()
+        }
+    except Exception as err:
+        logger.error("[EASM] Error durante la auditoría perimetral para %s: %s", domain_clean, err, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error durante la auditoría EASM: {err}"
+        ) from err
 
 
 @app.get("/health", tags=["System"])

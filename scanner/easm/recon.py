@@ -78,6 +78,8 @@ class DigitalPerimeterMapper:
 
     def sanitize_domain(self, target: str) -> str:
         """Limpia el dominio eliminando esquemas http/https, puertos o rutas."""
+        if not target:
+            return ""
         clean = target.strip().lower()
         if "://" in clean:
             parsed = urlparse(clean)
@@ -92,6 +94,9 @@ class DigitalPerimeterMapper:
         """
         discovered: set[str] = set()
         clean_domain = self.sanitize_domain(domain)
+        if not clean_domain:
+            return discovered
+
         url = f"https://crt.sh/?q=%.{clean_domain}&output=json"
 
         try:
@@ -165,6 +170,10 @@ class DigitalPerimeterMapper:
         fuentes pasivas (Certificate Transparency) y activas (DNS Recursivo).
         """
         clean_domain = self.sanitize_domain(domain)
+        if not clean_domain:
+            logger.warning("[EASM] Dominio vacío o inválido proporcionado a map_perimeter.")
+            return []
+
         logger.info("[EASM] Iniciando cartografía de superficie para: %s", clean_domain)
 
         candidates: set[str] = set()
