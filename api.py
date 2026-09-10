@@ -25,7 +25,7 @@ logger = logging.getLogger("OmniBreachAPI")
 
 app = FastAPI(
     title="OmniBreach v3.0 API",
-    description="Plataforma de Ciberdefensa Ofensiva & EASM (External Attack Surface Management): Cartografía de Subdominios, Detección de Puertos de Ransomware, Correlación CISA KEV, DAST, SAST, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Multi-Tenancy con RBAC.",
+    description="Framework Unificado CTEM & Evaluación Perimetral: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad de Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV y Telemetría en Tiempo Real.",
     version="3.0"
 )
 

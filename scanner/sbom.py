@@ -74,15 +74,8 @@ class SBOMGenerator:
                 norm_name = name.lower()
                 version = dist.version or "0.0.0"
                 summary = str(dist.metadata["Summary"] or "")
-                # PackageMetadata allows mapping access via [] or get
-                meta_dict = getattr(dist.metadata, "json", None)
-                if callable(meta_dict):
-                    m_data = meta_dict() or {}
-                    license_val = str(m_data.get("license") or "NOASSERTION")
-                    author = str(m_data.get("author") or "Community")
-                else:
-                    license_val = str(dist.metadata["License"] if "License" in dist.metadata else "NOASSERTION")
-                    author = str(dist.metadata["Author"] if "Author" in dist.metadata else "Community")
+                license_val = str(dist.metadata["License"]) if "License" in dist.metadata else "NOASSERTION"
+                author = str(dist.metadata["Author"]) if "Author" in dist.metadata else "Community"
 
                 purl = f"pkg:pypi/{norm_name}@{version}"
 

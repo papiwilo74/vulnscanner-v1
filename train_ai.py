@@ -9,8 +9,9 @@ import sys
 
 if sys.platform.startswith('win'):
     with contextlib.suppress(Exception):
-        if hasattr(sys.stdout, "reconfigure"):
-            getattr(sys.stdout, "reconfigure")(encoding='utf-8')
+        reconfig = getattr(sys.stdout, "reconfigure", None)
+        if callable(reconfig):
+            reconfig(encoding='utf-8')
 
 import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer

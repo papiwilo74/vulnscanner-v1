@@ -479,7 +479,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="OmniBreach v3.0 — Suite Defensiva & Ofensiva con EASM (External Attack Surface Management), Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Modo Lab",
+        description="OmniBreach v3.0 — Framework Unificado CTEM: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV y Telemetría en Vivo",
         epilog="Ejemplo: python main.py --easm empresa.com.co"
     )
     parser.add_argument("--version", "-V", action="version", version="OmniBreach v3.0")

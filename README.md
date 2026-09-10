@@ -19,13 +19,16 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach v3.0** es una plataforma integral de ciberdefensa ofensiva y defensiva que combina **EASM + SBOM (CycloneDX/SPDX) + Container Security + Probabilistic Attack Graphs con What-If + Active Learning AI + Subdomain Takeover Scanner + Public Secret Leaks OSINT + AI Remediation Advisor + DAST + SAST + IAST/RASP + Cluster Distribuido + Multi-Tenancy RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict` en el 100% del código, análisis SAST con `bandit`, correlación en tiempo real con el catálogo **CISA KEV**, detección de puertos críticos de Ransomware y acceso sin autenticación, especificación OpenAPI 3.1, reportes ejecutivos en PDF y panel SOC interactivo en tiempo real.
+> **OmniBreach v3.0** es un **Framework Unificado de Integración CTEM (Continuous Threat Exposure Management) y Orquestador Ligero de Pruebas de Seguridad**. Diseñado como una plataforma integral de ingeniería de ciberseguridad, combina **Cartografía Perimetral EASM + Modelado de Amenazas con Grafos de Ataque Probabilísticos (Centralidad de Brandes & Simulación What-If) + Generación de SBOM (CycloneDX 1.5 / SPDX 2.3) + Auditoría Estática de Contenedores + Detección de Subdomain Takeover + DAST Ligero + Telemetría ASGI en Memoria (PoC IAST/RASP) + Tecnología de Engaño (HoneyTokens)**.
+> 
+> Todo construido con rigor de ingeniería de software: tipado estricto `mypy --strict` en el 100% del código, SAST limpio con `bandit`, 258 pruebas automatizadas, correlación con el catálogo **CISA KEV**, especificación OpenAPI 3.1 y reportes ejecutivos en PDF.
 
 ---
 
 ## Tabla de Contenidos
 
 - [¿Qué es OmniBreach?](#que-es-omnibreach)
+- [Enfoque de Ingeniería y Propósito](#enfoque-de-ingenieria-y-proposito)
 - [Gestión de Superficie Externa (EASM)](#gestion-de-superficie-externa-easm)
 - [Guía Oficial de Despliegue en la Nube (Vercel + Render + Neon)](docs/DEPLOYMENT_GUIDE.md)
 - [Arquitectura y Decisiones Técnicas (ADRs)](docs/ARCHITECTURE_DECISIONS.md)
@@ -48,15 +51,26 @@
 
 ## ¿Qué es OmniBreach?
 
-**OmniBreach** es una plataforma avanzada de ciberseguridad corporativa desarrollada en Python para operaciones de ciberdefensa y auditoría continua, combinando:
+**OmniBreach** es un orquestador integral de seguridad defensiva y evaluación perimetral desarrollado en Python. En lugar de limitarse a escanear URLs aisladas, implementa un enfoque de **exposición continua (CTEM)** que unifica:
 
-- **EASM** (External Attack Surface Management): cartografía de perímetro digital a partir del dominio raíz, scraping de Certificate Transparency (`crt.sh`), detección de proveedores Cloud y escaneo de puertos de alto riesgo de Ransomware.
-- **DAST** (Dynamic Application Security Testing): escaneo activo y dinámico de endpoints web y APIs en vivo.
-- **SAST** (Static Application Security Testing): análisis estático de dependencias frontend y código JavaScript.
-- **IAST / RASP**: instrumentación y defensa activa en memoria con bloqueo HTTP 403 en tiempo de ejecución.
-- **ML**: modelo de Inteligencia Artificial local determinista (TF-IDF + Regresión Logística) para clasificación de vectores de ataque.
-- **Cluster Distribuido**: workers autónomos multi-región para auditorías de alta escala.
-- **Deception Defense**: señuelos HoneyTokens (URLs, API Keys, JWT) con detección de intrusos en tiempo real vía WebSocket.
+- **EASM Perimetral**: Cartografía de activos desde el dominio raíz, scraping de Certificate Transparency (`crt.sh`), identificación de proveedores Cloud y sondeo de servicios expuestos propensos a Ransomware.
+- **Modelado de Ataques y Choke Points**: Grafo Dirigido Acíclico (DAG) que correlaciona hallazgos multi-etapa y calcula la centralidad matemática de Brandes (*Betweenness Centrality*) para identificar qué remediación corta el mayor número de rutas hacia el impacto crítico.
+- **Simulación Analítica What-If**: Motor predictivo que calcula la reducción cuantitativa de riesgo sistémico (\(\Delta\text{Risk}\%\)) antes de aplicar un parche.
+- **Supply Chain & Container Security**: Generador de SBOM en formatos oficiales CycloneDX v1.5 y SPDX v2.3 (para cumplimiento de regulaciones como EU CRA y US EO 14028) junto con auditoría estática de directivas en Dockerfiles.
+- **Pruebas Dinámicas Ligeras (DAST & APIs)**: Comprobaciones activas no destructivas sobre endpoints web y contratos OpenAPI/Swagger.
+- **Agente de Telemetría ASGI (PoC IAST/RASP)**: Middleware para aplicaciones Python/Starlette que correlaciona sinks en tiempo de ejecución y demuestra mitigación activa en memoria (HTTP 403).
+- **Active Learning**: Inferencia ligera basada en n-gramas TF-IDF con recolección de feedback de analistas de seguridad para mejora continua.
+- **Deception Defense**: Señuelos HoneyTokens activos (URLs, API Keys y JWT) con alertas forenses en tiempo real vía WebSocket.
+
+---
+
+## Enfoque de Ingeniería y Propósito
+
+OmniBreach está concebido como una **plataforma unificada de investigación y evaluación de seguridad perimetral**. No pretende reemplazar soluciones corporativas comerciales multimillonarias que requieren cientos de analistas humanos (como Qualys, Rapid7 o Checkmarx), sino resolver un problema concreto de ingeniería:
+
+> **El problema:** La fragmentación de herramientas en equipos medianos. Habitualmente se requiere una herramienta para subdominios, otra para puertos, otra para SBOM, otra para DAST y hojas de cálculo manuales para entender cómo se relacionan las vulnerabilidades.
+>
+> **La solución de OmniBreach:** Unificar la cartografía perimetral, la correlación causal con **Grafos de Ataque Matemáticos**, el cumplimiento de **Supply Chain (SBOM)** y la telemetría en un único motor reproducible, auditable y con **calidad de código verificable (100% mypy strict, SAST limpio y suite exhaustiva de tests)**.
 
 ---
 
