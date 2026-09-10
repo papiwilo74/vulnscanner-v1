@@ -1,7 +1,7 @@
-# VulnScanner v2.5 (Enterprise Edition)
+# OmniBreach Enterprise v2.5.0
 
 <p align="center">
-  <img src="https://img.shields.io/badge/VulnScanner-v2.5.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="VulnScanner v2.5 Enterprise" />
+  <img src="https://img.shields.io/badge/OmniBreach-v2.5.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="OmniBreach v2.5 Enterprise" />
 </p>
 
 <p align="center">
@@ -10,6 +10,7 @@
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
   <a href="docs/SECURITY_CVE_MANAGEMENT.md"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit clean" /></a>
+  <a href="docs/DEPLOYMENT_GUIDE.md"><img src="https://img.shields.io/badge/Cloud-Vercel%20%7C%20Render%20%7C%20Neon-blueviolet.svg" alt="Deploy to Vercel Render Neon" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
   <a href="tests/"><img src="https://img.shields.io/badge/Tests-225%20passing-brightgreen.svg" alt="225 Tests" /></a>
@@ -17,13 +18,14 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **VulnScanner v2.5** es una plataforma de análisis de seguridad web y ciberdefensa en Python que integra **DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict`, análisis SAST con `bandit`, especificación OpenAPI 3.1 & YAML, reportes ejecutivos en PDF y suites de pruebas automatizadas listas out-of-the-box.
+> **OmniBreach Enterprise v2.5.0** es una plataforma integral de ciberdefensa y análisis de seguridad web en Python que combina **DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict`, análisis SAST con `bandit`, especificación OpenAPI 3.1, reportes ejecutivos en PDF, panel SOC interactivo en tiempo real y soporte nativo para despliegue en la nube (**Vercel + Render + Neon**).
 
 ---
 
 ## Tabla de Contenidos
 
-- [Que es VulnScanner?](#que-es-vulnscanner)
+- [Que es OmniBreach?](#que-es-omnibreach)
+- [Guía Oficial de Despliegue en la Nube (Vercel + Render + Neon)](docs/DEPLOYMENT_GUIDE.md)
 - [Arquitectura y Decisiones Técnicas (ADRs)](docs/ARCHITECTURE_DECISIONS.md)
 - [Especificacion OpenAPI 3.1 (JSON)](docs/openapi.json) | [Contrato YAML](docs/openapi.yaml)
 - [Benchmark de Rendimiento y Comparativa](tests/benchmark_performance.py)

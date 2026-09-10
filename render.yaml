@@ -1,0 +1,29 @@
+# Blueprint de Despliegue en Render para OmniBreach Enterprise
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: omnibreach-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn api:app --host 0.0.0.0 --port $PORT --workers 1"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ENVIRONMENT
+        value: production
+      # Modo ligero para no superar los 512MB de RAM en el plan gratuito de Render (omite Chromium)
+      - key: OMNIBREACH_LIGHTWEIGHT
+        value: "1"
+      # Orígenes permitidos de CORS (coloca aquí la URL de Vercel una vez desplegada)
+      - key: CORS_ORIGINS
+        value: "*"
+      # Cadena de conexión PostgreSQL de Neon (ej. postgresql://user:pass@ep-xyz.aws.neon.tech/neondb?sslmode=require)
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true

@@ -1,14 +1,21 @@
 import contextlib
 import importlib
+import os
 from typing import Any, Optional, cast
 
 _playwright_available: Optional[bool] = None
 _playwright_checked = False
 
 def is_playwright_available() -> bool:
-    """Comprueba una sola vez si Playwright está instalado."""
+    """Comprueba una sola vez si Playwright está instalado y permitido por la configuración."""
     global _playwright_available, _playwright_checked
     if not _playwright_checked:
+        # En entornos con RAM estricta (Render Free 512MB), desactivar Playwright para evitar OOM kill
+        if os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes") or os.environ.get("RENDER_FREE", "").lower() in ("1", "true", "yes"):
+            _playwright_available = False
+            _playwright_checked = True
+            return False
+
         try:
             importlib.import_module("playwright")
             _playwright_available = True

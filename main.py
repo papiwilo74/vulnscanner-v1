@@ -56,7 +56,17 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S"
 )
-logger = logging.getLogger("VulnScanner")
+logger = logging.getLogger("OmniBreach")
+
+OMNIBREACH_BANNER = (
+    "\n"
+    r"   ____                  _ ____                       _    " + "\n"
+    r"  / __ \____ ___  ____  (_) __ )________  ____ ______/ /_  " + "\n"
+    r" / / / / __ `__ \/ __ \/ / __  / ___/ _ \/ __ `/ ___/ __ \ " + "\n"
+    r"/ /_/ / / / / / / / / / / /_/ / /  /  __/ /_/ / /__/ / / / " + "\n"
+    r"\____/_/ /_/ /_/_/ /_/_/_____/_/   \___/\__,_/\___/_/ /_/  " + "\n"
+    "              ENTERPRISE EDITION v2.5.0\n"
+)
 
 CATEGORY_MAP: dict[str, str] = {
     "headers": "headers",
@@ -463,10 +473,10 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="VulnScanner Enterprise v2.4 — Suite Empresarial con Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque y Modo Lab Hermético",
+        description="OmniBreach Enterprise v2.5.0 — Suite Defensiva & Ofensiva de Ciberseguridad con Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Modo Lab",
         epilog="Ejemplo: python main.py --lab --full"
     )
-    parser.add_argument("--version", "-V", action="version", version="VulnScanner v2.4.0")
+    parser.add_argument("--version", "-V", action="version", version="OmniBreach Enterprise v2.5.0")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--web", "--dashboard", "--gui", dest="web_mode", action="store_true",
                         help="Inicia la interfaz web interactiva en tiempo real (SOC Dashboard) en el navegador")
@@ -541,6 +551,8 @@ if __name__ == "__main__":
                         help="ID de organización tenant para el escaneo (defecto: org_default)")
 
     args = parser.parse_args()
+    if not args.worker:
+        print(OMNIBREACH_BANNER)
 
     if args.worker:
         from scanner.cluster import ScanningWorkerDaemon

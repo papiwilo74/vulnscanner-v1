@@ -11,6 +11,7 @@ from typing import Any, Optional
 import requests
 import yaml
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
@@ -20,19 +21,31 @@ from scanner.deception import DeceptionManager, SnippetGenerator
 from scanner.tenancy import ROLE_PERMISSIONS, Role, TenancyManager, User
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("VulnScannerAPI")
+logger = logging.getLogger("OmniBreachAPI")
 
 app = FastAPI(
-    title="VulnScanner Enterprise API",
-    description="Microservicio web para automatización de auditorías de seguridad, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens), Cluster Distribuido y Multi-Tenancy con RBAC.",
-    version="2.4.0"
+    title="OmniBreach Enterprise API",
+    description="Microservicio web para automatización de auditorías de ciberdefensa, Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens), Cluster Distribuido y Multi-Tenancy con RBAC.",
+    version="2.5.0"
+)
+
+# Soporte CORS para despliegue distribuido (Frontend Vercel <-> Backend Render)
+_allowed_origins_raw = os.environ.get("CORS_ORIGINS", "*")
+_allowed_origins = [orig.strip() for orig in _allowed_origins_raw.split(",") if orig.strip()] or ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins if "*" not in _allowed_origins else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 deception_mgr = DeceptionManager()
 tenancy_mgr = TenancyManager()
 cluster_mgr = ClusterCoordinator()
 
-_db_path = os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db"))
+_db_path = os.environ.get("OMNIBREACH_DB", os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db")))
 _db_lock = Lock()
 
 
@@ -449,13 +462,27 @@ def send_webhook_notification(task_id: str, webhook_url: str, status: str, paylo
         logger.warning(f"No se pudo enviar la notificación Webhook para la tarea {task_id}: {e}")
 
 
+@app.get("/health", tags=["System"])
+def health_check() -> dict[str, Any]:
+    """Endpoint de estado para Render Blueprints, monitores UptimeRobot y verificación de latencia."""
+    is_postgres = bool(os.environ.get("DATABASE_URL", "").startswith(("postgres://", "postgresql://")))
+    return {
+        "status": "healthy",
+        "service": "OmniBreach Enterprise API",
+        "version": "2.5.0",
+        "database": "neon-postgresql" if is_postgres else "sqlite",
+        "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
+    }
+
+
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a VulnScanner Enterprise API",
-        "version": "2.4.0",
+        "message": "Bienvenido a OmniBreach Enterprise API",
+        "version": "2.5.0",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST"],
         "dashboard_url": "/dashboard",
+        "health_url": "/health",
         "docs_url": "/docs",
         "status": "online"
     }
