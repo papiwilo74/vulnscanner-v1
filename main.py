@@ -229,6 +229,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          generate_pdf: bool = False, auto_pr: bool = False,
          github_repo: Optional[str] = None, github_token: Optional[str] = None,
          base_branch: str = "main",
+         what_if_nodes: Optional[list[str]] = None,
          progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
@@ -438,6 +439,11 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
                         top_cp.node_title, top_cp.severed_paths_count)
             logger.info("[DEFENSA] Contramedida recomendada: %s", top_cp.recommended_defense)
         attack_graph_dict = attack_graph.to_dict()
+        if what_if_nodes:
+            what_if_res = attack_graph.simulate_remediation(what_if_nodes)
+            attack_graph_dict["what_if_simulation"] = what_if_res.to_dict()
+            logger.info("[WHAT-IF] Simulación completada: Reducción de riesgo del %.1f%% (%d rutas cortadas).",
+                        what_if_res.risk_reduction_percent, what_if_res.severed_attack_paths)
 
     # 7. Auto-Remediación DevSecOps con GitHub Pull Request
     pr_result = None
@@ -551,10 +557,16 @@ if __name__ == "__main__":
                         help="Inicia la instancia como un nodo worker de escaneo distribuido")
     parser.add_argument("--coordinator", type=str, default="http://localhost:8000",
                         help="URL del servidor API coordinador para workers (defecto: http://localhost:8000)")
-    parser.add_argument("--region", type=str, default="local",
-                        help="Identificador geográfico o cloud de la región del worker (ej. us-east-1, eu-central-1, local)")
     parser.add_argument("--tenant", type=str, default="org_default",
                         help="ID de organización tenant para el escaneo (defecto: org_default)")
+    parser.add_argument("--sbom", type=str, nargs="?", const="cyclonedx", choices=["cyclonedx", "spdx"],
+                        help="Genera un Software Bill of Materials (SBOM) del software en formato CycloneDX v1.5 o SPDX v2.3")
+    parser.add_argument("--dockerfile", type=str, default=None,
+                        help="Ruta al archivo Dockerfile para ejecutar auditoría de Container Security y malas prácticas")
+    parser.add_argument("--what-if", type=str, nargs="+", default=None,
+                        help="Simula la remediación de uno o más IDs de vulnerabilidad/nodos en el Grafo de Ataque")
+    parser.add_argument("--ai-feedback", type=str, nargs=2, metavar=("PAYLOAD", "LABEL"),
+                        help="Registra feedback de analista para Active Learning (ej: --ai-feedback '<script>' malicious)")
 
     args = parser.parse_args()
     if not args.worker:
@@ -710,6 +722,54 @@ if __name__ == "__main__":
         print()
         sys.exit(0)
 
+    if args.sbom:
+        from scanner.sbom import SBOMGenerator
+        gen = SBOMGenerator()
+        fmt = args.sbom.lower()
+        out_file = f"reports/sbom_{fmt}.json"
+        saved = gen.export_to_file(out_file, format_type=fmt)
+        print("\n" + "=" * 70)
+        print(f" [📦 SUPPLY CHAIN SECURITY] SBOM GENERADO EXITOSAMENTE ({fmt.upper()})")
+        print("=" * 70)
+        print(f" Estándar: {'CycloneDX v1.5 JSON' if fmt == 'cyclonedx' else 'SPDX v2.3 JSON'}")
+        print(" Normativas: Conforme a EU Cyber Resilience Act (CRA) y US EO 14028")
+        print(f" Archivo persistido en: {saved}")
+        print(f" Componentes inventariados: {len(gen.collect_components())}")
+        print("=" * 70 + "\n")
+        sys.exit(0)
+
+    if args.dockerfile:
+        from scanner.container_security import DockerfileScanner
+        c_scanner = DockerfileScanner()
+        findings_cont = c_scanner.scan_file(args.dockerfile)
+        print("\n" + "=" * 70)
+        print(f" [🐳 CONTAINER SECURITY] AUDITORÍA ESTÁTICA DOCKERFILE: {args.dockerfile}")
+        print("=" * 70)
+        if not findings_cont:
+            print(" ✅ No se detectaron malas prácticas ni directivas inseguras en el Dockerfile.")
+        else:
+            print(f" Se encontraron {len(findings_cont)} observaciones de seguridad:")
+            for f_cont in findings_cont:
+                sev_icon = "💥" if f_cont.severity in ("critical", "high") else "⚠️"
+                print(f"\n {sev_icon} [{f_cont.severity.upper()}] {f_cont.title} (Línea {f_cont.line_number})")
+                print(f"    Directiva: {f_cont.line_content}")
+                print(f"    Riesgo: {f_cont.description}")
+                print(f"    Remediación: {f_cont.remediation}")
+        print("=" * 70 + "\n")
+        sys.exit(0)
+
+    if args.ai_feedback:
+        from scanner.ai_check import record_analyst_feedback
+        f_payload, f_label_str = args.ai_feedback
+        is_mal = f_label_str.lower() in ("malicious", "vulnerable", "1", "true", "si", "sí")
+        ok = record_analyst_feedback(f_payload, is_malicious=is_mal, category="analyst_cli")
+        if ok:
+            print(f"\n[AI ACTIVE LEARNING] Feedback registrado: '{f_payload}' -> {'MALICIOSO' if is_mal else 'BENIGNO'}")
+            print("El clasificador incorporará este ejemplo en el próximo re-entrenamiento (train_ai.py).\n")
+        else:
+            print("\n[AI ERROR] No se pudo persistir el feedback de analista.\n")
+        sys.exit(0)
+
     if args.web_mode:
         import webbrowser
 
@@ -792,6 +852,7 @@ if __name__ == "__main__":
             github_repo=args.github_repo,
             github_token=args.github_token,
             base_branch=args.base_branch,
+            what_if_nodes=args.what_if,
         )
     finally:
         if lab_server:

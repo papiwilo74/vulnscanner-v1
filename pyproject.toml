@@ -131,6 +131,7 @@ module = [
     "defusedxml.*",
     "reportlab.*",
     "yaml",
+    "sklearn.*",
 ]
 ignore_missing_imports = true
 

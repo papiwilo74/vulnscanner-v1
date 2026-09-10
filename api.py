@@ -1006,4 +1006,86 @@ def fail_cluster_job(task_id: str, req: JobFailRequest) -> dict[str, Any]:
     return {"message": "Fallo registrado correctamente"}
 
 
+# ==============================================================================
+# 11. ENDPOINTS: SUPPLY CHAIN SBOM & CONTAINER SECURITY
+# ==============================================================================
+
+class DockerfileScanRequest(BaseModel):
+    dockerfile_content: str
+    file_path: Optional[str] = "Dockerfile"
+
+
+class WhatIfSimulateRequest(BaseModel):
+    remediated_node_ids: list[str]
+    findings: Optional[list[dict[str, Any]]] = None
+
+
+class AIFeedbackRequest(BaseModel):
+    payload: str
+    is_malicious: bool
+    category: Optional[str] = "analyst_api"
+    analyst: Optional[str] = "SecOps"
+
+
+@app.get("/api/v1/sbom")
+def get_sbom(format: str = "cyclonedx") -> JSONResponse:
+    """Genera y descarga el Software Bill of Materials (SBOM) en CycloneDX 1.5 o SPDX 2.3."""
+    from scanner.sbom import SBOMGenerator
+    gen = SBOMGenerator()
+    if format.lower() == "spdx":
+        sbom_data = gen.generate_spdx()
+    else:
+        sbom_data = gen.generate_cyclonedx()
+    return JSONResponse(content=sbom_data)
+
+
+@app.post("/api/v1/containers/scan-dockerfile")
+def scan_dockerfile_endpoint(req: DockerfileScanRequest) -> dict[str, Any]:
+    """Analiza estáticamente un Dockerfile en busca de malas prácticas y vulnerabilidades."""
+    from scanner.container_security import DockerfileScanner
+    scanner = DockerfileScanner()
+    findings = scanner.scan_content(req.dockerfile_content, file_path=req.file_path or "Dockerfile")
+    return {
+        "total_findings": len(findings),
+        "findings": [f.to_dict() for f in findings],
+    }
+
+
+@app.post("/api/v1/attack-graph/what-if")
+def what_if_simulation_endpoint(req: WhatIfSimulateRequest) -> dict[str, Any]:
+    """Simula la remediación de vulnerabilidades y calcula la reducción de riesgo en el Grafo de Ataque."""
+    from scanner.attack_graph import AttackGraph
+    from scanner.models import Finding
+
+    findings_objs: list[Finding] = []
+    if req.findings:
+        for f_data in req.findings:
+            findings_objs.append(Finding(
+                category=f_data.get("category", "default"),
+                title=f_data.get("title", "Finding"),
+                severity=f_data.get("severity", "medium"),
+                affected_url=f_data.get("affected_url", ""),
+            ))
+
+    graph = AttackGraph.build_from_findings(findings_objs)
+    result = graph.simulate_remediation(req.remediated_node_ids)
+    return result.to_dict()
+
+
+@app.post("/api/v1/ai/feedback")
+def submit_ai_feedback(req: AIFeedbackRequest) -> dict[str, Any]:
+    """Registra retroalimentación de analistas de seguridad para el Active Learning Loop de la IA."""
+    from scanner.ai_check import record_analyst_feedback
+    ok = record_analyst_feedback(
+        payload=req.payload,
+        is_malicious=req.is_malicious,
+        category=req.category or "api",
+        analyst=req.analyst or "SecOps",
+    )
+    if not ok:
+        raise HTTPException(status_code=400, detail="No se pudo registrar la muestra de feedback.")
+    return {"status": "success", "message": "Feedback de analista registrado para Active Learning."}
+
+
+
 

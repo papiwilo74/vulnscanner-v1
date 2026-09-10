@@ -14,12 +14,12 @@
   <a href="docs/DEPLOYMENT_GUIDE.md"><img src="https://img.shields.io/badge/Cloud-Vercel%20%7C%20Render%20%7C%20Neon-blueviolet.svg" alt="Deploy to Vercel Render Neon" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-248%20passing-brightgreen.svg" alt="248 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-258%20passing-brightgreen.svg" alt="258 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach v3.0** es una plataforma integral de ciberdefensa ofensiva y defensiva que combina **EASM (External Attack Surface Management) + Subdomain Takeover Scanner + Public Secret Leaks OSINT + AI Remediation Advisor (Runbooks) + DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Multi-Tenancy RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict` en el 100% del código, análisis SAST con `bandit`, correlación en tiempo real con el catálogo **CISA KEV**, detección de puertos críticos de Ransomware y acceso sin autenticación, especificación OpenAPI 3.1, reportes ejecutivos en PDF y panel SOC interactivo en tiempo real.
+> **OmniBreach v3.0** es una plataforma integral de ciberdefensa ofensiva y defensiva que combina **EASM + SBOM (CycloneDX/SPDX) + Container Security + Probabilistic Attack Graphs con What-If + Active Learning AI + Subdomain Takeover Scanner + Public Secret Leaks OSINT + AI Remediation Advisor + DAST + SAST + IAST/RASP + Cluster Distribuido + Multi-Tenancy RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict` en el 100% del código, análisis SAST con `bandit`, correlación en tiempo real con el catálogo **CISA KEV**, detección de puertos críticos de Ransomware y acceso sin autenticación, especificación OpenAPI 3.1, reportes ejecutivos en PDF y panel SOC interactivo en tiempo real.
 
 ---
 
@@ -64,6 +64,10 @@
 
 | Modulo | Descripcion |
 |---|---|
+| **SBOM Generator** | Generador de Software Bill of Materials en estándares oficiales **CycloneDX v1.5 JSON** y **SPDX v2.3 JSON** (cumplimiento EU CRA / US EO 14028) |
+| **Container Security Scanner** | Auditoría estática de Dockerfiles: ejecución como root, puertos inseguros, secrets en capas ENV, etiquetas mutables y comandos ADD |
+| **Probabilistic Attack Graph** | Modelado DAG con probabilidades de explotación, cálculo determinista de **Betweenness Centrality** y **Simulador de Impacto What-If** |
+| **Active Learning AI** | Modelo clasificador n-gram con Stratified 5-Fold Cross-Validation, estimación de incertidumbre y captura de feedback de analistas |
 | **Subdomain Takeover Scanner** | Detección concurrente de CNAMEs huérfanos/dangling hacia 11 servicios Cloud (AWS S3, GitHub Pages, Heroku, Azure, Zendesk, Fastly, Shopify, etc.) |
 | **Secret Leaks OSINT** | Rastreo pasivo de credenciales corporativas expuestas (AWS Keys, GitHub PAT, Stripe Live, DB connection strings, SSH Keys) en repositorios públicos |
 | **AI Remediation Advisor** | Generación de Runbooks ejecutivos y técnicos con scripts listos para ejecutar (`iptables`, eliminación de CNAMEs, rotación de claves) con o sin LLM local |
@@ -210,6 +214,10 @@ python main.py <URL> [OPCIONES]
 |---|---|---|
 | `--easm <dominio>` | Cartografía y auditoría completa de Superficie Externa (EASM, CT logs, Ransomware ports, CISA KEV) | `--easm empresa.com.co` |
 | `--runbook` | Genera y muestra el Runbook técnico de mitigación inmediata con scripts ejecutables | `--runbook` |
+| `--sbom [format]` | Genera un Software Bill of Materials (SBOM) en formato `cyclonedx` o `spdx` | `--sbom cyclonedx` |
+| `--dockerfile <path>` | Auditoría estática de seguridad y detección de malas prácticas en Dockerfiles | `--dockerfile ./Dockerfile` |
+| `--what-if <nodes>` | Simula la mitigación de vulnerabilidades y calcula la reducción de riesgo en el Grafo de Ataque | `--what-if node_1_sensitive_data` |
+| `--ai-feedback <p> <l>` | Registra muestras de analistas para Active Learning (`malicious` o `benign`) | `--ai-feedback "' OR 1=1" malicious` |
 | `--no-bruteforce` | Omite la fuerza bruta DNS en el modo EASM (análisis pasivo rápido) | `--no-bruteforce` |
 | `--no-open` | No abre el reporte HTML automaticamente | `--no-open` |
 | `--stealth` | Rate-limiting: User-Agent real + retardos aleatorios | `--stealth` |
