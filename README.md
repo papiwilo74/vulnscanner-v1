@@ -9,7 +9,7 @@
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
-  <a href="https://pypi.org/project/pip-audit/"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit" /></a>
+  <a href="docs/SECURITY_CVE_MANAGEMENT.md"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit clean" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
   <a href="tests/"><img src="https://img.shields.io/badge/Tests-225%20passing-brightgreen.svg" alt="225 Tests" /></a>

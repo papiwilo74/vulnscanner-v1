@@ -27,11 +27,10 @@ jobs:
           python-version: "3.11"
       - name: Install deps
         run: |
-          pip install mypy types-requests types-urllib3 types-colorama
+          pip install mypy
           pip install -r requirements.txt
-          pip install -r requirements_ai.txt
-      - name: Type check with mypy
-        run: mypy scanner utils api.py main.py
+      - name: Type check with mypy --strict
+        run: mypy scanner utils api.py main.py --strict
 
   security-scan:
     runs-on: ubuntu-latest
@@ -44,11 +43,10 @@ jobs:
         run: |
           pip install bandit pip-audit
           pip install -r requirements.txt
-          pip install -r requirements_ai.txt
       - name: Run Bandit SAST
-        run: bandit -r scanner api.py main.py -c bandit.yaml -ll
+        run: bandit -r scanner api.py main.py -c bandit.yaml
       - name: Run pip-audit SCA
-        run: pip-audit
+        run: pip-audit -r requirements.txt
 
   test:
     runs-on: ubuntu-latest
@@ -63,7 +61,6 @@ jobs:
       - name: Install deps
         run: |
           pip install -r requirements.txt
-          pip install -r requirements_ai.txt
           pip install pytest pytest-mock responses pytest-cov httpx
       - name: Run tests with coverage
         run: |
@@ -83,7 +80,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install deps
-        run: pip install -r requirements_ai.txt
+        run: pip install -r requirements.txt
       - name: Train AI model
         run: python train_ai.py --ci
       - name: Verify model files exist
@@ -91,6 +88,18 @@ jobs:
           test -f models/ai_model.joblib || (echo "ERROR: model not generated" && exit 1)
           test -f models/vectorizer.joblib || (echo "ERROR: vectorizer not generated" && exit 1)
           echo "Model files verified OK"
+
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run Accuracy Benchmark Gate
+        run: python tests/benchmark_accuracy.py
 
   build-check:
     runs-on: ubuntu-latest
