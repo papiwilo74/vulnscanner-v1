@@ -65,7 +65,7 @@ OMNIBREACH_BANNER = (
     r" / / / / __ `__ \/ __ \/ / __  / ___/ _ \/ __ `/ ___/ __ \ " + "\n"
     r"/ /_/ / / / / / / / / / / /_/ / /  /  __/ /_/ / /__/ / / / " + "\n"
     r"\____/_/ /_/ /_/_/ /_/_/_____/_/   \___/\__,_/\___/_/ /_/  " + "\n"
-    "                         v2.5\n"
+    "                      v3.0 EASM\n"
 )
 
 CATEGORY_MAP: dict[str, str] = {
@@ -473,11 +473,15 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="OmniBreach v2.5 — Suite Defensiva & Ofensiva de Ciberseguridad con Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Modo Lab",
-        epilog="Ejemplo: python main.py --lab --full"
+        description="OmniBreach v3.0 — Suite Defensiva & Ofensiva con EASM (External Attack Surface Management), Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Modo Lab",
+        epilog="Ejemplo: python main.py --easm empresa.com.co"
     )
-    parser.add_argument("--version", "-V", action="version", version="OmniBreach v2.5")
+    parser.add_argument("--version", "-V", action="version", version="OmniBreach v3.0")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
+    parser.add_argument("--easm", type=str, default=None, metavar="DOMINIO",
+                        help="Auditoría de Superficie Externa (EASM): Cartografía de subdominios, puertos de ransomware y CISA KEV")
+    parser.add_argument("--no-bruteforce", action="store_true",
+                        help="Omite la fuerza bruta DNS en el modo EASM (solo consultas pasivas CT logs)")
     parser.add_argument("--web", "--dashboard", "--gui", dest="web_mode", action="store_true",
                         help="Inicia la interfaz web interactiva en tiempo real (SOC Dashboard) en el navegador")
     parser.add_argument("--lab", "--offline", dest="lab_mode", action="store_true",
@@ -576,6 +580,47 @@ if __name__ == "__main__":
             worker.stop()
             print("\n[WORKER] Nodo detenido limpiamente.")
             sys.exit(0)
+
+    if args.easm:
+        from scanner.easm.engine import EASMEngine
+        easm_engine = EASMEngine()
+        print("\n" + "=" * 75)
+        print(f" [🌐 EASM SCOUT] CARTOGRAFÍA & SUPERFICIE DE ATAQUE EXTERNA: {args.easm}")
+        print("=" * 75)
+        report = easm_engine.run_full_surface_assessment(
+            args.easm,
+            include_bruteforce=not args.no_bruteforce
+        )
+        print(f"\n Calificación de Exposición: {report.exposure_grade} ({report.exposure_score}/100)")
+        print(f" Activos Totales Descubiertos: {report.total_assets}")
+        print(f" Servicios Expuestos: {report.total_exposed_services}")
+        print(f" Vectores de Ransomware (RDP, SMB, DBs): {report.critical_ransomware_vectors}")
+        print(f" Alertas CISA KEV (Exploits Activos): {report.cisa_kev_alerts}")
+        print("-" * 75)
+        if report.services:
+            print(" SERVICIOS Y PUERTOS CRÍTICOS EXPUESTOS:")
+            for s in report.services:
+                crit_flag = "🚨 [CRÍTICO]" if s["severity"] == "CRITICAL" else f"[{s['severity']}]"
+                print(f"   * {crit_flag} {s['host']} ({s['ip']}) -> Puerto {s['port']} ({s['service_name']})")
+                if s["unauthenticated_access"]:
+                    print(f"     ⚠️ ACCESO NO AUTENTICADO DETECTADO: {s['evidence']}")
+                elif s["banner"]:
+                    print(f"     Banner: {s['banner'][:80]}")
+            print("-" * 75)
+        if report.cves:
+            print(" ALERTA CISA KEV — VULNERABILIDADES ACTIVAMENTE EXPLOTADAS:")
+            for c in report.cves:
+                print(f"   * 💥 {c['cve_id']} - {c['vulnerability_name']}")
+                print(f"     Afecta: {c['affected_product']} (Campaña: {c['ransomware_campaign']})")
+                print(f"     Remediación: {c['remediation_steps']}")
+            print("-" * 75)
+        if report.identity_risk.get("typosquatting_detected"):
+            print(" RIESGO DE IDENTIDAD & TYPOSQUATTING (Phishing):")
+            for typo in report.identity_risk["typosquatting_detected"]:
+                print(f"   * ⚠️ Dominio suplantador activo: {typo['domain']} ({typo['ip']})")
+            print("-" * 75)
+        print()
+        sys.exit(0)
 
     if args.deception_generate:
         from scanner.deception import DeceptionManager, SnippetGenerator

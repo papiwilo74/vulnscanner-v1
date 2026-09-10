@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OmniBreach v2.5 — Real-Time SOC Dashboard</title>
+    <title>OmniBreach v3.0 — Real-Time SOC Dashboard & EASM</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -51,7 +51,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-lg leading-none tracking-tight flex items-center gap-2">
-                        OmniBreach <span class="bg-indigo-500/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full font-mono border border-indigo-500/30">v2.5</span>
+                        OmniBreach <span class="bg-indigo-500/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full font-mono border border-indigo-500/30">v3.0</span>
                     </h1>
                     <p class="text-xs text-slate-400">Plataforma de Ciberdefensa & Telemetría en Tiempo Real</p>
                 </div>
@@ -87,6 +87,10 @@
             <button id="tab-btn-cluster" onclick="switchTab('cluster')" class="px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
                 <i class="fa-solid fa-server text-cyan-400"></i> Cluster Distribuido (Workers)
                 <span id="tab-badge-workers" class="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">0 Nodos</span>
+            </button>
+            <button id="tab-btn-easm" onclick="switchTab('easm')" class="px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+                <i class="fa-solid fa-satellite-dish text-emerald-400"></i> Superficie Externa (EASM)
+                <span id="tab-badge-easm" class="hidden bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">0 Activos</span>
             </button>
         </div>
 
@@ -494,11 +498,194 @@
                 </div>
             </div>
         </div><!-- End view-cluster -->
+
+        <!-- TAB 4: CARTOGRAFÍA Y SUPERFICIE EXTERNA (EASM) -->
+        <div id="view-easm" class="space-y-6 hidden">
+            <!-- Banner -->
+            <div class="bg-gradient-to-r from-emerald-950/40 via-soc-card to-cyan-950/40 border border-emerald-500/30 rounded-2xl p-6 shadow-xl relative">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-emerald-500/20 text-emerald-400 text-xs px-2.5 py-0.5 rounded-full font-mono border border-emerald-500/30 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 live-dot"></span> MOTOR EASM NOVASEC
+                            </span>
+                            <span class="bg-indigo-500/20 text-indigo-400 text-xs px-2.5 py-0.5 rounded-full font-mono border border-indigo-500/30">
+                                CISA KEV & CERTIFICATE TRANSPARENCY
+                            </span>
+                        </div>
+                        <h2 class="text-xl font-bold mt-2">Cartografía de Perímetro y Gestión de Superficie Externa</h2>
+                        <p class="text-xs text-slate-400 mt-1 max-w-3xl">
+                            Mapeo digital automático desde el dominio raíz: scraping en Certificate Transparency logs (crt.sh), resolución DNS masiva, detección de nubes y escaneo de puertos de alto riesgo de Ransomware (RDP, SMB, bases de datos sin clave) con correlación CISA KEV.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EASM Launcher Card -->
+            <section class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <label for="easm-domain" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Dominio Raíz Corporativo</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i class="fa-solid fa-globe"></i>
+                            </span>
+                            <input type="text" id="easm-domain" placeholder="ejemplo.com.co" value="orderflowapp.online"
+                                   class="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm placeholder-slate-500">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-3">
+                        <div class="flex items-center gap-2 pb-2.5">
+                            <input type="checkbox" id="easm-bruteforce" checked class="rounded bg-slate-900 border-slate-700 text-emerald-600 focus:ring-emerald-500">
+                            <label for="easm-bruteforce" class="text-xs text-slate-300 font-mono">Fuerza Bruta DNS</label>
+                        </div>
+                        <button id="btn-easm-launch" onclick="launchEASMScan()" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-lg shadow-emerald-600/30 transition flex items-center gap-2">
+                            <i class="fa-solid fa-satellite-dish"></i> Mapear Perímetro
+                        </button>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div id="easm-progress-container" class="mt-5 hidden">
+                    <div class="flex justify-between text-xs font-mono text-slate-400 mb-1">
+                        <span id="easm-step-text">Iniciando cartografía EASM...</span>
+                        <span id="easm-percent-text"><i class="fa-solid fa-spinner fa-spin text-emerald-400"></i> Analizando</span>
+                    </div>
+                    <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div id="easm-progress-bar" class="bg-emerald-500 h-full rounded-full animate-pulse" style="width: 100%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- EASM Metrics Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Calificación de Riesgo</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-emerald-400">
+                            <span id="easm-stat-grade">--</span> <span id="easm-stat-score" class="text-sm text-slate-400 font-normal">(--/100)</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Exposure Grade</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                        <i class="fa-solid fa-shield-virus"></i>
+                    </div>
+                </div>
+
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Activos Descubiertos</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-cyan-400">
+                            <span id="easm-stat-assets">0</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Subdominios e IPs</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xl">
+                        <i class="fa-solid fa-sitemap"></i>
+                    </div>
+                </div>
+
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Puertos Ransomware</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-rose-400">
+                            <span id="easm-stat-ransomware">0</span>
+                        </div>
+                        <span class="text-xs text-slate-400">RDP, SMB, DBs sin clave</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 text-xl">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                </div>
+
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 flex items-center justify-between">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Alertas CISA KEV</span>
+                        <div class="text-2xl font-bold font-mono mt-1 text-amber-400">
+                            <span id="easm-stat-cve">0</span>
+                        </div>
+                        <span class="text-xs text-slate-400">Exploits Públicos / PoCs</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 text-xl">
+                        <i class="fa-solid fa-bug"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EASM Sub-Views & Tables -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Discovered Assets Table -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-network-wired text-cyan-400"></i> Perímetro y Activos Descubiertos
+                        </h3>
+                        <span id="easm-assets-count-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">0 hosts</span>
+                    </div>
+                    <div id="easm-assets-list" class="overflow-y-auto flex-1 max-h-[460px] space-y-3 pr-1">
+                        <div class="text-center py-16 text-slate-500 text-sm">
+                            <i class="fa-solid fa-globe text-3xl mb-2 block opacity-40"></i>
+                            Ingresa un dominio corporativo y presiona "Mapear Perímetro" para iniciar la cartografía.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ransomware Ports & Critical Services Table -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-skull-crossbones text-rose-400"></i> Servicios & Puertos de Alto Riesgo
+                        </h3>
+                        <span id="easm-services-count-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">0 expuestos</span>
+                    </div>
+                    <div id="easm-services-list" class="overflow-y-auto flex-1 max-h-[460px] space-y-3 pr-1">
+                        <div class="text-center py-16 text-slate-500 text-sm">
+                            <i class="fa-solid fa-shield-halved text-3xl mb-2 block opacity-40"></i>
+                            No se han detectado puertos de ransomware abiertos aún.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CISA KEV & Identity / Typosquatting Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- CISA KEV Alerts -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-fire text-amber-400"></i> Correlación Catálogo CISA KEV
+                        </h3>
+                        <span id="easm-cve-count-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">0 vulnerabilidades</span>
+                    </div>
+                    <div id="easm-cve-list" class="overflow-y-auto flex-1 max-h-[400px] space-y-3 pr-1">
+                        <div class="text-center py-16 text-slate-500 text-sm">
+                            <i class="fa-solid fa-check-double text-3xl mb-2 block opacity-40"></i>
+                            Ningún software expuesto coincide con vulnerabilidades del catálogo CISA KEV.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phishing / Typosquatting -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-base flex items-center gap-2">
+                            <i class="fa-solid fa-user-ninja text-purple-400"></i> Suplantación de Dominio (Typosquatting)
+                        </h3>
+                        <span id="easm-typo-count-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">0 sospechosos</span>
+                    </div>
+                    <div id="easm-typo-list" class="overflow-y-auto flex-1 max-h-[400px] space-y-3 pr-1">
+                        <div class="text-center py-16 text-slate-500 text-sm">
+                            <i class="fa-solid fa-user-shield text-3xl mb-2 block opacity-40"></i>
+                            No se han detectado dominios suplantadores activos para la marca.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!-- End view-easm -->
     </main>
 
     <!-- Footer -->
     <footer class="border-t border-soc-border py-4 text-center text-xs text-slate-500">
-        OmniBreach v2.5 &copy; 2026 — DevSecOps, Real-Time SOC Dashboard & Active Deception Defense.
+        OmniBreach v3.0 &copy; 2026 — DevSecOps, Real-Time SOC Dashboard, EASM & Active Deception Defense.
     </footer>
 
     <!-- Frontend Script -->
@@ -766,16 +953,19 @@
             const btnDast = document.getElementById('tab-btn-dast');
             const btnDec = document.getElementById('tab-btn-deception');
             const btnClu = document.getElementById('tab-btn-cluster');
+            const btnEasm = document.getElementById('tab-btn-easm');
             const viewDast = document.getElementById('view-dast');
             const viewDec = document.getElementById('view-deception');
             const viewClu = document.getElementById('view-cluster');
+            const viewEasm = document.getElementById('view-easm');
 
-            [btnDast, btnDec, btnClu].forEach(b => {
+            [btnDast, btnDec, btnClu, btnEasm].forEach(b => {
                 if (b) b.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800';
             });
             if (viewDast) viewDast.classList.add('hidden');
             if (viewDec) viewDec.classList.add('hidden');
             if (viewClu) viewClu.classList.add('hidden');
+            if (viewEasm) viewEasm.classList.add('hidden');
 
             if (tab === 'dast') {
                 if (btnDast) btnDast.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30';
@@ -788,6 +978,9 @@
                 if (btnClu) btnClu.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-cyan-600 text-white shadow-lg shadow-cyan-600/30';
                 if (viewClu) viewClu.classList.remove('hidden');
                 loadClusterData();
+            } else if (tab === 'easm') {
+                if (btnEasm) btnEasm.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-emerald-600 text-white shadow-lg shadow-emerald-600/30';
+                if (viewEasm) viewEasm.classList.remove('hidden');
             }
         }
 
@@ -1092,6 +1285,212 @@
             const host = window.location.host;
             const cmd = `python main.py --worker --coordinator ${proto}//${host} --region us-east-1`;
             showSnippetModal("Comando de Despliegue de Worker Autónomo", "Ejecuta este comando en cualquier servidor cloud (AWS EC2, Google Compute Engine, o VPS) para unirlo al cluster de escaneo:", cmd);
+        }
+
+        // =====================================================================
+        // EASM (EXTERNAL ATTACK SURFACE MANAGEMENT) JAVASCRIPT LOGIC
+        // =====================================================================
+        async function launchEASMScan() {
+            const domainInput = document.getElementById('easm-domain');
+            const domain = domainInput.value.trim().replace(/^https?:\/\//, '').split('/')[0];
+            if (!domain) {
+                alert("Por favor ingresa un dominio corporativo válido (ej. empresa.com.co).");
+                return;
+            }
+
+            const bruteforce = document.getElementById('easm-bruteforce').checked;
+            const btn = document.getElementById('btn-easm-launch');
+            const progress = document.getElementById('easm-progress-container');
+            const stepText = document.getElementById('easm-step-text');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Cartografiando...';
+            if (progress) progress.classList.remove('hidden');
+            if (stepText) stepText.textContent = `Consultando Certificate Transparency y DNS para ${domain}...`;
+
+            try {
+                const res = await fetch(apiUrl('/api/v1/easm/scan'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        domain: domain,
+                        include_bruteforce: bruteforce,
+                        max_workers: 20
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.detail || "Error en el escaneo EASM");
+                }
+
+                const data = await res.json();
+                renderEASMReport(data.report);
+                showToast(`✅ Cartografía EASM completada para ${domain}.`, false);
+            } catch (err) {
+                alert("Error al ejecutar cartografía EASM: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-satellite-dish"></i> Mapear Perímetro';
+                if (progress) progress.classList.add('hidden');
+            }
+        }
+
+        function renderEASMReport(report) {
+            if (!report) return;
+
+            // Stats
+            const gEl = document.getElementById('easm-stat-grade');
+            const sEl = document.getElementById('easm-stat-score');
+            const aEl = document.getElementById('easm-stat-assets');
+            const rEl = document.getElementById('easm-stat-ransomware');
+            const cEl = document.getElementById('easm-stat-cve');
+
+            if (gEl) {
+                gEl.textContent = report.exposure_grade || 'A+';
+                const g = report.exposure_grade || 'A';
+                if (g.startsWith('A')) gEl.className = 'text-emerald-400';
+                else if (g.startsWith('B')) gEl.className = 'text-cyan-400';
+                else if (g.startsWith('C')) gEl.className = 'text-amber-400';
+                else gEl.className = 'text-rose-500';
+            }
+            if (sEl) sEl.textContent = `(${report.exposure_score || 0}/100)`;
+            if (aEl) aEl.textContent = report.total_assets || 0;
+            if (rEl) rEl.textContent = report.critical_ransomware_vectors || 0;
+            if (cEl) cEl.textContent = report.cisa_kev_alerts || 0;
+
+            const badge = document.getElementById('tab-badge-easm');
+            if (badge) {
+                badge.textContent = `${report.total_assets || 0} Activos`;
+                badge.classList.remove('hidden');
+            }
+
+            // Assets list
+            const assetsContainer = document.getElementById('easm-assets-list');
+            const assetsBadge = document.getElementById('easm-assets-count-badge');
+            if (assetsBadge) assetsBadge.textContent = `${(report.assets || []).length} hosts`;
+
+            if (assetsContainer) {
+                if (!report.assets || report.assets.length === 0) {
+                    assetsContainer.innerHTML = '<div class="text-center py-12 text-slate-500 text-sm">No se encontraron activos para este dominio.</div>';
+                } else {
+                    assetsContainer.innerHTML = '';
+                    report.assets.forEach(a => {
+                        const item = document.createElement('div');
+                        item.className = 'p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5 hover:bg-slate-800/80 transition';
+                        const cloudBadge = a.cloud_provider ? `<span class="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">${a.cloud_provider}</span>` : '';
+                        const portsStr = (a.open_ports && a.open_ports.length > 0) ? `<span class="text-amber-400 font-mono text-xs">Puertos: ${a.open_ports.join(', ')}</span>` : '<span class="text-slate-500 text-xs">Sin puertos críticos</span>';
+                        item.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-server text-xs text-indigo-400"></i>
+                                    <span class="font-bold text-xs text-slate-200">${a.subdomain}</span>
+                                    ${cloudBadge}
+                                </div>
+                                <span class="text-xs font-mono text-slate-400">${a.ip || 'No IP'}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/60">
+                                <span>Origen: <b class="text-slate-300">${a.discovery_source || 'DNS'}</b></span>
+                                <div>${portsStr}</div>
+                            </div>
+                        `;
+                        assetsContainer.appendChild(item);
+                    });
+                }
+            }
+
+            // Services & Ransomware ports
+            const sList = document.getElementById('easm-services-list');
+            const sBadge = document.getElementById('easm-services-count-badge');
+            if (sBadge) sBadge.textContent = `${(report.services || []).length} expuestos`;
+
+            if (sList) {
+                if (!report.services || report.services.length === 0) {
+                    sList.innerHTML = '<div class="text-center py-12 text-slate-500 text-sm"><i class="fa-solid fa-circle-check text-emerald-400 text-2xl mb-2 block"></i>¡Excelente! Ningún puerto crítico de ransomware (RDP, SMB, Redis, etc.) está expuesto a internet.</div>';
+                } else {
+                    sList.innerHTML = '';
+                    report.services.forEach(s => {
+                        const item = document.createElement('div');
+                        const isCrit = s.severity === 'CRITICAL' || s.unauthenticated_access;
+                        item.className = `p-3.5 rounded-xl border ${isCrit ? 'border-rose-500/50 bg-rose-950/20' : 'border-slate-800 bg-slate-900/80'} space-y-1.5`;
+                        const sevBadge = isCrit
+                            ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-rose-500/20 text-rose-400 border border-rose-500/30">CRÍTICO</span>'
+                            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30">${s.severity}</span>`;
+                        const unauthWarning = s.unauthenticated_access
+                            ? `<div class="text-rose-400 text-xs font-semibold"><i class="fa-solid fa-triangle-exclamation"></i> ACCESO SIN CONTRASEÑA DETECTADO: ${s.evidence || ''}</div>`
+                            : '';
+                        const bannerInfo = s.banner ? `<div class="text-slate-400 font-mono text-[11px] truncate">Banner: ${s.banner}</div>` : '';
+                        item.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-xs text-slate-100">${s.service_name} (${s.port})</span>
+                                    ${sevBadge}
+                                </div>
+                                <span class="text-xs font-mono text-slate-400">${s.host}</span>
+                            </div>
+                            ${unauthWarning}
+                            ${bannerInfo}
+                        `;
+                        sList.appendChild(item);
+                    });
+                }
+            }
+
+            // CISA KEV list
+            const cList = document.getElementById('easm-cve-list');
+            const cBadge = document.getElementById('easm-cve-count-badge');
+            if (cBadge) cBadge.textContent = `${(report.cves || []).length} alertas`;
+
+            if (cList) {
+                if (!report.cves || report.cves.length === 0) {
+                    cList.innerHTML = '<div class="text-center py-12 text-slate-500 text-sm"><i class="fa-solid fa-shield-check text-emerald-400 text-2xl mb-2 block"></i>No se identificaron versiones con exploits conocidos en CISA KEV.</div>';
+                } else {
+                    cList.innerHTML = '';
+                    report.cves.forEach(c => {
+                        const item = document.createElement('div');
+                        item.className = 'p-3.5 rounded-xl border border-rose-500/60 bg-rose-950/25 space-y-1.5';
+                        item.innerHTML = `
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-rose-600 text-white">${c.cve_id}</span>
+                                    <span class="font-bold text-xs text-slate-200">${c.vulnerability_name}</span>
+                                </div>
+                                <span class="text-xs font-mono text-rose-400">CVSS ${c.cvss_score}</span>
+                            </div>
+                            <div class="text-xs text-slate-300">Software afectado: <b class="text-slate-100">${c.affected_product}</b></div>
+                            <div class="text-xs text-amber-300">Campaña: ${c.ransomware_campaign || 'Explotación Activa'}</div>
+                            <div class="text-[11px] text-emerald-300 font-mono mt-1">Remediación: ${c.remediation_steps}</div>
+                        `;
+                        cList.appendChild(item);
+                    });
+                }
+            }
+
+            // Typosquatting
+            const tList = document.getElementById('easm-typo-list');
+            const tBadge = document.getElementById('easm-typo-count-badge');
+            const typos = (report.identity_risk && report.identity_risk.typosquatting_detected) || [];
+            if (tBadge) tBadge.textContent = `${typos.length} sospechosos`;
+
+            if (tList) {
+                if (typos.length === 0) {
+                    tList.innerHTML = '<div class="text-center py-12 text-slate-500 text-sm"><i class="fa-solid fa-circle-check text-emerald-400 text-2xl mb-2 block"></i>No se detectaron dominios suplantadores activos registrados.</div>';
+                } else {
+                    tList.innerHTML = '';
+                    typos.forEach(t => {
+                        const item = document.createElement('div');
+                        item.className = 'p-3 rounded-xl bg-purple-950/20 border border-purple-500/40 flex items-center justify-between';
+                        item.innerHTML = `
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-triangle-exclamation text-purple-400 text-xs"></i>
+                                <span class="font-bold text-xs text-purple-200">${t.domain}</span>
+                            </div>
+                            <span class="text-xs font-mono text-slate-400">IP: ${t.ip}</span>
+                        `;
+                        tList.appendChild(item);
+                    });
+                }
+            }
         }
 
         // Iniciar WebSocket de Deception y cargar datos al inicio

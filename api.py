@@ -24,9 +24,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OmniBreachAPI")
 
 app = FastAPI(
-    title="OmniBreach API",
-    description="Microservicio web para automatización de auditorías de ciberdefensa, Telemetría en Vivo, Reportes Ejecutivos PDF, Auto-PR GitHub DevSecOps, IAST/RASP, Grafos de Ataque, OpenAPI, Ciberdefensa Activa (HoneyTokens), Cluster Distribuido y Multi-Tenancy con RBAC.",
-    version="2.5"
+    title="OmniBreach v3.0 API",
+    description="Plataforma de Ciberdefensa Ofensiva & EASM (External Attack Surface Management): Cartografía de Subdominios, Detección de Puertos de Ransomware, Correlación CISA KEV, DAST, SAST, IAST/RASP, Grafos de Ataque, Cluster Distribuido y Multi-Tenancy con RBAC.",
+    version="3.0"
 )
 
 # Soporte CORS para despliegue distribuido (Frontend Vercel <-> Backend Render)
@@ -462,6 +462,30 @@ def send_webhook_notification(task_id: str, webhook_url: str, status: str, paylo
         logger.warning(f"No se pudo enviar la notificación Webhook para la tarea {task_id}: {e}")
 
 
+class EASMScanRequest(BaseModel):
+    domain: str
+    include_bruteforce: bool = True
+    max_workers: int = 20
+
+
+@app.post("/api/v1/easm/scan", tags=["EASM"])
+def trigger_easm_scan(req: EASMScanRequest, request: Request) -> dict[str, Any]:
+    """Ejecuta una auditoría completa de superficie externa (EASM) para el dominio especificado."""
+    _ = get_current_user_optional(request)
+    from scanner.easm.engine import EASMEngine
+    engine = EASMEngine()
+    report = engine.run_full_surface_assessment(
+        req.domain,
+        include_bruteforce=req.include_bruteforce,
+        max_workers=min(req.max_workers, 30)
+    )
+    return {
+        "status": "completed",
+        "domain": req.domain,
+        "report": report.to_dict()
+    }
+
+
 @app.get("/health", tags=["System"])
 def health_check() -> dict[str, Any]:
     """Endpoint de estado para Render Blueprints, monitores UptimeRobot y verificación de latencia."""
@@ -469,7 +493,7 @@ def health_check() -> dict[str, Any]:
     return {
         "status": "healthy",
         "service": "OmniBreach API",
-        "version": "2.5",
+        "version": "3.0",
         "database": "neon-postgresql" if is_postgres else "sqlite",
         "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
     }
@@ -478,9 +502,9 @@ def health_check() -> dict[str, Any]:
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a OmniBreach API",
-        "version": "2.5",
-        "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST"],
+        "message": "Bienvenido a OmniBreach v3.0 API",
+        "version": "3.0",
+        "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST", "EASM CISA KEV"],
         "dashboard_url": "/dashboard",
         "health_url": "/health",
         "docs_url": "/docs",

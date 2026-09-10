@@ -1,30 +1,32 @@
-# OmniBreach v2.5
+# OmniBreach v3.0
 
 <p align="center">
-  <img src="https://img.shields.io/badge/OmniBreach-v2.5-blue?style=for-the-badge&logo=shield" alt="OmniBreach v2.5" />
+  <img src="https://img.shields.io/badge/OmniBreach-v3.0-blue?style=for-the-badge&logo=shield" alt="OmniBreach v3.0" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v2.5"><img src="https://img.shields.io/badge/Release-v2.5-007EC6.svg?logo=github" alt="Release v2.5" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.0"><img src="https://img.shields.io/badge/Release-v3.0-007EC6.svg?logo=github" alt="Release v3.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml"><img src="https://github.com/papiwilo74/vulnscanner-v1/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20Pass-green.svg" alt="Bandit" /></a>
+  <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"><img src="https://img.shields.io/badge/Intel-CISA%20KEV%20Synced-orange.svg" alt="CISA KEV Synced" /></a>
   <a href="docs/SECURITY_CVE_MANAGEMENT.md"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit clean" /></a>
   <a href="docs/DEPLOYMENT_GUIDE.md"><img src="https://img.shields.io/badge/Cloud-Vercel%20%7C%20Render%20%7C%20Neon-blueviolet.svg" alt="Deploy to Vercel Render Neon" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
   <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-225%20passing-brightgreen.svg" alt="225 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-234%20passing-brightgreen.svg" alt="234 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach v2.5** es una plataforma integral de ciberdefensa y análisis de seguridad web en Python que combina **DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Gestor Multi-Tenant con RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict`, análisis SAST con `bandit`, especificación OpenAPI 3.1, reportes ejecutivos en PDF, panel SOC interactivo en tiempo real y soporte nativo para despliegue en la nube (**Vercel + Render + Neon**).
+> **OmniBreach v3.0** es una plataforma integral de ciberdefensa ofensiva y defensiva que combina **EASM (External Attack Surface Management) + DAST + SAST + IAST/RASP + ML determinista + Cluster Distribuido + Multi-Tenancy RBAC + Deception Engine (HoneyTokens)**. Diseñado con arquitectura modular, tipado estricto `mypy --strict` en el 100% del código, análisis SAST con `bandit`, correlación en tiempo real con el catálogo **CISA KEV**, detección de puertos críticos de Ransomware y acceso sin autenticación, especificación OpenAPI 3.1, reportes ejecutivos en PDF y panel SOC interactivo en tiempo real.
 
 ---
 
 ## Tabla de Contenidos
 
-- [Que es OmniBreach?](#que-es-omnibreach)
+- [¿Qué es OmniBreach?](#que-es-omnibreach)
+- [Gestión de Superficie Externa (EASM)](#gestion-de-superficie-externa-easm)
 - [Guía Oficial de Despliegue en la Nube (Vercel + Render + Neon)](docs/DEPLOYMENT_GUIDE.md)
 - [Arquitectura y Decisiones Técnicas (ADRs)](docs/ARCHITECTURE_DECISIONS.md)
 - [Especificacion OpenAPI 3.1 (JSON)](docs/openapi.json) | [Contrato YAML](docs/openapi.yaml)
@@ -44,15 +46,17 @@
 
 ---
 
-## Que es VulnScanner?
+## ¿Qué es OmniBreach?
 
-**VulnScanner** es una herramienta de analisis de seguridad web de codigo abierto escrita en Python, que combina:
+**OmniBreach** es una plataforma avanzada de ciberseguridad corporativa desarrollada en Python para operaciones de ciberdefensa y auditoría continua, combinando:
 
-- **DAST** (Dynamic Application Security Testing): escaneo activo de endpoints en vivo
-- **SAST** (Static Application Security Testing): analisis estatico de codigo JavaScript
-- **IAST / RASP**: instrumentación y defensa activa en memoria con bloqueo HTTP 403
-- **ML**: un modelo de Inteligencia Artificial (TF-IDF + Regresion Logistica) determinista y local
-- **Lab Mode**: entorno hermético local sin conexión para pipelines CI/CD aislados
+- **EASM** (External Attack Surface Management): cartografía de perímetro digital a partir del dominio raíz, scraping de Certificate Transparency (`crt.sh`), detección de proveedores Cloud y escaneo de puertos de alto riesgo de Ransomware.
+- **DAST** (Dynamic Application Security Testing): escaneo activo y dinámico de endpoints web y APIs en vivo.
+- **SAST** (Static Application Security Testing): análisis estático de dependencias frontend y código JavaScript.
+- **IAST / RASP**: instrumentación y defensa activa en memoria con bloqueo HTTP 403 en tiempo de ejecución.
+- **ML**: modelo de Inteligencia Artificial local determinista (TF-IDF + Regresión Logística) para clasificación de vectores de ataque.
+- **Cluster Distribuido**: workers autónomos multi-región para auditorías de alta escala.
+- **Deception Defense**: señuelos HoneyTokens (URLs, API Keys, JWT) con detección de intrusos en tiempo real vía WebSocket.
 
 ---
 
@@ -60,8 +64,12 @@
 
 | Modulo | Descripcion |
 |---|---|
+| **EASM (Superficie Externa)** | Cartografía automática perimetral: CT logs (`crt.sh`), fuerza bruta DNS concurrente, detección de Cloud (AWS, Azure, GCP, Cloudflare) y Exposure Score (A+ a F) |
+| **Ransomware & DB Scout** | Sondeo de puertos críticos (RDP 3389, SMB 445, SSH 22, VNC, Telnet) y validación no destructiva de bases de datos sin autenticación (Redis, Elasticsearch, Mongo, Docker) |
+| **CISA KEV Intel** | Correlación en tiempo real con el catálogo CISA KEV (Known Exploited Vulnerabilities) y detección de exploits públicos (Apache RCE, regreSSHion, Citrix Bleed, Fortinet) |
+| **Threat & Typosquatting Intel** | Monitoreo de reputación corporativa, cálculo de homógrafos y detección de dominios suplantadores activos para phishing |
 | **Modo Laboratorio Hermético (`--lab`)** | Servidor web vulnerable simulado en memoria sobre puerto efímero local para pruebas y auditorías sin internet ni dependencias externas |
-| **Mypy Strict 100% Project-Wide** | Tipado estático exhaustivo verificado con `mypy --strict` en los 49 archivos fuente sin excepciones |
+| **Mypy Strict 100% Project-Wide** | Tipado estático exhaustivo verificado con `mypy --strict` en los 60 archivos fuente sin excepciones |
 | **OpenAPI 3.1 & YAML Contract** | Especificación formal y endpoint `/openapi.yaml` para integración con herramientas multi-lenguaje (Go, Rust, Java, TypeScript) |
 | **Catálogo MITRE ATT&CK v3.1** | Mapeo granular de cada vector de vulnerabilidad a técnicas oficiales (T1059.004, T1059.007, T1090.003, T1552.004, etc.) |
 | **Executive PDF Audit Report** | Reporte formal en PDF para comités CISO/Dirección con matrices de cumplimiento normativo (PCI-DSS v4.0, ISO/IEC 27001), calificación de seguridad (A+, A, B, C, F) y acta de firma |
@@ -129,12 +137,56 @@ python train_ai.py
 
 ---
 
+## Gestión de Superficie Externa (EASM)
+
+OmniBreach v3.0 introduce la suite **EASM (External Attack Surface Management)** para auditorías corporativas automáticas desde un solo dominio raíz (ej. `empresa.com.co`), sin requerir agentes instalados:
+
+```mermaid
+graph TD
+    Domain[Dominio Raíz ej: empresa.com.co] --> Recon[DigitalPerimeterMapper: crt.sh + DNS Masivo]
+    Recon --> Cloud[Identificación Cloud: AWS, Azure, GCP, Cloudflare]
+    Cloud --> Scout[ServiceScout: Sondeo de 14 Puertos Críticos]
+    Scout --> Ransomware[Vectores Ransomware: RDP, SMB, SSH, VNC]
+    Scout --> DBs[Bases de Datos Expuestas: Redis, Mongo, Elasticsearch]
+    Scout --> CVEIntel[CISAExploitIntel: Catálogo CISA KEV & PoCs Públicas]
+    Domain --> DarkWeb[DarkWebIntel: Phishing & Typosquatting]
+    CVEIntel --> EASMEngine[EASMEngine: Exposure Score 0-100 & Grado A+ a F]
+    DarkWeb --> EASMEngine
+    EASMEngine --> Console[Consola CLI: python main.py --easm]
+    EASMEngine --> RestAPI[REST API: POST /api/v1/easm/scan]
+    EASMEngine --> SOCWeb[SOC Dashboard: Pestaña Superficie Externa]
+```
+
+### Capacidades del Motor EASM
+1. **Cartografía Digital & CT Logs**: Extracción pasiva desde *Certificate Transparency* (`crt.sh`) y fuerza bruta concurrente de subdominios (`vpn`, `portal`, `admin`, `api`, `auth`, `citrix`, `rdp`, `mail`, `staging`).
+2. **Detección de Proveedores Cloud**: Clasificación instantánea de activos en AWS, Azure, Google Cloud, Cloudflare u On-Premise.
+3. **Escáner de Puertos de Ransomware & Movimiento Lateral**: Sondeo asíncrono de puertos de alto riesgo (RDP `3389`, SMB `445`, SSH `22`, VNC `5900`, Telnet `23`, Docker `2375`).
+4. **Verificación No Destructiva de Bases de Datos Expuestas**: Prueba activa y segura de acceso no autenticado en Redis (`6379`, comando `PING` -> `+PONG`), Elasticsearch (`9200`), MongoDB (`27017`) y MySQL (`3306`).
+5. **Correlación en Tiempo Real con CISA KEV**: Cruce automático de versiones de software detectadas (Apache HTTPD, OpenSSH regreSSHion, Citrix Bleed, Fortinet) contra vulnerabilidades activamente explotadas por cibercriminales.
+6. **Inteligencia de Suplantación (Typosquatting)**: Detección de dominios parecidos activos con registros DNS maliciosos orientados a spear-phishing de la marca.
+7. **Calificación de Exposición (Exposure Score)**: Algoritmo de puntuación de 0 a 100 y letras (A+, A, B, C, D, F) para auditorías a comités directivos.
+
+### Ejecución de EASM
+
+```bash
+# Cartografía y auditoría completa de superficie externa (Recomendado)
+python main.py --easm empresa.com.co
+
+# Cartografía pasiva rápida (solo Certificate Transparency logs, sin fuerza bruta DNS)
+python main.py --easm empresa.com.co --no-bruteforce
+```
+
+---
+
 ## Uso Rapido
 
 ```bash
-# 🚀 COMANDO MAESTRO TODO-EN-UNO (Recomendado para auditar tu sitio al 100%)
+# 🚀 COMANDO MAESTRO TODO-EN-UNO (Recomendado para auditar tu sitio web al 100%)
 # Activa crawling (10 páginas), subdominios, stealth, WAF, grafos de ataque y auto-detección de OpenAPI/IAST
 python main.py https://ejemplo.com/ --full
+
+# 🌐 Cartografía de Superficie de Ataque Externa (EASM) para una empresa completa
+python main.py --easm empresa.com.co
 
 # Escaneo basico de una URL
 python main.py https://ejemplo.com/
@@ -153,6 +205,8 @@ python main.py <URL> [OPCIONES]
 
 | Opcion | Descripcion | Ejemplo |
 |---|---|---|
+| `--easm <dominio>` | Cartografía y auditoría completa de Superficie Externa (EASM, CT logs, Ransomware ports, CISA KEV) | `--easm empresa.com.co` |
+| `--no-bruteforce` | Omite la fuerza bruta DNS en el modo EASM (análisis pasivo rápido) | `--no-bruteforce` |
 | `--no-open` | No abre el reporte HTML automaticamente | `--no-open` |
 | `--stealth` | Rate-limiting: User-Agent real + retardos aleatorios | `--stealth` |
 | `--delay N` | Retardo fijo de N segundos entre peticiones | `--delay 2.0` |
