@@ -17,7 +17,7 @@ types-colorama>=0.4.15
 # SAST, Linter y auditoría de seguridad
 bandit>=1.7.5
 pip-audit>=2.7.0
-ruff>=0.4.0
+ruff>=0.16.6
 
 # Dependencias opcionales para generación de reportes y parsers
 reportlab>=4.0.0
