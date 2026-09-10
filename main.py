@@ -482,6 +482,8 @@ if __name__ == "__main__":
                         help="Auditoría de Superficie Externa (EASM): Cartografía de subdominios, puertos de ransomware y CISA KEV")
     parser.add_argument("--no-bruteforce", action="store_true",
                         help="Omite la fuerza bruta DNS en el modo EASM (solo consultas pasivas CT logs)")
+    parser.add_argument("--runbook", action="store_true",
+                        help="Exporta el Runbook Técnico de Remediación a Medida generado por el Asesor de IA")
     parser.add_argument("--web", "--dashboard", "--gui", dest="web_mode", action="store_true",
                         help="Inicia la interfaz web interactiva en tiempo real (SOC Dashboard) en el navegador")
     parser.add_argument("--lab", "--offline", dest="lab_mode", action="store_true",
@@ -602,6 +604,8 @@ if __name__ == "__main__":
             print(f" Servicios Expuestos: {report.total_exposed_services}")
             print(f" Vectores de Ransomware (RDP, SMB, DBs): {report.critical_ransomware_vectors}")
             print(f" Alertas CISA KEV (Exploits Activos): {report.cisa_kev_alerts}")
+            print(f" Secuestros de Subdominio (Takeover): {len(report.takeovers)}")
+            print(f" Fugas de Secretos en Repositorios (OSINT): {len(report.secret_leaks)}")
             print("-" * 75)
             if report.services:
                 print(" SERVICIOS Y PUERTOS CRÍTICOS EXPUESTOS:")
@@ -612,6 +616,19 @@ if __name__ == "__main__":
                         print(f"     ⚠️ ACCESO NO AUTENTICADO DETECTADO: {s['evidence']}")
                     elif s["banner"]:
                         print(f"     Banner: {s['banner'][:80]}")
+                print("-" * 75)
+            if report.takeovers:
+                print(" 🚨 ALERTA: SUBDOMAIN TAKEOVER CONFIRMADOS:")
+                for to_item in report.takeovers:
+                    print(f"   * 💥 {to_item['subdomain']} -> CNAME: {to_item['cname']} ({to_item['service_name']})")
+                    print(f"     Firma detectada: {to_item['fingerprint_detected']}")
+                    print(f"     Mitigación: {to_item['remediation']}")
+                print("-" * 75)
+            if report.secret_leaks:
+                print(" 🔑 ALERTA: FUGAS DE SECRETOS EN REPOSITORIOS PÚBLICOS:")
+                for sec in report.secret_leaks:
+                    print(f"   * ⚠️ {sec['secret_type']} ({sec['masked_value']}) en {sec['source_repository']}")
+                    print(f"     Acción: {sec['remediation']}")
                 print("-" * 75)
             if report.cves:
                 print(" ALERTA CISA KEV — VULNERABILIDADES ACTIVAMENTE EXPLOTADAS:")
@@ -624,6 +641,21 @@ if __name__ == "__main__":
                 print(" RIESGO DE IDENTIDAD & TYPOSQUATTING (Phishing):")
                 for typo in report.identity_risk["typosquatting_detected"]:
                     print(f"   * ⚠️ Dominio suplantador activo: {typo['domain']} ({typo['ip']})")
+                print("-" * 75)
+
+            if args.runbook or report.critical_ransomware_vectors > 0 or report.takeovers:
+                rb = report.remediation_runbook
+                print(" 🛡️ ASESOR DE IA: RUNBOOK TÉCNICO DE REMEDIACIÓN A MEDIDA:")
+                print(f"   Motor: {rb.get('generated_by', 'OmniBreach AI')}")
+                print(f"   Resumen: {rb.get('executive_summary', '')}")
+                if rb.get("immediate_actions"):
+                    print("   Acciones Inmediatas (P0):")
+                    for act in rb["immediate_actions"]:
+                        print(f"     - [!] {act}")
+                if rb.get("executable_scripts"):
+                    print("   Comandos de Mitigación Listos para Ejecutar:")
+                    for sname, scode in rb["executable_scripts"].items():
+                        print(f"     [{sname}]:\n       " + scode.replace("\n", "\n       "))
                 print("-" * 75)
             print()
             sys.exit(0)

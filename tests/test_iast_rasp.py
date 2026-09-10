@@ -1,6 +1,6 @@
-"""Pruebas unitarias para el Agente Híbrido IAST / RASP."""
 import sqlite3
 import subprocess  # nosec B404
+from typing import Any, cast
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -13,9 +13,9 @@ from scanner.iast_agent import HookManager, IASTTelemetry, VulnScannerASGI
 from scanner.models import Finding
 
 
-def dummy_vuln_app():
+def dummy_vuln_app() -> Starlette:
     """Aplicación web intencionalmente vulnerable para pruebas de IAST/RASP."""
-    async def query_user(request: Request):
+    async def query_user(request: Request) -> JSONResponse:
         username = request.query_params.get("user", "")
         # Simular consulta SQL insegura
         conn = sqlite3.connect(":memory:")
@@ -26,7 +26,7 @@ def dummy_vuln_app():
         cursor.execute(query)
         return JSONResponse({"status": "ok", "query": query})
 
-    async def run_ping(request: Request):
+    async def run_ping(request: Request) -> JSONResponse:
         host = request.query_params.get("host", "127.0.0.1")
         # Simular inyección de comando OS
         cmd = f"ping -c 1 {host}"
@@ -42,14 +42,19 @@ def dummy_vuln_app():
 
 
 class TestIASTRASP:
-    def teardown_method(self):
+    def teardown_method(self) -> None:
         """Asegurar que los hooks se desinstalen después de cada test."""
         manager = HookManager(on_sink_event=lambda t: True)
         manager.uninstall_hooks()
 
-    def test_hook_manager_install_and_uninstall(self):
+    def test_hook_manager_install_and_uninstall(self) -> None:
         events: list[IASTTelemetry] = []
-        manager = HookManager(on_sink_event=lambda t: (events.append(t), True)[1])
+
+        def _record_event(t: IASTTelemetry) -> bool:
+            events.append(t)
+            return True
+
+        manager = HookManager(on_sink_event=_record_event)
         manager.install_hooks()
 
         conn = sqlite3.connect(":memory:")
@@ -65,11 +70,11 @@ class TestIASTRASP:
 
         manager.uninstall_hooks()
 
-    def test_iast_monitor_mode_telemetry_endpoint(self):
+    def test_iast_monitor_mode_telemetry_endpoint(self) -> None:
         raw_app = dummy_vuln_app()
         # Envolver en middleware ASGI en modo monitor (IAST)
         app = VulnScannerASGI(raw_app, mode="monitor")
-        client = TestClient(app)
+        client = TestClient(cast(Any, app))
 
         # Enviar petición con inyección SQL
         resp = client.get("/user?user=admin' OR 1=1--", headers={"x-vulnscanner-correlation-id": "test-cid-123"})
@@ -89,11 +94,11 @@ class TestIASTRASP:
 
         app.hook_manager.uninstall_hooks()
 
-    def test_rasp_protect_mode_blocks_attack(self):
+    def test_rasp_protect_mode_blocks_attack(self) -> None:
         raw_app = dummy_vuln_app()
         # Envolver en middleware ASGI en modo protect (RASP Activo)
         app = VulnScannerASGI(raw_app, mode="protect")
-        client = TestClient(app)
+        client = TestClient(cast(Any, app))
 
         # Enviar ataque SQLi
         resp = client.get("/user?user=admin' OR '1'='1", headers={"x-vulnscanner-correlation-id": "attack-1"})
@@ -109,11 +114,11 @@ class TestIASTRASP:
 
         app.hook_manager.uninstall_hooks()
 
-    def test_correlate_iast_with_engine(self, monkeypatch):
+    def test_correlate_iast_with_engine(self, monkeypatch: Any) -> None:
         # Simular endpoint IAST en ScanEngine
         class MockResponse:
             status_code = 200
-            def json(self):
+            def json(self) -> dict[str, Any]:
                 return {
                     "telemetry": [
                         {
@@ -127,7 +132,7 @@ class TestIASTRASP:
                 }
 
         class MockSession:
-            def get(self, url, timeout=5):
+            def get(self, url: str, timeout: int = 5) -> MockResponse:
                 return MockResponse()
 
         config = ScanConfig(target="http://testserver", iast_url="http://testserver")
@@ -140,7 +145,7 @@ class TestIASTRASP:
             affected_url="http://testserver/user",
         )
 
-        enriched = engine.correlate_iast([finding], session=MockSession())
+        enriched = engine.correlate_iast([finding], session=cast(Any, MockSession()))
         assert enriched == 1
         assert finding.iast_source_file == "app/views/user.py"
         assert finding.iast_source_line == 42
