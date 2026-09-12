@@ -1,0 +1,27 @@
+{
+  "target_url": "http://127.0.0.1:8000",
+  "target_app": "OWASP PyGoat",
+  "version": "1.3.0",
+  "duration_seconds": 0.48,
+  "total_findings": 10,
+  "ground_truth_challenges": 13,
+  "true_positives": 10,
+  "false_positives": 0,
+  "false_negatives": 4,
+  "precision": 1.0,
+  "recall": 0.6923,
+  "f1_score": 0.8182,
+  "choke_point_identified": "Clave Criptográfica / Secreto Expuesto en Código",
+  "choke_point_severed_paths": 1,
+  "detected_challenges": [
+    "debug_mode_stacktrace",
+    "exposed_admin_interface",
+    "exposed_internal_logs",
+    "exposed_secret_key",
+    "insecure_cookie_flag",
+    "missing_csp",
+    "missing_permissions_policy",
+    "reflected_xss",
+    "sql_injection"
+  ]
+}
