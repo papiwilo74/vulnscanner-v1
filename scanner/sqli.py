@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
 
-ERROR_PAYLOADS: list[str] = ["'", '"', "' OR '1'='1", "1; DROP TABLE users--"]
+ERROR_PAYLOADS: list[str] = ["'", '"', "'))", "' OR '1'='1", "'))--", "1; DROP TABLE users--"]
 
 # Firmas de error de base de datos precisas y estrictas para prevenir falsos positivos
 ERROR_SIGNATURES: list[str] = [
@@ -16,6 +16,9 @@ ERROR_SIGNATURES: list[str] = [
     r"quoted string not properly terminated",
     r"pg_query\(\):\s*query failed",
     r"sqlite3::query\(\)",
+    r"sqlite_error",
+    r"sqlite3\.operationalerror",
+    r"syntax error.*near",
     r"microsoft OLE DB Provider for SQL Server",
     r"ODBC SQL Server Driver",
     r"ora-[0-9]{5}",

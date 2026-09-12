@@ -12,6 +12,8 @@ ENV/
 
 # Reportes generados por el escáner
 reports/
+!reports/benchmark_performance.json
+!reports/benchmark_juiceshop.json
 *.db
 
 # Configuración del editor / IDE

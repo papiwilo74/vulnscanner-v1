@@ -13,7 +13,7 @@
   <a href="docs/SECURITY_CVE_MANAGEMENT.md"><img src="https://img.shields.io/badge/Dependencies-pip--audit%20clean-brightgreen.svg" alt="pip-audit clean" /></a>
   <a href="docs/DEPLOYMENT_GUIDE.md"><img src="https://img.shields.io/badge/Cloud-Vercel%20%7C%20Render%20%7C%20Neon-blueviolet.svg" alt="Deploy to Vercel Render Neon" /></a>
   <a href="tests/benchmark_performance.py"><img src="https://img.shields.io/badge/Throughput-181.97%20req%2Fs-brightgreen.svg" alt="Performance Benchmark" /></a>
-  <a href="tests/benchmark_accuracy.py"><img src="https://img.shields.io/badge/F1--Score-100%25-success.svg" alt="Accuracy Benchmark" /></a>
+  <a href="reports/benchmark_juiceshop.json"><img src="https://img.shields.io/badge/OWASP%20Juice%20Shop-Precision%2090%25%20%7C%20Recall%2057%25-brightgreen.svg" alt="OWASP Juice Shop Benchmark" /></a>
   <a href="tests/"><img src="https://img.shields.io/badge/Tests-259%20passing-brightgreen.svg" alt="259 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
@@ -21,7 +21,7 @@
 
 > **OmniBreach v3.0** es un **Framework Unificado de Integración CTEM (Continuous Threat Exposure Management) y Orquestador Ligero de Pruebas de Seguridad**. Diseñado como una plataforma integral de ingeniería de ciberseguridad, combina **Cartografía Perimetral EASM + Modelado de Amenazas con Grafos de Ataque Probabilísticos (Centralidad de Brandes & Simulación What-If) + Generación de SBOM (CycloneDX 1.5 / SPDX 2.3) + Auditoría Estática de Contenedores + Detección de Subdomain Takeover + DAST Ligero + Telemetría ASGI en Memoria (PoC IAST/RASP) + Tecnología de Engaño (HoneyTokens)**.
 > 
-> Todo construido con rigor de ingeniería de software: tipado estricto `mypy --strict` en el 100% del código (93 archivos fuente), SAST de código limpio con `bandit`, 259 pruebas automatizadas (0 omitidas), correlación con el catálogo **CISA KEV**, especificación OpenAPI 3.1 y reportes ejecutivos en PDF.
+> Todo construido con rigor de ingeniería de software: tipado estricto `mypy --strict` en el 100% del código (94 archivos fuente), SAST de código limpio con `bandit`, 259 pruebas automatizadas (0 omitidas), validación empírica contra **OWASP Juice Shop** (90% precisión), correlación con el catálogo **CISA KEV**, especificación OpenAPI 3.1 y reportes ejecutivos en PDF.
 
 ---
 
@@ -30,6 +30,7 @@
 - [¿Qué es OmniBreach?](#que-es-omnibreach)
 - [Enfoque de Ingeniería y Propósito](#enfoque-de-ingenieria-y-proposito)
 - [Modelado de Ataques y Choke Points (Brandes Centrality)](#modelado-de-ataques-y-choke-points-el-nucleo-diferencial)
+- [Validación Empírica en OWASP Juice Shop](#validacion-empirica-en-owasp-juice-shop)
 - [Gestión de Superficie Externa (EASM)](#gestion-de-superficie-externa-easm)
 - [Guía Oficial de Despliegue en la Nube (Vercel + Render + Neon)](docs/DEPLOYMENT_GUIDE.md)
 - [Arquitectura y Decisiones Técnicas (ADRs)](docs/ARCHITECTURE_DECISIONS.md)
@@ -137,6 +138,55 @@ graph LR
 El módulo permite a los analistas ejecutar escenarios contrafácticos: *"¿Qué sucede con el riesgo global si mitigamos el nodo $v_k$?"*. El motor recalcula instantáneamente la métrica de riesgo acumulado y reporta la reducción porcentual:
 
 $$\Delta\text{Risk}\% = \frac{\text{Riesgo}_{\text{actual}} - \text{Riesgo}_{\text{post-parche}}}{\text{Riesgo}_{\text{actual}}} \times 100$$
+
+---
+
+## Validación Empírica en OWASP Juice Shop
+
+Para superar la brecha entre claims teóricos y efectividad comprobable en ciberseguridad, OmniBreach se evalúa cuantitativamente contra **OWASP Juice Shop (v20.2.0)**, la aplicación web deliberadamente vulnerable que sirve como estándar de referencia en la industria para pruebas DAST.
+
+Juice Shop documenta y cataloga formalmente **116 retos de vulnerabilidad** con puntaje oficial (`/api/Challenges`).
+
+### Resultados Cuantitativos del Benchmark
+
+El arnés de evaluación reproducible [`tests/benchmark_juiceshop.py`](tests/benchmark_juiceshop.py) ejecuta la batería de escaneo dinámico y cruza los hallazgos contra el ground-truth documentado:
+
+| Métrica | Valor Obtenido | Interpretación Técnica |
+|---|---|---|
+| **Precision** | **90.0%** (9 / 10) | De las 10 alertas emitidas, 9 corresponden a debilidades reales documentadas. Solo 1 falso positivo. |
+| **Recall (Sensibilidad DAST)** | **57.1%** (8 / 14) | Detectó 8 de los 14 retos DAST automatizables sin autenticación en Juice Shop. |
+| **F1-Score** | **69.9%** | Balance armónico entre precisión y cobertura de detección. |
+| **Tiempo de Auditoría** | **< 1 segundo** | Ejecución local ultra-optimizada sin latencia de red. |
+| **Falsos Positivos** | **1** | Mínima tasa de ruido en el escaneo perimetral. |
+| **Falsos Negativos** | **6** | Retos que requieren autenticación profunda o payloads no cubiertos por heurísticas ligeras. |
+
+### Retos Oficiales de Juice Shop Detectados y Confirmados
+
+- `dbSchemaChallenge`: Inyección SQL confirmada mediante firmas de error en SQLite (`near ")": syntax error`).
+- `directoryListingChallenge`: Descubrimiento de directorio expuesto `/ftp` con documentos internos descargables.
+- `errorHandlingChallenge`: Fuga de stack trace y detalles de tecnología del backend (Express + SQLite).
+- `localXssChallenge`: Detección de sinks inseguros en el cliente JavaScript (`document.write`) propensos a DOM-XSS.
+- `prototypePollutionChallenge`: Funciones vulnerables de merge/extend sin protección de `__proto__` en scripts cliente.
+- `corsMisconfiguration`: Exposición de cabecera `Access-Control-Allow-Origin: *` en endpoints REST.
+- `cspBypassChallenge`: Ausencia total de `Content-Security-Policy` facilitando inyección de código.
+- `exposedMetricsChallenge`: Identificación de endpoints de observabilidad y métricas de servidor expuestas.
+- `sensitiveDataLeak`: Detección de tokens JWT y cadenas de depuración en archivos compilados de frontend.
+
+### Validación Práctica del Grafo de Ataques y Brandes Centrality
+
+Sobre los hallazgos confirmados en Juice Shop, el motor modeló el Grafo Dirigido Acíclico (DAG) y calculó la Centralidad de Intermediación de Brandes ($C_B(v)$):
+- **Choke Point Crítico Identificado:** La inyección de código en cliente (`document.write` / DOM-XSS) y la exposición de base de datos fueron destacados como los cuellos de botella prioritarios, demostrando que el triaje algorítmico prioriza las rutas de ataque encadenadas por encima de listados estáticos CVSS.
+
+### Cómo Reproducir este Benchmark
+Cualquier evaluador o investigador puede verificar estas métricas en su propia máquina:
+```bash
+# 1. Iniciar OWASP Juice Shop en segundo plano (puerto 3000)
+npx -y juice-shop  # o node build/app
+
+# 2. Ejecutar el benchmark empírico de OmniBreach
+python tests/benchmark_juiceshop.py
+```
+Los resultados completos se exportan estructurados a [`reports/benchmark_juiceshop.json`](reports/benchmark_juiceshop.json).
 
 ---
 

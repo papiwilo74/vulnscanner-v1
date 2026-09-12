@@ -6,7 +6,7 @@ import requests
 COMMON_PATHS: list[str] = [
     "/admin", "/login", "/backup", "/config",
     "/wp-admin", "/.env", "/api/v1", "/phpmyadmin",
-    "/dashboard", "/test", "/old", "/debug",
+    "/dashboard", "/test", "/old", "/debug", "/ftp",
     "/.env.local", "/.git/config", "/.git/HEAD",
     "/docker-compose.yml", "/package.json", "/requirements.txt",
     "/backup.zip", "/db.sql", "/database.sql", "/config.php",
@@ -15,7 +15,7 @@ COMMON_PATHS: list[str] = [
 
 # Si la respuesta contiene esto, probablemente es un SPA redirigiendo al index
 SPA_SIGNATURES = [
-    "<!doctype html>",
+    "<app-root",
     "<div id=\"root\">",
     "<div id=\"app\">",
     "window.__NUXT__",

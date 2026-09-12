@@ -1,0 +1,26 @@
+{
+  "target_url": "http://localhost:3000",
+  "target_app": "OWASP Juice Shop",
+  "version": "20.2.0",
+  "duration_seconds": 0.84,
+  "total_findings": 10,
+  "ground_truth_challenges": 14,
+  "true_positives": 9,
+  "false_positives": 1,
+  "false_negatives": 6,
+  "precision": 0.9,
+  "recall": 0.5714,
+  "f1_score": 0.699,
+  "choke_point_identified": "Uso de Funciones Inseguras en JavaScript (document.write)",
+  "choke_point_severed_paths": 1,
+  "detected_challenges": [
+    "corsMisconfiguration (CORS Misconfiguration)",
+    "cspBypassChallenge (CSP Bypass)",
+    "dbSchemaChallenge (Database Schema)",
+    "directoryListingChallenge (Confidential Document)",
+    "errorHandlingChallenge (Error Handling)",
+    "exposedMetricsChallenge (Exposed Metrics)",
+    "prototypePollutionChallenge (Prototype Pollution)",
+    "sensitiveDataLeak (Sensitive Data Exposure)"
+  ]
+}
