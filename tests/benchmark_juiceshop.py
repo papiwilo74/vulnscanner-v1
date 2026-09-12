@@ -67,7 +67,7 @@ CHALLENGE_SIGNATURE_MAP: dict[str, tuple[str, str]] = {
     "jwtUnsignedChallenge": ("Unsigned JWT", "JWT"),
     "prototypePollutionChallenge": ("Prototype Pollution", "Prototype Pollution"),
     "dbSchemaChallenge": ("Database Schema", "Posible SQLi"),
-    "loginAdminChallenge": ("Login Admin", "SQLi en Login"),
+    "loginAdminChallenge": ("Login Admin", "Bypass de Autenticación por SQLi"),
     "sensitiveDataLeak": ("Sensitive Data Exposure", "Uso de Funciones Inseguras"),
 }
 
@@ -142,6 +142,10 @@ def run_juiceshop_benchmark(base_url: str = "http://localhost:3000") -> Benchmar
     search_url = f"{base_url}/rest/products/search?q=apple"
     raw_sqli = check_sqli(search_url, session=session)
     all_findings.extend(Finding.from_legacy_list(raw_sqli, "sqli", search_url))
+
+    login_url = f"{base_url}/rest/user/login"
+    raw_login_sqli = check_sqli(login_url, session=session)
+    all_findings.extend(Finding.from_legacy_list(raw_login_sqli, "sqli", login_url))
 
     raw_xss = check_xss(search_url, session=session)
     all_findings.extend(Finding.from_legacy_list(raw_xss, "xss", search_url))

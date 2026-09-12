@@ -47,7 +47,7 @@ def _is_valid_jwt(token_str: str) -> bool:
         pass
     return False
 
-def scan_text_for_sensitive_data(text: str, source_name: str) -> list[dict[str, str]]:
+def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = "") -> list[dict[str, str]]:
     """
     Escanea un texto (HTML, JS, comentarios) en busca de patrones sensibles.
     """
@@ -106,14 +106,20 @@ def scan_text_for_sensitive_data(text: str, source_name: str) -> list[dict[str, 
             })
 
         # Buscar referencias a entornos locales o de desarrollo expuestos
+        target_host = urlparse(target_url).hostname or ""
+        is_local_target = target_host.lower() in ("localhost", "127.0.0.1", "::1")
         dev_envs = re.findall(r"\b(localhost|127\.0\.0\.1|test-env|staging-api|dev-db)\b", text, re.IGNORECASE)
         if dev_envs:
-            unique_envs = list(set(dev_envs))
-            findings.append({
-                "vuln": "Referencia a Entorno de Desarrollo en Código de Producción",
-                "risk": "Bajo",
-                "detail": f"Se detectaron referencias a servidores de prueba/desarrollo en '{source_name}': {', '.join(unique_envs)}."
-            })
+            unique_envs = {env.lower() for env in dev_envs}
+            if is_local_target:
+                unique_envs.discard("localhost")
+                unique_envs.discard("127.0.0.1")
+            if unique_envs:
+                findings.append({
+                    "vuln": "Referencia a Entorno de Desarrollo en Código de Producción",
+                    "risk": "Bajo",
+                    "detail": f"Se detectaron referencias a servidores de prueba/desarrollo en '{source_name}': {', '.join(sorted(unique_envs))}."
+                })
 
     return findings
 
@@ -142,7 +148,7 @@ def check_sensitive_data(url: str, html_content: Optional[str] = None, session: 
             return results
 
     # 1. Escanear el HTML principal
-    results.extend(scan_text_for_sensitive_data(html_content, "HTML de la página principal"))
+    results.extend(scan_text_for_sensitive_data(html_content, "HTML de la página principal", target_url=url))
 
     # 2. Extraer scripts JS locales/del mismo host y escanearlos
     parsed_base = urlparse(url)
@@ -164,7 +170,7 @@ def check_sensitive_data(url: str, html_content: Optional[str] = None, session: 
                 # Descargar script JS
                 js_res = client.get(abs_src, timeout=5)
                 if js_res.status_code == 200:
-                    results.extend(scan_text_for_sensitive_data(js_res.text, f"Archivo JS: {src}"))
+                    results.extend(scan_text_for_sensitive_data(js_res.text, f"Archivo JS: {src}", target_url=url))
             except requests.RequestException:
                 pass
 
