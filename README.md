@@ -172,10 +172,27 @@ El arnés de evaluación reproducible [`tests/benchmark_juiceshop.py`](tests/ben
 - `exposedMetricsChallenge`: Identificación de endpoints de observabilidad y métricas de servidor expuestas.
 - `sensitiveDataLeak`: Detección de tokens JWT y cadenas de depuración en archivos compilados de frontend.
 
-### Validación Práctica del Grafo de Ataques y Brandes Centrality
+### Análisis Técnico de Desviaciones (FP y FN)
+
+La transparencia metodológica es el pilar de este benchmark:
+
+- **Origen del Falso Positivo (1 FP):**
+  - Alerta: *"Referencia a Entorno de Desarrollo en Código de Producción"*.
+  - Causa: La regla heurística detectó la cadena literal `localhost` dentro de un comentario empaquetado en el bundle compilado `main.js` de Angular. Si bien es una advertencia de higiene informativa útil en código propietario, en Juice Shop no constituye una falla explotable.
+- **Origen de los Falsos Negativos (6 FN):**
+  - Los 6 retos DAST no detectados corresponden a vectores fuera del alcance de un escaneo dinámico pasivo/heurístico básico:
+    1. **SQLi en Login (`loginAdminChallenge`):** Requiere inyectar payloads estructurados en cuerpos JSON (`POST /rest/user/login`), no en parámetros de query URL.
+    2. **XSS Reflejado en Búsqueda:** El framework Angular sanitiza el DOM en tiempo de ejecución; solo se detona visualmente mediante un navegador headless interactivo (requiere `--headless-crawl` con Playwright).
+    3. **Redirección Abierta (`redirectChallenge`):** Requiere conocer el parámetro propietario `?to=` que solo se descubre mediante fuzzing masivo de parámetros o importando la especificación OpenAPI.
+    4. **XXE B2B:** Endpoint `/b2b/v2/orders` que espera un esquema XML/SOAP específico.
+    5. **Unsigned JWT:** Requiere una sesión de usuario activa previa y forjar el header `{"alg": "none"}` contra el carrito de compras.
+    6. **SCA de Componentes Obsoletos:** Versiones de librerías frontend de Juice Shop no indexadas en la base local de firmas.
+
+### Validación del Grafo de Ataques y Brandes Centrality
 
 Sobre los hallazgos confirmados en Juice Shop, el motor modeló el Grafo Dirigido Acíclico (DAG) y calculó la Centralidad de Intermediación de Brandes ($C_B(v)$):
-- **Choke Point Crítico Identificado:** La inyección de código en cliente (`document.write` / DOM-XSS) y la exposición de base de datos fueron destacados como los cuellos de botella prioritarios, demostrando que el triaje algorítmico prioriza las rutas de ataque encadenadas por encima de listados estáticos CVSS.
+- **Choke Point Identificado:** La inyección en cliente (`document.write` / DOM-XSS) y la exposición de base de datos fueron seleccionadas algorítmicamente como los puntos neurálgicos.
+- **Consideración de Topología:** En una aplicación aislada con 10 hallazgos, este cálculo opera como una **prueba de concepto del algoritmo**. El verdadero valor analítico de la Centralidad de Brandes se maximiza en topologías complejas (20+ nodos interconectados entre subdominios EASM, servicios expuestos y bases de datos), donde la ruta crítica no resulta evidente para un analista a simple vista.
 
 ### Cómo Reproducir este Benchmark
 Cualquier evaluador o investigador puede verificar estas métricas en su propia máquina:
