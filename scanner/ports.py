@@ -27,6 +27,57 @@ def check_single_port(ip: str, port: int, name: str, service: str, risk: str) ->
             s.settimeout(1.2)
             res = s.connect_ex((ip, port))
             if res == 0:
+                # Banner grabbing y verificación activa de servicio
+                # Previene falsos positivos en proxies Anycast / CDN Edge que completan el TCP handshake sin alojar el servicio
+                if port == 21:  # FTP
+                    s.settimeout(1.0)
+                    try:
+                        banner = s.recv(256)
+                        if not banner.startswith(b"220"):
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
+                elif port == 22:  # SSH
+                    s.settimeout(1.0)
+                    try:
+                        banner = s.recv(256)
+                        if not banner.startswith(b"SSH-"):
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
+                elif port == 25:  # SMTP
+                    s.settimeout(1.0)
+                    try:
+                        banner = s.recv(256)
+                        if not banner.startswith(b"220"):
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
+                elif port == 110:  # POP3
+                    s.settimeout(1.0)
+                    try:
+                        banner = s.recv(256)
+                        if not banner.startswith(b"+OK"):
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
+                elif port == 143:  # IMAP
+                    s.settimeout(1.0)
+                    try:
+                        banner = s.recv(256)
+                        if not (banner.startswith(b"* OK") or banner.startswith(b"* PREAUTH")):
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
+                elif port == 3306:  # MySQL
+                    s.settimeout(1.0)
+                    try:
+                        banner = s.recv(256)
+                        if len(banner) < 5 or banner[4] != 10:
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
+
                 return {
                     "vuln": f"Puerto expuesto públicamente: {port} ({name})",
                     "risk": risk,

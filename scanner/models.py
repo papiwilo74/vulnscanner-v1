@@ -1,8 +1,10 @@
 """Modelo estandarizado de hallazgos para VulnScanner con soporte CVSS v3.1, CWE y MITRE ATT&CK."""
+import contextlib
 import hashlib
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 
 @dataclass
@@ -391,8 +393,16 @@ class Finding:
         return hash(key)
 
     def dedup_key(self) -> str:
+        affected = self.affected_url or ""
+        # Normalizar a nivel de origen para configuraciones globales del servidor
+        # (previene spam de hallazgos idénticos en cada subpágina rastreada)
+        if self.category in ("headers", "cookies", "ssl", "cors", "ports") and affected:
+            with contextlib.suppress(Exception):
+                parsed = urlparse(affected)
+                if parsed.netloc:
+                    affected = f"{parsed.scheme}://{parsed.netloc}"
         return hashlib.md5(
-            f"{self.category}|{self.title}|{self.affected_url or ''}|{self.parameter or ''}".encode(),
+            f"{self.category}|{self.title}|{affected}|{self.parameter or ''}".encode(),
             usedforsecurity=False
         ).hexdigest()
 
