@@ -34,7 +34,8 @@ def check_websocket(url: str, html_content: str = "",
         results.append({
             "vuln": "WebSocket Inseguro (ws:// sin TLS)",
             "risk": "Alto",
-            "detail": f"Conexion WebSocket sin cifrar detectada: {ws_url}. Usar 'wss://' (WebSocket sobre TLS) para proteger datos en transito."
+            "detail": f"Conexion WebSocket sin cifrar detectada: {ws_url}. Usar 'wss://' (WebSocket sobre TLS) para proteger datos en transito.",
+            "confidence": "confirmed",
         })
 
     wss_urls = WSS_SECURE_RE.findall(html_content)
@@ -42,8 +43,10 @@ def check_websocket(url: str, html_content: str = "",
         results.append({
             "vuln": "WebSocket Seguro Detectado (wss://)",
             "risk": "Bajo",
-            "detail": f"Se detectaron {len(set(wss_urls))} conexion(es) WebSocket cifradas en la pagina."
+            "detail": f"Se detectaron {len(set(wss_urls))} conexion(es) WebSocket cifradas en la pagina.",
+            "confidence": "confirmed",
         })
+
 
     inline_scripts = re.findall(
         r"<script[^>]*>(.*?)</script>",

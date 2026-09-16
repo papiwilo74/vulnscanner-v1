@@ -142,6 +142,7 @@ class ParameterFuzzer:
                             f"(Estado: {base_status} -> {probe_res.status_code}, Variación: {len_diff} bytes). "
                             "Puede exponer lógica interna o eludir controles de acceso."
                         ),
+                        "confidence": "confirmed",
                         "cwe": "CWE-489",
                         "cvss": 5.3,
                         "url": probe_url,
@@ -154,10 +155,12 @@ class ParameterFuzzer:
                             f"El backend procesa y refleja directamente el parámetro de consulta no documentado '{param}'. "
                             "Superficie candidata para pruebas de XSS, Inyección o Manipulación de Estado."
                         ),
+                        "confidence": "confirmed",
                         "cwe": "CWE-20",
                         "cvss": 3.7,
                         "url": probe_url,
                     })
+
 
         return discovered_urls, findings
 

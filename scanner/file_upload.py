@@ -85,13 +85,15 @@ def check_file_upload(url: str, html_content: str = "",
                 results.append({
                     "vuln": "Formulario de Subida de Archivos Detectado",
                     "risk": "Bajo",
-                    "detail": f"Formulario con input file '{fi['name']}' en '{action}'. Accept: '{accept}'. Metodo: {form['method']}. Verificar validacion de tipo/extensión en servidor."
+                    "detail": f"Formulario con input file '{fi['name']}' en '{action}'. Accept: '{accept}'. Metodo: {form['method']}. Verificar validacion de tipo/extensión en servidor.",
+                    "confidence": "confirmed",
                 })
             else:
                 results.append({
                     "vuln": "Formulario de Subida de Archivos sin Restriccion Visible",
-                    "risk": "Medio",
-                    "detail": f"Formulario con input file '{fi['name']}' en '{action}' sin atributo 'accept'. Metodo: {form['method']}. Verificar validacion de extensiones en servidor."
+                    "risk": "Bajo",
+                    "detail": f"Formulario con input file '{fi['name']}' en '{action}' sin atributo 'accept'. Metodo: {form['method']}. Verificar validacion de extensiones en servidor.",
+                    "confidence": "probable",
                 })
 
     upload_endpoints = re.findall(
@@ -102,7 +104,9 @@ def check_file_upload(url: str, html_content: str = "",
         results.append({
             "vuln": "Endpoint de Subida de Archivos Encontrado",
             "risk": "Bajo",
-            "detail": f"Referencia a endpoint de subida en codigo: '{ep}'. Verificar que tenga validacion de extensiones, antivirus y limite de tamano."
+            "detail": f"Referencia a endpoint de subida en codigo: '{ep}'. Verificar que tenga validacion de extensiones, antivirus y limite de tamano.",
+            "confidence": "probable",
         })
+
 
     return results

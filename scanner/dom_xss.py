@@ -18,6 +18,15 @@ DOM_SOURCES_REGEX = re.compile(
 
 DOM_SINKS_REGEX = re.compile(
     r"(\.innerHTML\s*=|\.outerHTML\s*=|document\.write\s*\(|document\.writeln\s*\(|eval\s*\(|setTimeout\s*\([^,]+|setInterval\s*\([^,]+|new\s+Function\s*\(|\.src\s*=|\.href\s*=)",
+    re.IGNORECASE,
+)
+DOM_DIRECT_FLOW = re.compile(
+    r"(\.innerHTML|\.outerHTML|document\.write|document\.writeln|eval|setTimeout|setInterval|new\s+Function|\.src|\.href)\s*(\(|=)[^;]*\b(location\.(?:search|hash|href|pathname)|document\.(?:URL|documentURI|referrer)|window\.name)\b",
+    re.IGNORECASE
+)
+
+ASSIGNMENT_RE = re.compile(
+    r"(?:var|let|const)\s+([a-zA-Z0-9_$]+)\s*=\s*[^;]*\b(location\.(?:search|hash|href|pathname)|document\.(?:URL|documentURI|referrer)|window\.name)\b",
     re.IGNORECASE
 )
 
@@ -25,7 +34,7 @@ DOM_SINKS_REGEX = re.compile(
 def analyze_scripts_for_dom_xss(html_content: str, target_url: str) -> list[dict[str, Any]]:
     """
     Analiza bloques <script> en el HTML en busca de patrones de código JavaScript
-    vulnerables a DOM-based XSS.
+    vulnerables a DOM-based XSS verificando correlación de flujo de datos.
     """
     findings: list[dict[str, Any]] = []
     if not html_content:
@@ -35,27 +44,56 @@ def analyze_scripts_for_dom_xss(html_content: str, target_url: str) -> list[dict
     script_blocks = re.findall(r"<script[^>]*>(.*?)</script>", html_content, re.DOTALL | re.IGNORECASE)
 
     for i, script in enumerate(script_blocks):
-        # 1. Comprobar si el script contiene una fuente y un sumidero
-        source_match = DOM_SOURCES_REGEX.search(script)
-        sink_match = DOM_SINKS_REGEX.search(script)
-
-        if source_match and sink_match:
-            source_snippet = source_match.group(0).strip()
-            sink_snippet = sink_match.group(0).strip()
-            evidence = f"Source: {source_snippet} | Sink: {sink_snippet}"
+        # 1. Comprobación de flujo directo (Source inyectado directamente en Sink)
+        direct_match = DOM_DIRECT_FLOW.search(script)
+        if direct_match:
+            sink_kw = direct_match.group(1).strip()
+            source_kw = direct_match.group(3).strip()
             findings.append({
                 "vuln": "DOM-Based Cross-Site Scripting (DOM XSS)",
                 "risk": "Alto",
-                "detail": f"Se detectó flujo de entrada no confiable en script #{i+1} ({source_snippet}) hacia sumidero ({sink_snippet}).",
+                "detail": f"Se detectó flujo directo de entrada no confiable en script #{i+1} ({source_kw}) hacia sumidero ({sink_kw}).",
                 "type": "DOM-Based Cross-Site Scripting (DOM XSS)",
                 "severity": "Alto",
                 "url": target_url,
-                "description": f"Se detectó un flujo peligroso de DOM XSS en bloque <script> #{i+1}: Source ({source_snippet}) -> Sink ({sink_snippet}).",
-                "evidence": evidence,
+                "description": f"Se detectó un flujo peligroso de DOM XSS en bloque <script> #{i+1}: Source ({source_kw}) -> Sink ({sink_kw}).",
+                "evidence": f"Source: {source_kw} | Sink: {sink_kw}",
+                "confidence": "confirmed",
                 "solution": "Evita asignar variables del DOM (location.hash, location.search) a innerHTML o eval(). Utiliza textContent o librerías de sanitización como DOMPurify."
             })
+            continue
+
+        # 2. Comprobación de propagación de variables (var x = source; ... sink = x)
+        var_assignments = ASSIGNMENT_RE.findall(script)
+        has_flow = False
+        for var_name, source_expr in var_assignments:
+            sink_var_pattern = re.compile(
+                rf"(\.innerHTML|\.outerHTML|document\.write|document\.writeln|eval|setTimeout|setInterval|new\s+Function|\.src|\.href)\s*(\(|=)[^;]*\b{re.escape(var_name)}\b",
+                re.IGNORECASE
+            )
+            sink_match = sink_var_pattern.search(script)
+            if sink_match:
+                sink_kw = sink_match.group(1).strip()
+                findings.append({
+                    "vuln": "DOM-Based Cross-Site Scripting (DOM XSS)",
+                    "risk": "Alto",
+                    "detail": f"Se detectó flujo de entrada no confiable en script #{i+1} ({source_expr} -> {var_name}) hacia sumidero ({sink_kw}).",
+                    "type": "DOM-Based Cross-Site Scripting (DOM XSS)",
+                    "severity": "Alto",
+                    "url": target_url,
+                    "description": f"Se detectó un flujo peligroso de DOM XSS en bloque <script> #{i+1}: Source ({source_expr} -> {var_name}) -> Sink ({sink_kw}).",
+                    "evidence": f"Source: {source_expr} | Sink: {sink_kw}",
+                    "confidence": "confirmed",
+                    "solution": "Evita asignar variables del DOM a innerHTML o eval(). Utiliza textContent o librerías de sanitización como DOMPurify."
+                })
+                has_flow = True
+                break
+
+        if has_flow:
+            continue
 
     return findings
+
 
 
 def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict[str, Any]]:
@@ -98,7 +136,9 @@ def dynamic_check_dom_xss(target_url: str, timeout: int = 8000) -> list[dict[str
                             "vuln": "DOM-Based Cross-Site Scripting (Dinámico)",
                             "risk": "Alto",
                             "detail": f"El valor inyectado en la URL ({canary}) fue reflejado en el DOM del navegador.",
+                            "confidence": "confirmed",
                             "type": "DOM-Based XSS (Dinámico)",
+
                             "severity": "Alto",
                             "url": test_url,
                             "description": f"El valor inyectado en la URL ({canary}) fue reflejado dinámicamente en el DOM tras la ejecución del JavaScript de la página.",

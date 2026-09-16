@@ -61,8 +61,12 @@ def parse_version(version_str: str) -> tuple[int, ...]:
         return (0,)
 
 def is_version_vulnerable(detected_version: str, max_vulnerable_version: str) -> bool:
-    """Comprueba si la versión detectada es <= la versión máxima vulnerable."""
-    return parse_version(detected_version) <= parse_version(max_vulnerable_version)
+    """Comprueba si la versión detectada es válida y <= la versión máxima vulnerable."""
+    dv = parse_version(detected_version)
+    mv = parse_version(max_vulnerable_version)
+    if not dv or dv == (0,):
+        return False
+    return dv <= mv
 
 def check_library_vulnerabilities(lib_name: str, detected_version: str) -> list[dict[str, str]]:
     """Devuelve hallazgos si la versión detectada es vulnerable."""
@@ -78,10 +82,12 @@ def check_library_vulnerabilities(lib_name: str, detected_version: str) -> list[
                 "risk": risk,
                 "detail": f"Se detectó {lib_name} versión {detected_version}. "
                           f"Esta versión es vulnerable a: {description}. "
-                          f"Se recomienda actualizar a la última versión estable."
+                          f"Se recomienda actualizar a la última versión estable.",
+                "confidence": "confirmed",
             })
             break  # Reportar solo el hallazgo más crítico por librería
     return findings
+
 
 def check_sca(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     """

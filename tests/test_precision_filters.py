@@ -314,6 +314,241 @@ def test_ports_banner_confirmed(monkeypatch):
     assert "Banner de protocolo verificado" in finding["detail"]
 
 
+# ---------------------------------------------------------------------------
+# Phase 3 Precision Filter Tests
+# ---------------------------------------------------------------------------
+
+@responses.activate
+def test_graphql_spa_keyword_query_not_flagged():
+    """Un sitio web común o SPA cuyo HTML contiene la palabra 'query' no debe reportar GraphQL."""
+    url = "https://my-app.test"
+    html_with_query = "<html><body>Welcome! Search query here: <p>Results for query</p></body></html>"
+
+    responses.add(
+        responses.GET,
+        re.compile(r"^https://my-app\.test"),
+        body=html_with_query,
+        status=200,
+        content_type="text/html",
+    )
+    responses.add(
+        responses.POST,
+        re.compile(r"^https://my-app\.test"),
+        body="Not found",
+        status=404,
+    )
+
+    from scanner.graphql import check_graphql
+
+    findings = check_graphql(url)
+    assert len(findings) == 0, f"No debe reportar GraphQL por texto genérico 'query': {findings}"
+
+
+@responses.activate
+def test_graphql_playground_console_confirmed():
+    """Una consola interactiva (GraphiQL o Playground) debe detectarse con confianza 'confirmed'."""
+    url = "https://my-app.test/graphql"
+    playground_html = "<html><head><title>GraphiQL</title></head><body><div id='graphiql'></div></body></html>"
+
+    responses.add(
+        responses.GET,
+        "https://my-app.test/graphiql",
+        body=playground_html,
+        status=200,
+        content_type="text/html",
+    )
+    responses.add(
+        responses.POST,
+        re.compile(r"^https://my-app\.test"),
+        body="Not found",
+        status=404,
+    )
+    responses.add(
+        responses.GET,
+        re.compile(r"^https://my-app\.test"),
+        body="Not found",
+        status=404,
+    )
+
+    from scanner.graphql import check_graphql
+
+    findings = check_graphql(url)
+    console_findings = [f for f in findings if "Consola GraphQL Interactiva" in f["vuln"]]
+    assert len(console_findings) == 1
+    assert console_findings[0]["confidence"] == "confirmed"
+
+
+@responses.activate
+def test_graphql_deduplication_prefers_introspection():
+    """Si un endpoint expone introspección y también responde a GET, se prioriza el hallazgo crítico."""
+    endpoint = "https://my-app.test/graphql"
+    intro_json = {
+        "data": {
+            "__schema": {
+                "queryType": {"name": "Query"},
+                "mutationType": None,
+                "subscriptionType": None,
+                "types": [{"name": "User", "kind": "OBJECT"}],
+            }
+        }
+    }
+
+    responses.add(
+        responses.POST,
+        endpoint,
+        json=intro_json,
+        status=200,
+        content_type="application/json",
+    )
+    responses.add(
+        responses.GET,
+        endpoint,
+        json={"data": {"ok": True}},
+        status=200,
+        content_type="application/json",
+    )
+    # Todos los demás endpoints 404
+    responses.add(
+        responses.POST,
+        re.compile(r"^https://my-app\.test/(?!graphql$)"),
+        body="Not found",
+        status=404,
+    )
+    responses.add(
+        responses.GET,
+        re.compile(r"^https://my-app\.test/(?!graphql$)"),
+        body="Not found",
+        status=404,
+    )
+
+    from scanner.graphql import check_graphql
+
+    findings = check_graphql("https://my-app.test")
+    # Solo debe haber 1 hallazgo para /graphql: el de introspección
+    assert len(findings) == 1
+    assert "Introspeccion" in findings[0]["vuln"]
+    assert findings[0]["confidence"] == "confirmed"
+
+
+def test_dom_xss_independent_sources_and_sinks_not_flagged():
+    """Un script con source y sink independientes (sin flujo de datos) no debe alertarse."""
+    from scanner.dom_xss import analyze_scripts_for_dom_xss
+
+    safe_script = """
+    <html><body><script>
+        var theme = localStorage.getItem('theme');
+        setTimeout(function() { console.log('keepalive'); }, 1000);
+    </script></body></html>
+    """
+    findings = analyze_scripts_for_dom_xss(safe_script, "https://my-app.test")
+    assert len(findings) == 0, f"Coocurrencia sin flujo no debe disparar DOM XSS: {findings}"
+
+
+def test_dom_xss_direct_flow_confirmed():
+    """Un flujo directo source -> sink debe marcarse con confianza 'confirmed'."""
+    from scanner.dom_xss import analyze_scripts_for_dom_xss
+
+    vuln_script = """
+    <html><body><script>
+        document.write(location.search);
+    </script></body></html>
+    """
+    findings = analyze_scripts_for_dom_xss(vuln_script, "https://my-app.test")
+    assert len(findings) == 1
+    assert findings[0]["confidence"] == "confirmed"
+    assert "location.search" in findings[0]["evidence"]
+
+
+def test_dom_xss_variable_propagation_confirmed():
+    """Un flujo que propaga a través de una variable debe marcarse con confianza 'confirmed'."""
+    from scanner.dom_xss import analyze_scripts_for_dom_xss
+
+    vuln_script = """
+    <html><body><script>
+        var untrusted = location.hash;
+        document.getElementById('content').innerHTML = untrusted;
+    </script></body></html>
+    """
+    findings = analyze_scripts_for_dom_xss(vuln_script, "https://my-app.test")
+    assert len(findings) == 1
+    assert findings[0]["confidence"] == "confirmed"
+    assert "location.hash" in findings[0]["evidence"]
+
+
+def test_sca_unparseable_version_not_vulnerable():
+    """Versiones no analizables o inválidas no deben generar falsos positivos."""
+    from scanner.sca import is_version_vulnerable
+
+    assert is_version_vulnerable("invalid-ver", "2.0.0") is False
+    assert is_version_vulnerable("", "2.0.0") is False
+    assert is_version_vulnerable("unknown", "1.0.0") is False
+
+
+def test_sca_vulnerable_library_confirmed():
+    """Librerías vulnerables confirmadas deben etiquetarse con confidence='confirmed'."""
+    from scanner.sca import check_library_vulnerabilities
+
+    findings = check_library_vulnerabilities("bootstrap", "3.3.7")
+    assert len(findings) >= 1
+    assert findings[0]["confidence"] == "confirmed"
+
+
+def test_websocket_confidence_confirmed():
+    """Detecciones de websocket deben calibrarse con confidence='confirmed'."""
+    from scanner.websocket import check_websocket
+
+    html = "<script>var ws = new WebSocket('ws://chat.test/live');</script>"
+    findings = check_websocket("https://chat.test", html_content=html)
+    insecure = [f for f in findings if "ws://" in f["vuln"]]
+    assert len(insecure) == 1
+    assert insecure[0]["confidence"] == "confirmed"
+
+
+def test_file_upload_confidence_calibration():
+    """Inputs de archivo sin accept deben reportarse como riesgo Bajo y 'probable'."""
+    from scanner.file_upload import check_file_upload
+
+    # Formulario sin accept
+    html_no_accept = '<form action="/submit" method="POST"><input type="file" name="avatar"></form>'
+    f_no_accept = check_file_upload("https://my-app.test", html_content=html_no_accept)
+    form_findings = [f for f in f_no_accept if "Formulario" in f["vuln"]]
+    assert len(form_findings) == 1
+    assert form_findings[0]["risk"] == "Bajo"
+    assert form_findings[0]["confidence"] == "probable"
+
+    # Formulario con accept
+    html_with_accept = '<form action="/submit" method="POST"><input type="file" name="doc" accept=".pdf"></form>'
+    f_accept = check_file_upload("https://my-app.test", html_content=html_with_accept)
+    form_findings_accept = [f for f in f_accept if "Formulario" in f["vuln"]]
+    assert len(form_findings_accept) == 1
+    assert form_findings_accept[0]["confidence"] == "confirmed"
+
+
+@responses.activate
+def test_param_fuzzer_confidence_confirmed():
+    """Parámetros ocultos con respuesta diferencial deben marcarse con confidence='confirmed'."""
+    from scanner.param_fuzzer import ParameterFuzzer
+
+    responses.add(
+        responses.GET,
+        "https://my-app.test/api",
+        body="normal response",
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        re.compile(r"^https://my-app\.test/api\?debug="),
+        body="debug mode active - internal memory dump with substantial length difference",
+        status=200,
+    )
+
+    fuzzer = ParameterFuzzer()
+    _, findings = fuzzer.probe_url("https://my-app.test/api", candidate_params=["debug"])
+    assert len(findings) >= 1
+    assert findings[0]["confidence"] == "confirmed"
+
+
+
 
 
 
