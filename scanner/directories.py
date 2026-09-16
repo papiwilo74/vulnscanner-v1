@@ -27,16 +27,36 @@ def is_spa_fallback(response: requests.Response) -> bool:
     body = response.text.lower()
     return any(sig.lower() in body for sig in SPA_SIGNATURES)
 
-def check_single_directory(base_url: str, path: str, session: Optional[requests.Session] = None, baseline_status: Optional[int] = None, baseline_location: str = "", baseline_body_sig: str = "") -> Optional[dict[str, str]]:
+def check_single_directory(
+    base_url: str,
+    path: str,
+    session: Optional[requests.Session] = None,
+    baseline_status: Optional[int] = None,
+    baseline_location: str = "",
+    baseline_body_sig: str = "",
+    baseline_len: int = 0,
+    is_soft_404: bool = False,
+) -> Optional[dict[str, str]]:
     try:
         url = base_url.rstrip("/") + path
         client = session if session is not None else requests
         r = client.get(url, timeout=5, allow_redirects=False)
         status = r.status_code
 
+        # 1. Filtro Soft-404 para SPAs y servidores que devuelven 200 o redirect para rutas inexistentes
+        if is_soft_404 and status == 200:
+            if is_spa_fallback(r):
+                return None
+            len_diff = abs(len(r.text) - baseline_len)
+            if len_diff < max(len(path) + 40, 100):
+                return None
+            if r.text[:300].lower() == baseline_body_sig:
+                return None
+
         if baseline_status is not None and status == baseline_status:
             if status == 200:
-                if r.text[:300].lower() == baseline_body_sig or is_spa_fallback(r):
+                len_diff = abs(len(r.text) - baseline_len)
+                if len_diff < max(len(path) + 40, 100) or r.text[:300].lower() == baseline_body_sig or is_spa_fallback(r):
                     return None
             elif status in (301, 302):
                 if r.headers.get("Location", "") == baseline_location:
@@ -52,7 +72,8 @@ def check_single_directory(base_url: str, path: str, session: Optional[requests.
                 return {
                     "vuln": f"Ruta existente protegida (403): {path}",
                     "risk": "Bajo",
-                    "detail": "El recurso existe pero devuelve HTTP 403 (Forbidden). Solo revela la existencia del recurso."
+                    "detail": "El recurso existe pero devuelve HTTP 403 (Forbidden). Solo revela la existencia del recurso.",
+                    "confidence": "confirmed",
                 }
             if status in (301, 302, 307, 308):
                 loc = r.headers.get("Location", "")
@@ -68,7 +89,8 @@ def check_single_directory(base_url: str, path: str, session: Optional[requests.
                 return {
                     "vuln": f"Directorio expuesto con redirección: {path}",
                     "risk": "Bajo",
-                    "detail": f"Responde con HTTP {status} -> {loc}"
+                    "detail": f"Responde con HTTP {status} -> {loc}",
+                    "confidence": "probable",
                 }
 
             # Para status == 200: si es un archivo de backend/código y responde HTML, es falso positivo (404 personalizado)
@@ -81,7 +103,8 @@ def check_single_directory(base_url: str, path: str, session: Optional[requests.
             return {
                 "vuln": f"Archivo o directorio expuesto: {path}",
                 "risk": "Alto",
-                "detail": f"Responde con HTTP {status}"
+                "detail": f"Responde con HTTP {status}",
+                "confidence": "confirmed",
             }
     except requests.RequestException:
         pass
@@ -94,19 +117,37 @@ def check_directories(base_url: str, session: Optional[requests.Session] = None)
     baseline_status = None
     baseline_location = ""
     baseline_body_sig = ""
+    baseline_len = 0
+    is_soft_404 = False
     try:
-        r_fake = client.get(base_url.rstrip("/") + "/no_existe_12345_zzz.html", timeout=5, allow_redirects=False)
+        r_fake = client.get(base_url.rstrip("/") + "/_soft404_canary_test_999_xyz.html", timeout=5, allow_redirects=False)
         baseline_status = r_fake.status_code
         baseline_location = r_fake.headers.get("Location", "")
         baseline_body_sig = r_fake.text[:300].lower()
+        baseline_len = len(r_fake.text)
+        is_soft_404 = bool(baseline_status == 200 or is_spa_fallback(r_fake))
     except requests.RequestException:
         pass
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(check_single_directory, base_url, path, session, baseline_status, baseline_location, baseline_body_sig): path for path in COMMON_PATHS}
+        futures = {
+            executor.submit(
+                check_single_directory,
+                base_url,
+                path,
+                session,
+                baseline_status,
+                baseline_location,
+                baseline_body_sig,
+                baseline_len,
+                is_soft_404,
+            ): path
+            for path in COMMON_PATHS
+        }
         for future in as_completed(futures):
             res = future.result()
             if res:
                 results.append(res)
 
     return results
+

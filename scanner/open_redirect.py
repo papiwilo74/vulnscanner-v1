@@ -11,6 +11,7 @@ REDIRECT_PARAMS = [
 ]
 
 EVIL_URL = "https://evil-phishing-site.com"
+CONTROL_URL = "https://control-verify-target.org"
 
 
 def check_open_redirect(url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
@@ -27,6 +28,7 @@ def check_open_redirect(url: str, session: Optional[requests.Session] = None) ->
         return results
 
     for param in redirect_candidates:
+        # Sonda 1: Inyección del primer dominio externo
         modified = query_params.copy()
         modified[param] = [EVIL_URL]
 
@@ -53,12 +55,33 @@ def check_open_redirect(url: str, session: Optional[requests.Session] = None) ->
             )
 
             if is_external_evil:
-                results.append({
-                    "vuln": "Open Redirect",
-                    "risk": "Medio",
-                    "detail": f"El parametro '{param}' redirige a una URL externa arbitraria: {location}"
-                })
-                continue
+                # Sonda 2 (Control Diferencial): Verificar que acepte cualquier destino arbitrario
+                modified_ctrl = query_params.copy()
+                modified_ctrl[param] = [CONTROL_URL]
+                ctrl_url = urlunparse((
+                    parsed.scheme, parsed.netloc, parsed.path,
+                    parsed.params, urlencode(modified_ctrl, doseq=True), parsed.fragment,
+                ))
+                try:
+                    r_ctrl = client.get(ctrl_url, timeout=6, allow_redirects=False)
+                    loc_ctrl = r_ctrl.headers.get("Location", "")
+                    ctrl_parsed = urlparse(loc_ctrl)
+                    is_ctrl_valid = bool(
+                        (ctrl_parsed.netloc and ctrl_parsed.netloc.lower() == urlparse(CONTROL_URL).netloc.lower())
+                        or loc_ctrl.startswith(CONTROL_URL)
+                        or loc_ctrl.startswith(f"//{urlparse(CONTROL_URL).netloc}")
+                    )
+                except requests.RequestException:
+                    is_ctrl_valid = False
+
+                if is_ctrl_valid:
+                    results.append({
+                        "vuln": "Open Redirect",
+                        "risk": "Medio",
+                        "detail": f"El parámetro '{param}' redirige a una URL externa arbitraria: {location}",
+                        "confidence": "confirmed",
+                    })
+                    continue
 
         body_lower = r.text.lower()
         evil_lower = EVIL_URL.lower()
@@ -66,7 +89,8 @@ def check_open_redirect(url: str, session: Optional[requests.Session] = None) ->
             results.append({
                 "vuln": "Open Redirect (Meta Refresh / JS)",
                 "risk": "Medio",
-                "detail": f"El parametro '{param}' genera una redireccion a URL externa en el cuerpo de la respuesta (status {r.status_code})."
+                "detail": f"El parámetro '{param}' genera una redirección a URL externa en el cuerpo de la respuesta (status {r.status_code}).",
+                "confidence": "probable",
             })
 
     return results

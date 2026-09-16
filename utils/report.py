@@ -1036,10 +1036,18 @@ def print_report(
     for n in normalized:
         risk = n.get("risk", "Bajo")
         color = COLORS.get(risk, "")
-        conf_badge = f" [{n.get('confidence', '').upper()}]" if n.get('confidence') not in ('possible', '') else ""
+        conf_val = n.get("confidence", "").lower()
+        if conf_val == "confirmed":
+            conf_badge = f" {Fore.GREEN}[CONFIRMADO 100%]{color}"
+        elif conf_val == "probable":
+            conf_badge = f" {Fore.YELLOW}[PROBABLE]{color}"
+        elif conf_val and conf_val != "possible":
+            conf_badge = f" [{conf_val.upper()}]"
+        else:
+            conf_badge = ""
         cvss_str = f" [CVSS {n.get('cvss_score', 0.0)}]" if n.get('cvss_score') else ""
         cwe_str = f" [{n.get('cwe_id')}]" if n.get('cwe_id') else ""
-        print(f"\n{color}[{risk}]{cvss_str}{cwe_str} {n['vuln']}{conf_badge}")
+        print(f"\n{color}[{risk}]{cvss_str}{cwe_str}{conf_badge} {n['vuln']}")
         print(f"       -> {n['detail']}")
         if n.get("evidence") and n["evidence"].get("response_fragment"):
             frag = n["evidence"]["response_fragment"]
