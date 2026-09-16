@@ -64,6 +64,12 @@ def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) ->
             if std_info.get("owasp_category"):
                 tags.append(std_info["owasp_category"])
 
+            # Integración de cumplimiento normativo (PCI-DSS v4.0)
+            from utils.compliance import COMPLIANCE_MAPPING
+            comp_info = COMPLIANCE_MAPPING.get(category, COMPLIANCE_MAPPING["default"])
+            for pci_req in comp_info.get("pci_dss", []):
+                tags.append(f"PCI-DSS-v4.0:{pci_req}")
+
             rules_dict[rule_id] = {
                 "id": rule_id,
                 "name": category.replace("_", " ").title() + " Rule",
@@ -77,6 +83,7 @@ def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) ->
                         f"Vulnerabilidad: {title}\n"
                         f"CWE: {cwe_id} - {cwe_name}\n"
                         f"MITRE ATT&CK: {mitre_id} - {mitre_name}\n"
+                        f"PCI-DSS v4.0: {', '.join(comp_info.get('pci_dss', []))}\n"
                         f"CVSS v3.1: {cvss_score} ({cvss_vector})\n"
                         f"Solución: {data.get('remediation', 'Revisar la configuración y aplicar parches recomendados.')}"
                     ),
@@ -85,6 +92,7 @@ def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) ->
                         f"**Estándares de Seguridad:**\n"
                         f"- **CWE**: [{cwe_id}](https://cwe.mitre.org/data/definitions/{cwe_id.replace('CWE-', '')}.html) - {cwe_name}\n"
                         f"- **MITRE ATT&CK**: [{mitre_id}](https://attack.mitre.org/techniques/{mitre_id}/) - {mitre_name}\n"
+                        f"- **PCI-DSS v4.0**: `{', '.join(comp_info.get('pci_dss', []))}`\n"
                         f"- **CVSS v3.1 Base Score**: `{cvss_score}` (`{cvss_vector}`)\n\n"
                         f"**Remediación:**\n"
                         f"{data.get('remediation', 'Revisar la configuración y aplicar parches recomendados.')}"
@@ -95,6 +103,8 @@ def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) ->
                     "precision": "very-high" if confidence == "confirmed" else "high",
                     "problem.severity": problem_severity,
                     "security-severity": str(cvss_score) if cvss_score > 0 else "5.0",
+                    "pciDssRequirements": comp_info.get("pci_dss", []),
+                    "owaspCategory": comp_info.get("owasp", ""),
                 }
             }
 
@@ -170,7 +180,21 @@ def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) ->
                         "version": "2.0.0",
                         "informationUri": "https://github.com/papiwilo74/vulnscanner-v1",
                         "rules": list(rules_dict.values())
-                    }
+                    },
+                    "taxonomies": [
+                        {
+                            "name": "PCI-DSS",
+                            "version": "4.0",
+                            "organization": "PCI Security Standards Council",
+                            "shortDescription": {"text": "Payment Card Industry Data Security Standard v4.0"},
+                        },
+                        {
+                            "name": "OWASP-Top-10",
+                            "version": "2021",
+                            "organization": "OWASP Foundation",
+                            "shortDescription": {"text": "OWASP Top 10 Web Application Security Risks 2021"},
+                        },
+                    ]
                 },
                 "invocations": [
                     {

