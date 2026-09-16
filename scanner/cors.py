@@ -47,14 +47,16 @@ def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dic
                     results.append({
                         "vuln": "CORS Mal configurado (Origen Reflejado con Credenciales)",
                         "risk": "Alto",
-                        "detail": f"El servidor ({method}) acepta cualquier origen de forma dinámica y permite el envío de credenciales (Access-Control-Allow-Credentials: true) para el origen: {attacker_origin}."
+                        "detail": f"El servidor ({method}) acepta cualquier origen de forma dinámica y permite el envío de credenciales (Access-Control-Allow-Credentials: true) para el origen: {attacker_origin}.",
+                        "confidence": "confirmed",
                     })
                     break  # Evitar duplicar si se detecta en GET y OPTIONS
                 else:
                     results.append({
                         "vuln": "CORS Permisivo (Origen Reflejado)",
                         "risk": "Bajo",
-                        "detail": f"El servidor ({method}) refleja el origen de la petición en Access-Control-Allow-Origin: {ac_origin}, aunque no permite credenciales explícitamente."
+                        "detail": f"El servidor ({method}) refleja el origen de la petición en Access-Control-Allow-Origin: {ac_origin}, aunque no permite credenciales explícitamente.",
+                        "confidence": "confirmed",
                     })
                     break
 
@@ -65,7 +67,8 @@ def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dic
                     results.append({
                         "vuln": "CORS Inseguro (Comodín con Credenciales)",
                         "risk": "Medio",
-                        "detail": f"El servidor ({method}) expone Access-Control-Allow-Origin: * y Access-Control-Allow-Credentials: true, lo cual es una configuración contradictoria e insegura."
+                        "detail": f"El servidor ({method}) expone Access-Control-Allow-Origin: * y Access-Control-Allow-Credentials: true, lo cual es una configuración contradictoria e insegura.",
+                        "confidence": "confirmed",
                     })
                     break
                 else:
@@ -73,9 +76,11 @@ def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dic
                     results.append({
                         "vuln": "CORS Abierto (Comodín)",
                         "risk": "Bajo",
-                        "detail": f"El servidor ({method}) expone Access-Control-Allow-Origin: * permitiendo peticiones desde cualquier origen sin credenciales."
+                        "detail": f"El servidor ({method}) expone Access-Control-Allow-Origin: * permitiendo peticiones desde cualquier origen sin credenciales.",
+                        "confidence": "confirmed",
                     })
                     break
+
     except requests.RequestException:
         # Silenciar excepciones de conexión de red esperadas en escaneo
         pass

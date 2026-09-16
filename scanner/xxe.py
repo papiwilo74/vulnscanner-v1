@@ -83,9 +83,11 @@ def check_xxe(url: str, html_content: str = "", session: Optional[requests.Sessi
                             results.append({
                                 "vuln": "XML External Entity Injection (XXE)",
                                 "risk": "Alto",
-                                "detail": f"Posible XXE en '{target}' con Content-Type '{content_type}'. Se detecto contenido del sistema en la respuesta: '{sig}'"
+                                "detail": f"Posible XXE en '{target}' con Content-Type '{content_type}'. Se detecto contenido del sistema en la respuesta: '{sig}'",
+                                "confidence": "confirmed",
                             })
                             return results
+
                 except requests.RequestException:
                     continue
 

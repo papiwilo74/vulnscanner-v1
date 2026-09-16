@@ -62,7 +62,9 @@ def check_headers(response: requests.Response | Any) -> list[dict[str, str]]:
             results.append({
                 "vuln": f"Header faltante: {header}",
                 "risk": risk,
-                "detail": desc
+                "detail": desc,
+                "confidence": "confirmed",
             })
+
 
     return results

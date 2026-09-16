@@ -76,7 +76,8 @@ def check_injections(url: str, session: Optional[requests.Session] = None) -> li
                             results.append({
                                 "vuln": "Inyección de Comandos del Sistema Operativo (OS Command Injection)",
                                 "risk": "Alto",
-                                "detail": f"Inyección basada en tiempo exitosa en el parámetro '{param_name}'. Retardo de {elapsed:.2f}s (Línea base: {baseline_time:.2f}s) con payload: {payload}"
+                                "detail": f"Inyección basada en tiempo exitosa en el parámetro '{param_name}'. Retardo de {elapsed:.2f}s (Línea base: {baseline_time:.2f}s) con payload: {payload}",
+                                "confidence": "confirmed",
                             })
                             break
                     except requests.RequestException:
@@ -102,9 +103,11 @@ def check_injections(url: str, session: Optional[requests.Session] = None) -> li
                     results.append({
                         "vuln": "Inyección de Plantillas del Servidor (SSTI)",
                         "risk": "Alto",
-                        "detail": f"El servidor evaluó la expresión matemática del payload '{payload}' dando como resultado '{expected}' en el parámetro '{param_name}'."
+                        "detail": f"El servidor evaluó la expresión matemática del payload '{payload}' dando como resultado '{expected}' en el parámetro '{param_name}'.",
+                        "confidence": "confirmed",
                     })
                     break
+
             except requests.RequestException:
                 pass
 

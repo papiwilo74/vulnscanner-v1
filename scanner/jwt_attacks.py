@@ -112,8 +112,23 @@ def check_jwt_attacks(url: str, html_content: str = "", session: Optional[reques
     results.append({
         "vuln": "JWT Expuesto en Cliente",
         "risk": "Bajo",
-        "detail": f"Se detectaron {len(tokens)} token(s) JWT en el HTML/JS del cliente."
+        "detail": f"Se detectaron {len(tokens)} token(s) JWT en el HTML/JS del cliente.",
+        "confidence": "confirmed",
     })
+
+    # Sonda diferencial previa: Verificar si el endpoint realmente exige autenticación.
+    # Un endpoint público devolverá 200 ante cualquier token arbitrario (falso positivo de forja).
+    endpoint_enforces_auth = False
+    try:
+        r_control = client.get(
+            url,
+            headers={"Authorization": "Bearer invalid.token.control_99999_xyz"},
+            timeout=5,
+        )
+        if r_control.status_code in (401, 403):
+            endpoint_enforces_auth = True
+    except requests.RequestException:
+        pass
 
     for token in tokens[:5]:
         decoded = _decode_jwt(token)
@@ -127,47 +142,53 @@ def check_jwt_attacks(url: str, html_content: str = "", session: Optional[reques
             results.append({
                 "vuln": "JWT con Algoritmo 'none'",
                 "risk": "Alto",
-                "detail": f"JWT detectado con algoritmo 'none'. Esto permite bypassear la verificacion de firma. Payload: {json.dumps(payload)[:120]}"
+                "detail": f"JWT detectado con algoritmo 'none'. Esto permite bypassear la verificacion de firma. Payload: {json.dumps(payload)[:120]}",
+                "confidence": "confirmed",
             })
             break
 
-        none_token = _forge_none(token)
-        if none_token:
-            auth_header_val = "Bearer " + none_token
-            try:
-                r = client.get(url, headers={"Authorization": auth_header_val}, timeout=5)
-                if r.status_code == 200:
-                    results.append({
-                        "vuln": "JWT — Ataque 'alg=none' Aceptado",
-                        "risk": "Alto",
-                        "detail": f"El servidor acepto un JWT sin firma (alg=none). Payload original: {json.dumps(payload)[:120]}"
-                    })
-                    break
-            except requests.RequestException:
-                pass
+        if endpoint_enforces_auth:
+            none_token = _forge_none(token)
+            if none_token:
+                auth_header_val = "Bearer " + none_token
+                try:
+                    r = client.get(url, headers={"Authorization": auth_header_val}, timeout=5)
+                    if r.status_code == 200:
+                        results.append({
+                            "vuln": "JWT — Ataque 'alg=none' Aceptado",
+                            "risk": "Alto",
+                            "detail": f"El servidor aceptó un JWT sin firma (alg=none). Payload original: {json.dumps(payload)[:120]}",
+                            "confidence": "confirmed",
+                        })
+                        break
+                except requests.RequestException:
+                    pass
 
-    for token in tokens[:2]:
-        decoded = _decode_jwt(token)
-        if decoded is None:
-            continue
-        if decoded["header"].get("alg", "").upper() in ("HS256", "HS384", "HS512"):
-            secret_found = False
-            for secret in COMMON_SECRETS:
-                forged = _forge_hs256(token, secret)
-                if forged:
-                    try:
-                        r = client.get(url, headers={"Authorization": "Bearer " + forged}, timeout=5)
-                        if r.status_code == 200:
-                            results.append({
-                                "vuln": "JWT — Secreto HMAC Debil",
-                                "risk": "Alto",
-                                "detail": f"JWT firmado con secreto HMAC predecible: '{secret}'. Se forjo una firma valida aceptada por el servidor."
-                            })
-                            secret_found = True
-                            break
-                    except requests.RequestException:
-                        pass
-            if secret_found:
-                break
+    if endpoint_enforces_auth:
+        for token in tokens[:2]:
+            decoded = _decode_jwt(token)
+            if decoded is None:
+                continue
+            if decoded["header"].get("alg", "").upper() in ("HS256", "HS384", "HS512"):
+                secret_found = False
+                for secret in COMMON_SECRETS:
+                    forged = _forge_hs256(token, secret)
+                    if forged:
+                        try:
+                            r = client.get(url, headers={"Authorization": "Bearer " + forged}, timeout=5)
+                            if r.status_code == 200:
+                                results.append({
+                                    "vuln": "JWT — Secreto HMAC Debil",
+                                    "risk": "Alto",
+                                    "detail": f"JWT firmado con secreto HMAC predecible: '{secret}'. Se forjo una firma valida aceptada por el servidor.",
+                                    "confidence": "confirmed",
+                                })
+                                secret_found = True
+                                break
+                        except requests.RequestException:
+                            pass
+                if secret_found:
+                    break
 
     return results
+

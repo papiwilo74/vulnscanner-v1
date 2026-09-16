@@ -4,7 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from html.parser import HTMLParser
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 
@@ -106,7 +106,8 @@ def test_form_xss(
             return {
                 "vuln": f"XSS Reflejado en Formulario ({method.upper()})",
                 "risk": "Alto",
-                "detail": f"Input: '{target_input}', Action: {action_url}. Payload reflejado sin escapar: {payload}"
+                "detail": f"Input: '{target_input}', Action: {action_url}. Payload reflejado sin escapar: {payload}",
+                "confidence": "confirmed",
             }
     except requests.RequestException:
         pass
@@ -131,7 +132,8 @@ def test_form_error_sqli(
             return {
                 "vuln": f"SQLi en Formulario ({method.upper()})",
                 "risk": "Alto",
-                "detail": f"Input: '{target_input}', Action: {action_url}. Error de DB detectado con payload: {payload} (firmas: {', '.join(new_sigs)})"
+                "detail": f"Input: '{target_input}', Action: {action_url}. Error de DB detectado con payload: {payload} (firmas: {', '.join(new_sigs)})",
+                "confidence": "confirmed",
             }
     except requests.RequestException:
         pass
@@ -165,7 +167,8 @@ def test_form_time_sqli(
                     return {
                         "vuln": f"Blind SQLi (Tiempo) en Formulario ({method.upper()})",
                         "risk": "Alto",
-                        "detail": f"Input: '{target_input}', Action: {action_url}. Retardo de {elapsed:.2f}s (Línea base: {baseline_time:.2f}s) con payload: {payload}"
+                        "detail": f"Input: '{target_input}', Action: {action_url}. Retardo de {elapsed:.2f}s (Línea base: {baseline_time:.2f}s) con payload: {payload}",
+                        "confidence": "confirmed",
                     }
             except requests.RequestException:
                 pass
@@ -173,10 +176,12 @@ def test_form_time_sqli(
         pass
     return None
 
+
 def scan_single_form(
     form: dict[str, Any],
     session: Optional[requests.Session] = None,
-    passive: bool = False
+    passive: bool = False,
+    base_url: str = ""
 ) -> list[dict[str, str]]:
     results = []
     action_url = form['action']
@@ -184,7 +189,15 @@ def scan_single_form(
     inputs = form['inputs']
 
     # 0. Detectar ausencia de Token CSRF en formularios POST (análisis estático, pasivo)
-    if method == 'post':
+    # Excluir formularios con action externo (terceros) donde la app local no gestiona CSRF
+    is_external = False
+    if base_url and action_url:
+        target_netloc = urlparse(base_url).netloc.lower()
+        action_netloc = urlparse(action_url).netloc.lower()
+        if action_netloc and target_netloc and action_netloc != target_netloc:
+            is_external = True
+
+    if method == 'post' and not is_external:
         csrf_patterns = [
             r'csrf', r'token', r'authenticity_token', r'xsrf', r'middlewaretoken'
         ]
@@ -260,10 +273,11 @@ def check_forms(url: str, html_content: Optional[str] = None, session: Optional[
 
     # Procesar formularios concurrentemente
     with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(scan_single_form, form, session, passive): form for form in forms}
+        futures = {executor.submit(scan_single_form, form, session, passive, url): form for form in forms}
         for future in as_completed(futures):
             res = future.result()
             if res:
                 results.extend(res)
 
     return results
+

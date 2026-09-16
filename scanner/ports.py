@@ -78,14 +78,18 @@ def check_single_port(ip: str, port: int, name: str, service: str, risk: str) ->
                     except (OSError, socket.timeout):
                         return None
 
+                is_banner_confirmed = port in (21, 22, 25, 110, 143, 3306)
                 return {
                     "vuln": f"Puerto expuesto públicamente: {port} ({name})",
                     "risk": risk,
                     "detail": f"El puerto está abierto en la IP {ip} ({service})."
+                              + (" Banner de protocolo verificado." if is_banner_confirmed else ""),
+                    "confidence": "confirmed" if is_banner_confirmed else "probable",
                 }
     except (OSError, socket.timeout):
         pass
     return None
+
 
 def check_ports(url: str) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []

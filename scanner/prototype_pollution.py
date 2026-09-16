@@ -10,13 +10,11 @@ PROTO_POLLUTION_PATTERNS = [
     r"\.constructor\.prototype",
     r"constructor\.prototype\s*:\s*",
     r"Object\.assign\s*\(.*__proto__",
-    r"\.hasOwnProperty\s*\(.*__proto__",
     r"merge\s*\(.*__proto__",
     r"extend\s*\(.*__proto__",
     r"deepMerge\s*\(.*__proto__",
     r"lodash\.merge\s*\([^)]*true",
     r"jQuery\.extend\s*\([^)]*true",
-    r"Object\.create\s*\(\s*null\s*\)",
 ]
 
 UNSAFE_MERGE_PATTERNS = [
@@ -32,9 +30,18 @@ COOKIE_PROTO_RE = re.compile(
     re.IGNORECASE,
 )
 
+VENDOR_SCRIPTS = [
+    "jquery", "react", "vue", "angular", "bootstrap", "lodash.min",
+    "core-js", "chunk-vendors", "vendor", "webpack", "next", "polyfill"
+]
+
 
 def _analyze_js_for_prototype_pollution(js_code: str, source: str) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
+
+    source_lower = source.lower()
+    if any(v in source_lower for v in VENDOR_SCRIPTS):
+        return findings
 
     for pat in PROTO_POLLUTION_PATTERNS:
         matches = re.findall(pat, js_code, re.IGNORECASE)
@@ -45,6 +52,7 @@ def _analyze_js_for_prototype_pollution(js_code: str, source: str) -> list[dict[
                 "detail": f"Acceso/manipulacion de __proto__ o prototype detectado en '{source}': {matches[0][:80]}"
             })
             break
+
 
     for pat in UNSAFE_MERGE_PATTERNS:
         matches = re.findall(pat, js_code, re.IGNORECASE)

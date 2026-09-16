@@ -72,7 +72,8 @@ def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = 
             findings.append({
                 "vuln": f"Exposición de Datos Sensibles ({name})",
                 "risk": "Alto",
-                "detail": f"Se detectó un patrón coincidente con '{name}' en '{source_name}'. Valores truncados: {', '.join(censored_matches)}"
+                "detail": f"Se detectó un patrón coincidente con '{name}' en '{source_name}'. Valores truncados: {', '.join(censored_matches)}",
+                "confidence": "confirmed",
             })
 
     # 2. Comprobar comentarios sospechosos/sensibles (ej. TODOs con credenciales)
@@ -87,8 +88,14 @@ def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = 
             })
 
     # 3. Comprobar malas prácticas de funciones o entornos de prueba (Análisis Estático)
-    # Buscar llamadas a eval() o document.write()
-    if source_name.endswith('.js') or "Archivo JS" in source_name:
+    # Excluir librerías y bundles vendor minificados para evitar falsos positivos con polyfills/Webpack
+    is_vendor_js = any(v in source_name.lower() for v in [
+        "jquery", "react", "vue", "angular", "bootstrap", "lodash",
+        "chunk-vendors", "vendor", "webpack", "polyfill", "node_modules", "core-js"
+    ])
+
+    # Buscar llamadas a eval() o document.write() solo en código de la aplicación
+    if (source_name.endswith('.js') or "Archivo JS" in source_name) and not is_vendor_js:
         eval_matches = re.findall(r"\beval\s*\([^\)]*\)", text)
         if eval_matches:
             findings.append({
@@ -106,6 +113,7 @@ def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = 
             })
 
         # Buscar referencias a entornos locales o de desarrollo expuestos
+
         target_host = urlparse(target_url).hostname or ""
         is_local_target = target_host.lower() in ("localhost", "127.0.0.1", "::1")
         dev_envs = re.findall(r"\b(localhost|127\.0\.0\.1|test-env|staging-api|dev-db)\b", text, re.IGNORECASE)

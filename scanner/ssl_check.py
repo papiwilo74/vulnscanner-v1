@@ -31,7 +31,8 @@ def check_ssl(url: str, session: Optional[requests.Session] = None) -> list[dict
         results.append({
             "vuln": "SSL/TLS No Habilitado (HTTP Claro)",
             "risk": "Alto",
-            "detail": "El sitio web utiliza HTTP sin cifrar. Todo el tráfico, incluidas contraseñas y datos sensibles, se transmite en texto plano."
+            "detail": "El sitio web utiliza HTTP sin cifrar. Todo el tráfico, incluidas contraseñas y datos sensibles, se transmite en texto plano.",
+            "confidence": "confirmed",
         })
         return results
 
@@ -52,7 +53,8 @@ def check_ssl(url: str, session: Optional[requests.Session] = None) -> list[dict
         results.append({
             "vuln": "Certificado SSL/TLS Inválido o Autofirmado",
             "risk": "Alto",
-            "detail": f"No se pudo verificar la cadena de confianza del certificado para {hostname}. Error: {e.reason or e}"
+            "detail": f"No se pudo verificar la cadena de confianza del certificado para {hostname}. Error: {e.reason or e}",
+            "confidence": "confirmed",
         })
     except (OSError, ssl.SSLError):
         cert_valid = False
@@ -64,19 +66,21 @@ def check_ssl(url: str, session: Optional[requests.Session] = None) -> list[dict
             not_after_val = cert_info.get('notAfter')
             if isinstance(not_after_val, str):
                 not_after = datetime.datetime.strptime(not_after_val, '%b %d %H:%M:%S %Y %Z')
-                days_remaining = (not_after - datetime.datetime.utcnow()).days
+                days_remaining = (not_after - datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)).days
 
                 if days_remaining < 0:
                     results.append({
                         "vuln": "Certificado SSL/TLS Expirado",
                         "risk": "Alto",
-                        "detail": f"El certificado SSL/TLS para {hostname} expiró el {not_after}."
+                        "detail": f"El certificado SSL/TLS para {hostname} expiró el {not_after}.",
+                        "confidence": "confirmed",
                     })
                 elif days_remaining < 15:
                     results.append({
                         "vuln": "Certificado SSL/TLS Próximo a Expirar",
                         "risk": "Bajo",
-                        "detail": f"El certificado SSL/TLS expirará pronto (en {days_remaining} días, el {not_after})."
+                        "detail": f"El certificado SSL/TLS expirará pronto (en {days_remaining} días, el {not_after}).",
+                        "confidence": "confirmed",
                     })
         except (ValueError, KeyError):
             pass
@@ -95,9 +99,11 @@ def check_ssl(url: str, session: Optional[requests.Session] = None) -> list[dict
                 results.append({
                     "vuln": f"Soporte para Protocolo Obsoleto ({name})",
                     "risk": "Medio",
-                    "detail": f"El servidor acepta conexiones negociadas con {name}, el cual es obsoleto y vulnerable a ataques como BEAST y POODLE."
+                    "detail": f"El servidor acepta conexiones negociadas con {name}, el cual es obsoleto y vulnerable a ataques como BEAST y POODLE.",
+                    "confidence": "confirmed",
                 })
         except (OSError, AttributeError, ssl.SSLError):
+
             # Si el sistema actual no soporta PROTOCOL_TLSv1/PROTOCOL_TLSv1_1 o la conexión falla, asumimos que no se aceptó
             pass
 
