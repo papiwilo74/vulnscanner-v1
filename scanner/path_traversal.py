@@ -74,7 +74,8 @@ def check_path_traversal(url: str, session: Optional[requests.Session] = None) -
                     results.append({
                         "vuln": "Path Traversal / Directory Traversal",
                         "risk": "Alto",
-                        "detail": f"Contenido de archivo del sistema detectado en parametro '{param_name}' con payload '{payload}'. Firma Unix: '{sig}'"
+                        "detail": f"Contenido de archivo del sistema detectado en parametro '{param_name}' con payload '{payload}'. Firma Unix: '{sig}'",
+                        "confidence": "confirmed",
                     })
                     return results
 
@@ -83,7 +84,8 @@ def check_path_traversal(url: str, session: Optional[requests.Session] = None) -
                     results.append({
                         "vuln": "Path Traversal / Directory Traversal",
                         "risk": "Alto",
-                        "detail": f"Contenido de archivo del sistema Windows detectado en parametro '{param_name}' con payload '{payload}'. Firma: '{sig}'"
+                        "detail": f"Contenido de archivo del sistema detectado en parametro '{param_name}' con payload '{payload}'. Firma Windows: '{sig}'",
+                        "confidence": "confirmed",
                     })
                     return results
 

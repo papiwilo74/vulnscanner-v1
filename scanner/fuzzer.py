@@ -49,6 +49,9 @@ def _is_valid_exposed_file(path: str, response: requests.Response) -> bool:
         or "<body" in text_sample
         or '<div id="root">' in text_sample
         or '<div id="app">' in text_sample
+        or '<div id="__next">' in text_sample
+        or '<app-root' in text_sample
+        or '__next_data__' in text_sample
     )
 
     p_lower = path.lower()
@@ -155,7 +158,10 @@ def check_exposed_files(base_url: str, session: Optional[requests.Session] = Non
                     continue
 
                 # Si la longitud o el contenido es idéntico a la respuesta del archivo inexistente, es un falso positivo
-                if baseline_len > 0 and abs(content_len - baseline_len) < 50 and r.text[:200] == baseline_text[:200]:
+                if baseline_len > 0 and (
+                    abs(content_len - baseline_len) < max(len(path) + 40, 80)
+                    or (r.text[:200] == baseline_text[:200])
+                ):
                     continue
 
                 # Validación profunda del contenido para evitar falsos positivos con SPAs o 404 personalizados
@@ -165,7 +171,8 @@ def check_exposed_files(base_url: str, session: Optional[requests.Session] = Non
                 results.append({
                     "vuln": f"Archivo Sensible Expuesto ({path})",
                     "risk": "Alto" if not path.endswith('.json') else "Medio",
-                    "detail": f"Se puede acceder públicamente al archivo en: {target_url} (Código: 200, Tamaño: {content_len} bytes)."
+                    "detail": f"Se puede acceder públicamente al archivo en: {target_url} (Código: 200, Tamaño: {content_len} bytes).",
+                    "confidence": "confirmed",
                 })
         except requests.RequestException:
             pass

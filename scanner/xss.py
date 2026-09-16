@@ -45,6 +45,7 @@ def test_xss_payload(
                 "vuln": f"XSS reflejado en parámetro '{param}'",
                 "risk": "Alto",
                 "detail": f"Payload reflejado sin escapar en la respuesta HTTP: {payload}",
+                "confidence": "confirmed",
             }
     except requests.RequestException:
         pass

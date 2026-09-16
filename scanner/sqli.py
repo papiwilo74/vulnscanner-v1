@@ -61,6 +61,7 @@ def test_error_sqli(
                 "vuln": f"Posible SQLi en parámetro '{param}'",
                 "risk": "Alto",
                 "detail": f"Error de Base de Datos confirmado con payload: {payload} (coincidencia: {matched_sigs[0]})",
+                "confidence": "confirmed",
             }
     except requests.RequestException:
         pass
@@ -98,6 +99,7 @@ def test_time_sqli(
                         "vuln": f"Posible Blind SQLi (Tiempo) en parámetro '{param}'",
                         "risk": "Alto",
                         "detail": f"El servidor tardó {elapsed:.2f}s en responder (Línea base: {baseline_time:.2f}s) con el payload: {payload}",
+                        "confidence": "confirmed",
                     }
             except requests.RequestException:
                 pass
