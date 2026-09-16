@@ -23,6 +23,29 @@ COMMON_SPA_ROUTES: list[str] = [
 ]
 
 
+def detect_spa_signature(html_content: str) -> bool:
+    """
+    Detecta si el contenido HTML corresponde a una Single Page Application (SPA)
+    construida con frameworks modernos como React, Vue, Angular, Next.js, Nuxt o Svelte.
+    """
+    if not html_content:
+        return False
+    lower = html_content.lower()
+    markers = [
+        '<div id="root"',
+        '<div id="app"',
+        '<div id="__next"',
+        '<app-root',
+        '__next_data__',
+        'window.__initial_state__',
+        'ng-version=',
+        'data-reactroot=',
+        'data-v-',
+    ]
+    return any(marker in lower for marker in markers)
+
+
+
 class LinkParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
@@ -131,16 +154,27 @@ def crawl_site(
       5. Navegador headless dinámico con Playwright (si use_headless=True y disponible)
     Hasta alcanzar max_pages páginas únicas.
     """
-    if use_headless and is_playwright_available():
+    should_use_headless = use_headless
+    client = session if session is not None else requests
+
+    if not should_use_headless and is_playwright_available():
+        with contextlib.suppress(Exception):
+            probe_r = client.get(start_url, timeout=6)
+            if probe_r.status_code == 200 and detect_spa_signature(probe_r.text):
+                print("  [SPA-DETECT] Signatura SPA detectada (React/Vue/Angular). Activando automáticamente Playwright...")
+                should_use_headless = True
+
+    if should_use_headless and is_playwright_available():
         from scanner.headless_crawler import crawl_site_dynamic
         print(f"  [CRAWL-HEADLESS] Iniciando rastreo SPA con navegador headless (limite: {max_pages} paginas)...")
         pages, apis = crawl_site_dynamic(start_url, max_pages=max_pages)
         if apis:
             print(f"  [API-DISCOVERY] Interceptados {len(apis)} endpoints de API dinámicos")
-        return pages
+        all_discovered = list(dict.fromkeys(pages + list(apis)))
+        return all_discovered[:max_pages]
 
     visited: set[str] = set()
-    client = session if session is not None else requests
+
 
     parsed_start = urlparse(start_url)
     root_url = f"{parsed_start.scheme}://{parsed_start.netloc}/"

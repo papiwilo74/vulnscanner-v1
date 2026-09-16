@@ -61,7 +61,9 @@ class HeadlessCrawler:
                         req_url = req.url
                         r_type = req.resource_type
                         if r_type in ["fetch", "xhr", "websocket"] or "/api/" in req_url.lower():
-                            intercepted_apis.add(req_url.split("#")[0])
+                            clean_api = req_url.split("#")[0]
+                            if urlparse(clean_api).netloc == base_domain:
+                                intercepted_apis.add(clean_api)
 
                 page.on("request", on_request)
 

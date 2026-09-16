@@ -30,6 +30,7 @@ from scanner.jwt_attacks import check_jwt_attacks
 from scanner.models import Finding, deduplicate_findings
 from scanner.oast import check_oast_vulnerabilities
 from scanner.open_redirect import check_open_redirect
+from scanner.param_fuzzer import check_param_fuzzer, discover_parameters
 from scanner.path_traversal import check_path_traversal
 from scanner.ports import check_ports
 from scanner.prototype_pollution import check_prototype_pollution
@@ -95,6 +96,7 @@ CATEGORY_MAP: dict[str, str] = {
     "ssl": "ssl",
     "ports": "ports",
     "oast": "oast",
+    "param_fuzzer": "sensitive_data",
 }
 
 def _legacy_to_findings(legacy_list: list[dict[str, Any]], category: str, url: str) -> list[Finding]:
@@ -191,6 +193,7 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
     if not passive:
         tasks.append(("SQL Injection", "sqli", check_sqli, page_url, session))
         tasks.append(("Inyecciones (Comandos/SSTI)", "injections", check_injections, page_url, session))
+        tasks.append(("Fuzzing de Parámetros Ocultos", "param_fuzzer", check_param_fuzzer, page_url, session))
         if enable_oast:
             tasks.append(("OAST (Blind SSRF / RCE / Log4j)", "oast", check_oast_vulnerabilities, page_url, session))
 
@@ -230,6 +233,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          github_repo: Optional[str] = None, github_token: Optional[str] = None,
          base_branch: str = "main",
          what_if_nodes: Optional[list[str]] = None,
+         param_fuzz: bool = False,
          progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
@@ -355,6 +359,20 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             use_headless=headless_crawl
         )
 
+    if target_urls and not engine.is_cancelled and (param_fuzz or profile == "aggressive"):
+        logger.info("[PARAM-FUZZ] Ejecutando descubrimiento diferencial de parámetros en %d URL(s)...", len(target_urls))
+        new_param_urls: list[str] = []
+        for u in target_urls[:5]:
+            if "?" not in u:
+                try:
+                    disc = discover_parameters(u, session=session, max_params=20)
+                    new_param_urls.extend(disc)
+                except Exception as e:
+                    logger.debug("Error en descubrimiento de parámetros de %s: %s", u, e)
+        if new_param_urls:
+            logger.info("[PARAM-FUZZ] %d URL(s) parametrizadas incorporadas para auditoría activa.", len(new_param_urls))
+            target_urls = list(dict.fromkeys(target_urls + new_param_urls))
+
     if not engine.is_cancelled:
         logger.info("Búsqueda de archivos sensibles expuestos...")
         raw = check_exposed_files(url, session=session)
@@ -477,7 +495,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         generate_pdf=generate_pdf,
     )
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="OmniBreach v3.0 — Framework Unificado CTEM: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV y Telemetría en Vivo",
         epilog="Ejemplo: python main.py --easm empresa.com.co"
@@ -535,6 +553,8 @@ if __name__ == "__main__":
                         help="Ruta a archivo .har (HTTP Archive) para reproducir sesión autenticada")
     parser.add_argument("--headless-crawl", action="store_true",
                         help="Habilita rastreador headless dinámico con Playwright para SPAs")
+    parser.add_argument("--param-fuzz", action="store_true",
+                        help="Habilita descubrimiento activo y fuzzing diferencial de parámetros de consulta ocultos")
     parser.add_argument("--headless-login", action="store_true",
                         help="Usa navegador headless interactivo para resolver el login")
     parser.add_argument("--openapi", type=str, default=None,
@@ -799,6 +819,9 @@ if __name__ == "__main__":
             args.crawl = 10
         args.subdomains = True
         args.stealth = True
+        args.param_fuzz = True
+        if is_playwright_available():
+            args.headless_crawl = True
         # Auto-descubrir OpenAPI si el servidor expone contrato
         if not args.openapi:
             session_check = build_session(args.cookie, args.auth) or requests.Session()
@@ -853,8 +876,14 @@ if __name__ == "__main__":
             github_token=args.github_token,
             base_branch=args.base_branch,
             what_if_nodes=args.what_if,
+            param_fuzz=args.param_fuzz,
         )
     finally:
         if lab_server:
             lab_server.stop()
             logger.info("[LAB MODE] Servidor de pruebas hermético detenido.")
+
+
+if __name__ == "__main__":
+    main()
+

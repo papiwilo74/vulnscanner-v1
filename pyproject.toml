@@ -1,20 +1,20 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
-name = "vulnscanner"
-version = "2.5.0"
-description = "Escáner de vulnerabilidades web modular con soporte de IA, modo sigiloso y reportes HTML/JSON"
+name = "omnibreach"
+version = "3.0.1"
+description = "OmniBreach Enterprise Web Security, Continuous Threat Exposure Management (CTEM) & Attack Surface Management (EASM) Scanner"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.9"
 authors = [
-    { name = "villa" }
+    { name = "OmniBreach Security Team" }
 ]
-keywords = ["security", "scanner", "vulnerability", "web", "pentest", "cybersecurity"]
+keywords = ["security", "scanner", "vulnerability", "easm", "ctem", "pentest", "cybersecurity", "dast", "sbom", "attack-graph"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Topic :: Security",
@@ -46,7 +46,8 @@ Homepage = "https://github.com/papiwilo74/vulnscanner-v1"
 Documentation = "https://github.com/papiwilo74/vulnscanner-v1#readme"
 
 [project.scripts]
-vulnscanner = "main:scan"
+omnibreach = "main:main"
+vulnscanner = "main:main"
 
 [project.optional-dependencies]
 dev = [
@@ -135,6 +136,10 @@ module = [
 ]
 ignore_missing_imports = true
 
+[tool.setuptools]
+py-modules = ["main", "api"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["scanner*", "utils*"]
+

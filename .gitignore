@@ -32,3 +32,9 @@ ms-playwright/
 .pytest_cache/
 .coverage
 coverage.xml
+
+# Build & packaging artifacts
+build/
+dist/
+*.egg-info/
+
