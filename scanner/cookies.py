@@ -17,7 +17,8 @@ def check_cookies(response: requests.Response | Any) -> list[dict[str, str]]:
             results.append({
                 "vuln": f"Cookie '{cookie.name}' sin flag Secure",
                 "risk": "Alto",
-                "detail": "Puede transmitirse por HTTP"
+                "detail": "Puede transmitirse por HTTP",
+                "confidence": "confirmed",
             })
 
         if is_csrf:
@@ -27,7 +28,9 @@ def check_cookies(response: requests.Response | Any) -> list[dict[str, str]]:
             results.append({
                 "vuln": f"Cookie '{cookie.name}' sin flag HttpOnly",
                 "risk": "Alto",
-                "detail": "Accesible desde JavaScript (riesgo XSS)"
+                "detail": "Accesible desde JavaScript (riesgo XSS)",
+                "confidence": "confirmed",
             })
+
 
     return results
