@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -51,6 +52,7 @@ def check_headers(response: requests.Response | Any) -> list[dict[str, str]]:
     is_https = _is_https_response(response)
     is_browser_document = _is_browser_document_response(response)
 
+    # 1. Cabeceras de seguridad faltantes
     for header, (risk, desc) in SECURITY_HEADERS.items():
         if header == "Strict-Transport-Security" and not is_https:
             continue
@@ -66,5 +68,27 @@ def check_headers(response: requests.Response | Any) -> list[dict[str, str]]:
                 "confidence": "confirmed",
             })
 
+    # 2. Auditoría de Content-Security-Policy Débil / Permisivo
+    if is_browser_document:
+        csp = _get_header_case_insensitive(response.headers, "Content-Security-Policy")
+        if csp:
+            csp_lower = csp.lower()
+            weaknesses: list[str] = []
+            if "'unsafe-inline'" in csp_lower and "nonce-" not in csp_lower and "sha256-" not in csp_lower:
+                weaknesses.append("'unsafe-inline' sin nonce/hash")
+            if "'unsafe-eval'" in csp_lower:
+                weaknesses.append("'unsafe-eval' permitido")
+            if re.search(r"(?:script-src|default-src)[^;]*\*", csp_lower):
+                weaknesses.append("comodín '*' en script-src/default-src")
+            if re.search(r"(?:script-src|default-src)[^;]*\bhttp:", csp_lower):
+                weaknesses.append("inclusión de scripts sobre HTTP inseguro")
+
+            if weaknesses:
+                results.append({
+                    "vuln": "Content-Security-Policy Débil o Permisivo",
+                    "risk": "Medio",
+                    "detail": f"La política CSP contiene directivas inseguras que facilitan XSS: {', '.join(weaknesses)}.",
+                    "confidence": "confirmed",
+                })
 
     return results

@@ -51,11 +51,28 @@ def test_xss_payload(
         pass
     return None
 
+VENDOR_INDICATORS: tuple[str, ...] = (
+    "jquery",
+    "react",
+    "vue",
+    "angular",
+    "bootstrap",
+    "chunk-vendors",
+    "vendor",
+    "vendors",
+    "runtime",
+    "webpack",
+    "main.min.js",
+    "polyfills",
+    "bundle.min.js",
+    "core-js",
+)
+
 def analyze_js_code(code: str, script_name: str) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
 
     # Excluir bundles minificados comunes de librerías para evitar falsos positivos masivos en JS cliente
-    if any(lib in script_name.lower() for lib in ["jquery", "react", "vue", "angular", "bootstrap"]):
+    if any(lib in script_name.lower() for lib in VENDOR_INDICATORS):
         return findings
 
     # Patrones de concordancia directa en código propio
@@ -83,6 +100,7 @@ def analyze_js_code(code: str, script_name: str) -> list[dict[str, str]]:
                     "vuln": "Posible XSS basado en DOM (Directo)",
                     "risk": "Medio",
                     "detail": f"{desc} en {script_name}. Código sospechoso: {snippet}",
+                    "confidence": "probable",
                 }
             )
             return findings

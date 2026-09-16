@@ -18,12 +18,19 @@ ERROR_SIGNATURES: list[str] = [
     r"sqlite3::query\(\)",
     r"sqlite_error",
     r"sqlite3\.operationalerror",
-    r"syntax error.*near",
+    r"syntax error at or near\b",
+    r"incorrect syntax near\b",
     r"microsoft OLE DB Provider for SQL Server",
     r"ODBC SQL Server Driver",
     r"ora-[0-9]{5}",
     r"oracle error",
     r"PostgreSQL query failed",
+]
+
+BOOLEAN_PAIRS: list[tuple[str, str]] = [
+    ("' AND '1'='1", "' AND '1'='2"),
+    ("1 AND 1=1", "1 AND 1=2"),
+    ("') AND ('1'='1", "') AND ('1'='2"),
 ]
 
 TIME_PAYLOADS: list[str] = [
@@ -108,6 +115,60 @@ def test_time_sqli(
     return None
 
 
+def test_boolean_sqli(
+    parsed: Any,
+    params: dict[str, list[str]],
+    param: str,
+    true_payload: str,
+    false_payload: str,
+    baseline_body: str = "",
+    session: Optional[requests.Session] = None,
+) -> Optional[dict[str, str]]:
+    """Prueba inyecciones SQL booleanas/inferenciales comparando condición verdadera vs falsa."""
+    if not baseline_body:
+        return None
+
+    client = session if session is not None else requests
+
+    test_params_true = params.copy()
+    test_params_true[param] = [true_payload]
+    url_true = urlunparse(parsed._replace(query=urlencode(test_params_true, doseq=True)))
+
+    test_params_false = params.copy()
+    test_params_false[param] = [false_payload]
+    url_false = urlunparse(parsed._replace(query=urlencode(test_params_false, doseq=True)))
+
+    try:
+        r_true = client.get(url_true, timeout=5)
+        if r_true.status_code != 200:
+            return None
+
+        r_false = client.get(url_false, timeout=5)
+
+        base_len = len(baseline_body)
+        true_len = len(r_true.text)
+        false_len = len(r_false.text)
+
+        diff_true = abs(true_len - base_len)
+        diff_false = abs(false_len - base_len)
+
+        if diff_true <= 40 and (diff_false >= 60 or r_false.status_code != 200) and r_true.text != r_false.text:
+            return {
+                "vuln": f"SQLi Booleano Confirmado en parámetro '{param}'",
+                "risk": "Alto",
+                "detail": (
+                    f"Inyección SQL inferencial/booleana confirmada en '{param}'. "
+                    f"Condición Verdadera ('{true_payload}') replica la respuesta base mientras que "
+                    f"Condición Falsa ('{false_payload}') altera la respuesta "
+                    f"(Diferencia: {abs(true_len - false_len)} bytes)."
+                ),
+                "confidence": "confirmed",
+            }
+    except requests.RequestException:
+        pass
+    return None
+
+
 AUTH_BYPASS_PAYLOADS: list[str] = ["' OR 1=1--", "' OR '1'='1", "admin'--", "') OR ('1'='1--"]
 
 def test_json_sqli(
@@ -152,6 +213,7 @@ def test_json_sqli(
                                 "vuln": f"Bypass de Autenticación por SQLi en cuerpo JSON ('{key}')",
                                 "risk": "Crítico",
                                 "detail": f"Autenticación exitosa (HTTP 200) en '{url}' con payload en '{key}': {bypass_p}",
+                                "confidence": "confirmed",
                             })
                             return results
                     except requests.RequestException:
@@ -170,6 +232,7 @@ def test_json_sqli(
                                 "vuln": f"Posible SQLi (Error) en cuerpo JSON ('{key}')",
                                 "risk": "Alto",
                                 "detail": f"Error de Base de Datos confirmado en '{url}' en campo '{key}' con payload: {err_p}",
+                                "confidence": "confirmed",
                             })
                             return results
                 except requests.RequestException:
@@ -204,11 +267,15 @@ def check_sqli(
     except requests.RequestException:
         baseline_time = 1.0
 
-    tasks = []
+    tasks: list[tuple[str, str, Any]] = []
 
     for param in params:
         for payload in ERROR_PAYLOADS:
             tasks.append(("error", param, payload))
+
+    for param in params:
+        for true_p, false_p in BOOLEAN_PAIRS:
+            tasks.append(("boolean", param, (true_p, false_p)))
 
     for param in params:
         for payload in TIME_PAYLOADS:
@@ -218,9 +285,11 @@ def check_sqli(
         futures = {}
         for task_type, param, payload in tasks:
             if task_type == "error":
-                fut = executor.submit(test_error_sqli, parsed, params, param, payload, baseline_body, session)
+                fut = executor.submit(test_error_sqli, parsed, params, param, str(payload), baseline_body, session)
+            elif task_type == "boolean" and isinstance(payload, tuple):
+                fut = executor.submit(test_boolean_sqli, parsed, params, param, payload[0], payload[1], baseline_body, session)
             else:
-                fut = executor.submit(test_time_sqli, parsed, params, param, payload, baseline_time, url, session)
+                fut = executor.submit(test_time_sqli, parsed, params, param, str(payload), baseline_time, url, session)
             futures[fut] = (param, task_type)
 
         flagged_params = set()
