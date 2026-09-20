@@ -1,0 +1,48 @@
+name: Security Benchmark CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  empirical-benchmark:
+    runs-on: ubuntu-latest
+
+    services:
+      juiceshop:
+        image: bkimminich/juice-shop:latest
+        ports:
+          - 3000:3000
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest requests responses
+
+      - name: Wait for Juice Shop
+        run: |
+          timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null; do sleep 2; done'
+
+      - name: Run Empirical Benchmark & Regression Check
+        run: |
+          python scripts/run_benchmarks.py --juiceshop-url http://localhost:3000 --fail-on-regression
+
+      - name: Archive Benchmark Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-reports
+          path: reports/benchmark_history.json

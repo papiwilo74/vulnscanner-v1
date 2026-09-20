@@ -177,9 +177,25 @@ def check_xss(url: str, html_content: Optional[str] = None, session: Optional[re
         except requests.RequestException:
             baselines[param] = ""
 
+    from scanner.context_fuzzer import detect_reflection_context, generate_contextual_payloads
+
     tasks = []
     for param in params:
-        for payload in XSS_PAYLOADS:
+        probe = "vScanProbe74"
+        test_params = params.copy()
+        test_params[param] = [probe]
+        probe_url = urlunparse(parsed._replace(query=urlencode(test_params, doseq=True)))
+        param_payloads = XSS_PAYLOADS.copy()
+        try:
+            r_probe = client.get(probe_url, timeout=5)
+            if probe in r_probe.text:
+                contexts = detect_reflection_context(r_probe.text, probe)
+                if contexts:
+                    param_payloads = generate_contextual_payloads(contexts)
+        except requests.RequestException:
+            pass
+
+        for payload in param_payloads:
             tasks.append((param, payload))
 
     with ThreadPoolExecutor(max_workers=10) as executor:

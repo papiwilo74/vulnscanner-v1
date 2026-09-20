@@ -68,10 +68,99 @@ def is_version_vulnerable(detected_version: str, max_vulnerable_version: str) ->
         return False
     return dv <= mv
 
-def check_library_vulnerabilities(lib_name: str, detected_version: str) -> list[dict[str, str]]:
-    """Devuelve hallazgos si la versión detectada es vulnerable."""
+_OSV_CACHE: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+
+def query_osv_vulnerabilities(
+    lib_name: str,
+    version: str,
+    ecosystem: str = "npm",
+    session: Optional[requests.Session] = None,
+    timeout: float = 4.0,
+) -> list[dict[str, str]]:
+    """
+    Consulta la API pública de OSV.dev (Open Source Vulnerabilities)
+    para verificar si una versión específica de un paquete tiene CVEs o GHSAs conocidos.
+    """
+    cache_key = (lib_name.lower(), version, ecosystem.lower())
+    if cache_key in _OSV_CACHE:
+        return _OSV_CACHE[cache_key]
+
     findings: list[dict[str, str]] = []
+    client = session if session is not None else requests
+    api_url = "https://api.osv.dev/v1/query"
+    payload = {
+        "package": {
+            "name": lib_name.lower(),
+            "ecosystem": ecosystem,
+        },
+        "version": version,
+    }
+
+    try:
+        r = client.post(api_url, json=payload, timeout=timeout)
+        if r.status_code == 200:
+            data = r.json()
+            vulns = data.get("vulns", [])
+            for item in vulns:
+                vuln_id = item.get("id", "Vulnerabilidad Desconocida")
+                aliases = item.get("aliases", [])
+                cve_ref = next((a for a in aliases if a.startswith("CVE-")), vuln_id)
+                summary = item.get("summary") or item.get("details", "")[:120]
+
+                # Mapear severidad de OSV a niveles del escáner
+                db_specific = item.get("database_specific", {})
+                sev_raw = db_specific.get("severity", "") if isinstance(db_specific, dict) else ""
+                sev_upper = str(sev_raw).upper()
+
+                if "CRITICAL" in sev_upper:
+                    risk = "Crítico"
+                elif "HIGH" in sev_upper:
+                    risk = "Alto"
+                elif "LOW" in sev_upper:
+                    risk = "Bajo"
+                else:
+                    risk = "Medio"
+
+                findings.append({
+                    "vuln": f"Componente Vulnerable ({lib_name} v{version} - {cve_ref})",
+                    "risk": risk,
+                    "detail": (
+                        f"La versión {version} de '{lib_name}' está registrada en OSV.dev "
+                        f"con vulnerabilidad ({cve_ref}): {summary}. "
+                        f"Se recomienda actualizar inmediatamente a una versión parcheada."
+                    ),
+                    "confidence": "confirmed",
+                })
+
+            _OSV_CACHE[cache_key] = findings
+            return findings
+    except (requests.RequestException, ValueError):
+        pass
+
+    return findings
+
+
+def check_library_vulnerabilities(
+    lib_name: str,
+    detected_version: str,
+    session: Optional[requests.Session] = None,
+    use_osv: bool = True,
+) -> list[dict[str, str]]:
+    """
+    Devuelve hallazgos si la versión detectada es vulnerable.
+    Consulta primero la API dinámica de OSV.dev; si no hay respuesta o falla,
+    recurre a la base de datos local de respaldo.
+    """
     lib_key = lib_name.lower()
+
+    # 1. Consulta dinámica a OSV.dev si está habilitado
+    if use_osv:
+        osv_findings = query_osv_vulnerabilities(lib_key, detected_version, session=session)
+        if osv_findings:
+            return osv_findings
+
+    # 2. Respaldo (Fallback) con diccionario local si OSV no devolvió resultados o está offline
+    findings: list[dict[str, str]] = []
     if lib_key not in VULNERABLE_LIBS:
         return findings
 
@@ -155,7 +244,7 @@ def check_sca(url: str, html_content: Optional[str] = None, session: Optional[re
 
     # 3. Evaluar versiones detectadas contra la base de datos de vulnerabilidades
     for lib_name, version in detected_libs.items():
-        findings = check_library_vulnerabilities(lib_name, version)
+        findings = check_library_vulnerabilities(lib_name, version, session=session)
         results.extend(findings)
 
     return results

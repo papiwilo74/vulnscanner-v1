@@ -87,6 +87,7 @@ class ScanConfig:
     allow_private: bool = False
     iast_url: Optional[str] = None
     enable_attack_chain: bool = True
+    session_macro: Any = None
 
     @classmethod
     def from_profile(cls, profile: ScanProfile, target: str = "", **overrides: Any) -> "ScanConfig":
@@ -116,6 +117,11 @@ class ScanEngine:
         self._circuit_state: str = "CLOSED"  # "CLOSED", "OPEN", "HALF-OPEN"
         self._consecutive_throttles: int = 0
         self._circuit_open_until: float = 0.0
+
+        self.session_manager: Optional[Any] = None
+        if getattr(self.config, "session_macro", None):
+            from scanner.session_macro import StateAwareSessionManager
+            self.session_manager = StateAwareSessionManager(macro=self.config.session_macro)
 
     @property
     def current_rps(self) -> float:
