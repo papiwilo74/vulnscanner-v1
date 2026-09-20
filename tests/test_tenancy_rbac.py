@@ -81,7 +81,8 @@ def test_tenancy_organization_and_user_creation(temp_tenancy: TenancyManager) ->
     assert decoded_user.id == admin_usr.id
 
 
-def test_api_auth_and_tenant_isolation() -> None:
+def test_api_auth_and_tenant_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("api.run_scan_in_background", lambda task_id, req: None)
     client = TestClient(app)
 
     # 1. Registrar Organización A y Usuario A

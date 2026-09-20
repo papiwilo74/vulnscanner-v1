@@ -107,7 +107,8 @@ def test_cluster_failover_reaping(temp_cluster: ClusterCoordinator) -> None:
     assert reclaimed.task_id == "task_failover_01"
 
 
-def test_api_cluster_endpoints() -> None:
+def test_api_cluster_endpoints(monkeypatch: pytest.MonkeyPatch, temp_cluster: ClusterCoordinator) -> None:
+    monkeypatch.setattr("api.cluster_mgr", temp_cluster)
     client = TestClient(app)
 
     # 1. Registrar Worker vía API

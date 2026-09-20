@@ -30,7 +30,7 @@ jobs:
           pip install mypy
           pip install -r requirements.txt
       - name: Type check with mypy --strict
-        run: mypy scanner utils api.py main.py --strict
+        run: mypy --explicit-package-bases scanner utils api.py main.py tests scripts --strict
 
   security-scan:
     runs-on: ubuntu-latest
@@ -44,7 +44,7 @@ jobs:
           pip install bandit pip-audit
           pip install -r requirements.txt
       - name: Run Bandit SAST
-        run: bandit -r scanner api.py main.py -c bandit.yaml
+        run: bandit -r scanner api.py main.py utils scripts -c bandit.yaml
       - name: Run pip-audit SCA
         run: pip-audit -r requirements.txt
 
