@@ -234,6 +234,8 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          base_branch: str = "main",
          what_if_nodes: Optional[list[str]] = None,
          param_fuzz: bool = False,
+         session_macro_file: Optional[str] = None,
+         sentinel_url: Optional[str] = None,
          progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
@@ -251,6 +253,26 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         config.max_rps = int(1.0 / delay)
     if passive:
         config.active_payloads = False
+
+    if session_macro_file and os.path.exists(session_macro_file):
+        try:
+            import json
+
+            from scanner.session_macro import MacroStep, SessionMacro
+            with open(session_macro_file, encoding="utf-8") as f:
+                macro_data = json.load(f)
+                steps = [MacroStep(**s) for s in macro_data.get("steps", [])]
+                config.session_macro = SessionMacro(
+                    name=macro_data.get("name", "cli_macro"),
+                    steps=steps,
+                    sentinel_url=sentinel_url or macro_data.get("sentinel_url"),
+                    sentinel_expected_status=macro_data.get("sentinel_expected_status", 200),
+                    login_redirect_patterns=macro_data.get("login_redirect_patterns", ["/login", "/auth"]),
+                    headers_to_persist=macro_data.get("headers_to_persist", {}),
+                )
+                logger.info("[SESSION MACRO] Macro de sesión cargado: %s", config.session_macro.name)
+        except Exception as err:
+            logger.error("Error al cargar macro de sesión '%s': %s", session_macro_file, err)
 
     engine = ScanEngine(config)
     try:
@@ -588,9 +610,21 @@ def main() -> None:
     parser.add_argument("--ai-feedback", type=str, nargs=2, metavar=("PAYLOAD", "LABEL"),
                         help="Registra feedback de analista para Active Learning (ej: --ai-feedback '<script>' malicious)")
 
+    parser.add_argument("--session-macro", type=str, default=None,
+                        help="Ruta a archivo JSON con la definición del macro de autenticación interactiva")
+    parser.add_argument("--sentinel-url", type=str, default=None,
+                        help="URL centinela para comprobar sesión viva y forzar re-autenticación automática")
+    parser.add_argument("--benchmark", action="store_true",
+                        help="Ejecuta el arnés de benchmark automatizado contra aplicaciones locales (Juice Shop / PyGoat)")
+
     args = parser.parse_args()
     if not args.worker:
         print(OMNIBREACH_BANNER)
+
+    if args.benchmark:
+        from scripts.run_benchmarks import main as run_benchmarks_main
+        run_benchmarks_main()
+        sys.exit(0)
 
     if args.worker:
         from scanner.cluster import ScanningWorkerDaemon
@@ -877,6 +911,8 @@ def main() -> None:
             base_branch=args.base_branch,
             what_if_nodes=args.what_if,
             param_fuzz=args.param_fuzz,
+            session_macro_file=args.session_macro,
+            sentinel_url=args.sentinel_url,
         )
     finally:
         if lab_server:

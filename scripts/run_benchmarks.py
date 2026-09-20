@@ -19,7 +19,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tests.benchmark_juiceshop import BenchmarkMetrics, run_juiceshop_benchmark
+from tests.benchmark_juiceshop import run_juiceshop_benchmark
 from tests.benchmark_pygoat import run_pygoat_benchmark
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
