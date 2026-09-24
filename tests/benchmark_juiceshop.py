@@ -77,7 +77,11 @@ def fetch_juice_shop_challenges(base_url: str) -> list[dict[str, Any]]:
     try:
         r = requests.get(f"{base_url}/api/Challenges", timeout=6)
         if r.status_code == 200:
-            return r.json().get("data", [])
+            data = r.json()
+            if isinstance(data, dict):
+                items = data.get("data", [])
+                if isinstance(items, list):
+                    return [c for c in items if isinstance(c, dict)]
     except Exception as e:
         print(f"[!] Advertencia: No se pudo conectar a /api/Challenges: {e}")
     return []

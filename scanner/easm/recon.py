@@ -100,7 +100,7 @@ class DigitalPerimeterMapper:
         url = f"https://crt.sh/?q=%.{clean_domain}&output=json"
 
         try:
-            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) OmniBreach-EASM/3.0"}
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) OmniBreach-EASM/3.8"}
             resp = requests.get(url, headers=headers, timeout=12)
             if resp.status_code == 200:
                 try:

@@ -1,6 +1,6 @@
-"""Generador de Reportes Ejecutivos en PDF para VulnScanner Enterprise.
+"""Generador de Reportes Ejecutivos en PDF para OmniBreach v3.8.
 
-Produce documentos formales de auditoría para comités de riesgo y CISOs,
+Produce documentos formales de auditoría para comités de riesgo y evaluación técnica,
 incluyendo matrices de cumplimiento normativo (PCI-DSS v4.0, ISO/IEC 27001, OWASP Top 10),
 desglose de severidad CVSS v3.1, recomendaciones y acta de firma de auditoría.
 """
@@ -113,7 +113,7 @@ def generate_pdf_report(
     story: list[Any] = []
 
     # 1. Portada / Encabezado
-    story.append(Paragraph("VULNSCANNER ENTERPRISE", title_style))
+    story.append(Paragraph("OMNIBREACH v3.8", title_style))
     story.append(Paragraph("Informe Formal de Auditoría de Seguridad & Cumplimiento Normativo", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=2, color=accent_color, spaceAfter=14))
 
@@ -242,7 +242,7 @@ def generate_pdf_report(
     story.append(Paragraph("4. Acta de Cierre y Conformidad de Auditoría", h2_style))
     sig_data = [
         [
-            Paragraph("<b>Emitido por:</b><br/>Auditor Líder de Ciberseguridad<br/>VulnScanner Enterprise Security Suite", body_style),
+            Paragraph("<b>Emitido por:</b><br/>Auditor de Seguridad<br/>OmniBreach v3.8 Security Suite", body_style),
             Paragraph("<b>Recibido y Aprobado por:</b><br/>Responsable de Aplicaciones / CISO<br/>Firma: ________________________", body_style),
         ],
         [

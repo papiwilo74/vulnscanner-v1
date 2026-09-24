@@ -1,4 +1,4 @@
-"""Cliente HTTP Adaptativo y Evasión Anti-WAF para OmniBreach Enterprise.
+"""Cliente HTTP Adaptativo y Evasión Anti-WAF para OmniBreach v3.8.
 
 Implementa control de flujo dinámico estilo AIMD (Additive Increase, Multiplicative Decrease),
 manejo inteligente de cabeceras 'Retry-After', rotación de perfiles de navegador y

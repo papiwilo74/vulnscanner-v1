@@ -8,6 +8,7 @@ uvicorn>=0.20.0
 reportlab>=4.0.0
 responses>=0.23.0
 httpx>=0.25.0
+psycopg2-binary>=2.9.0
 
 # Type stubs (ensures out-of-the-box mypy --strict pass without manual installs)
 types-requests>=2.31.0

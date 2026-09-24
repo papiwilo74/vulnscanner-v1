@@ -1,8 +1,8 @@
-# Módulo 08: Arquitectura Avanzada v5.0.0 — SCA en Tiempo Real, Macros de Sesión, Fuzzing Contextual y Harness de Benchmarks
+# Módulo 08: Arquitectura Avanzada v3.8 — SCA en Tiempo Real, Macros de Sesión, Fuzzing Contextual y Harness de Benchmarks
 
-## 1. El Salto a v5.0.0: De Escáner Heurístico a Plataforma Adaptativa
+## 1. El Salto a v3.8: De Escáner Heurístico a Motor Adaptativo
 
-La versión 5.0.0 de OmniBreach introduce cuatro saltos de ingeniería que transforman la forma en que el motor interactúa con aplicaciones web modernas:
+La versión 3.8 de OmniBreach introduce cuatro saltos de ingeniería que transforman la forma en que el motor interactúa con aplicaciones web modernas:
 1. **Inteligencia en Vivo (SCA Dinámico):** Reemplazo de diccionarios locales rígidos por consultas asíncronas a bases de datos de vulnerabilidades globales (OSV.dev).
 2. **Conciencia de Estado (State-Aware Sessions):** Capacidad de auditar aplicaciones de página única (SPAs) y SaaS protegidos por autenticación compleja sin perder la sesión.
 3. **Fuzzing Quirúrgico (Context-Aware AST):** Detección matemática de la posición de la entrada en el DOM antes de disparar payloads.

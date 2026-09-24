@@ -567,7 +567,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <div class="nav-container">
             <div class="brand-group">
                 <div class="brand-logo">VS</div>
-                <div class="brand-name">VulnScanner Enterprise</div>
+                <div class="brand-name">OmniBreach v3.8</div>
             </div>
             <div class="header-actions">
                 <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">
@@ -1004,7 +1004,7 @@ def print_report(
     }
 
     print(f"\n{'='*60}")
-    print(f"  VulnScanner Enterprise -- Reporte para: {url}")
+    print(f"  OmniBreach v3.8 -- Reporte para: {url}")
     print(f"{'='*60}")
     if engine_summary:
         print(f"  Perfil: {engine_summary.get('profile', 'N/A')} | "

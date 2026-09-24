@@ -119,7 +119,7 @@ class GitHubPRClient:
     def generate_pr_body(self, findings: list[Finding], target_url: str) -> str:
         """Construye un cuerpo de Pull Request en Markdown con matriz CVSS y explicación."""
         body = [
-            "## 🛡️ VulnScanner Enterprise — Auto-Remediation Patch",
+            "## 🛡️ OmniBreach v3.8 — Auto-Remediation Patch",
             f"Este Pull Request fue generado automáticamente para resolver vulnerabilidades detectadas en: `{target_url}`.\n",
             "### 📋 Hallazgos Atendidos:",
             "| Severidad | Vulnerabilidad | CVSS v3.1 | CWE | MITRE ATT&CK |",

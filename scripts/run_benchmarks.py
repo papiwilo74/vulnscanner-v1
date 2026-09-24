@@ -39,7 +39,9 @@ class BenchmarkHarness:
         if self.history_path.exists():
             try:
                 with open(self.history_path, encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    if isinstance(data, list):
+                        return [item for item in data if isinstance(item, dict)]
             except (json.JSONDecodeError, OSError):
                 return []
         return []

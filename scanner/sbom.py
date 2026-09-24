@@ -142,9 +142,9 @@ class SBOMGenerator:
                 "component": {
                     "type": "application",
                     "name": "OmniBreach",
-                    "version": "3.0.0",
-                    "description": "Enterprise External Attack Surface Management & Threat Defense",
-                    "purl": "pkg:generic/omnibreach@3.0.0",
+                    "version": "3.8",
+                    "description": "External Attack Surface Management & DAST Scanner",
+                    "purl": "pkg:generic/omnibreach@3.8",
                 },
             },
             "components": cdx_components,
@@ -181,10 +181,10 @@ class SBOMGenerator:
             "dataLicense": "CC0-1.0",
             "SPDXID": doc_id,
             "name": "OmniBreach Software Bill of Materials",
-            "documentNamespace": f"https://spdx.org/spdxdocs/omnibreach-v3.0-{uuid.uuid4().hex[:8]}",
+            "documentNamespace": f"https://spdx.org/spdxdocs/omnibreach-v3.8-{uuid.uuid4().hex[:8]}",
             "creationInfo": {
                 "created": timestamp,
-                "creators": ["Tool: OmniBreach-SBOMGenerator-3.0", "Organization: NovaSec"],
+                "creators": ["Tool: OmniBreach-SBOMGenerator-3.8", "Organization: OmniBreach Project"],
             },
             "packages": spdx_packages,
         }

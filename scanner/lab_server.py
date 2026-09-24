@@ -1,5 +1,5 @@
 """
-Servidor de Laboratorio Aislado (Lab Mode / Hermetic CI) para VulnScanner Enterprise.
+Servidor de Laboratorio Aislado (Lab Mode / Hermetic CI) para OmniBreach v3.8.
 Levanta una aplicación web simulada con vulnerabilidades controladas para permitir:
 1. Pruebas y auditorías locales sin conexión a internet ni dependencias externas.
 2. Demostraciones rápidas y validación en pipelines CI/CD cerrados.

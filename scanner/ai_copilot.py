@@ -1,4 +1,4 @@
-"""OmniBreach Enterprise — Copiloto de Seguridad Ofensiva y Remediación (AI Security Copilot).
+"""OmniBreach v3.8 — Copiloto de Seguridad Ofensiva y Remediación (AI Security Copilot).
 
 Provee un motor de inteligencia híbrido (Groq Cloud ultrarrápido + Ollama local en RTX 4060)
 con cinco modos operativos:
@@ -113,7 +113,7 @@ class HybridLLMClient:
         headers = {
             "Authorization": f"Bearer {self.config.groq_api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "OmniBreach-Copilot/5.0.0",
+            "User-Agent": "OmniBreach-Copilot/3.8",
         }
         payload: dict[str, Any] = {
             "model": self.config.groq_model,
@@ -240,14 +240,15 @@ class FindingTriager:
         messages = [
             {
                 "role": "system",
-                "content": "Eres el Lead Security Analyst de OmniBreach Enterprise. Tu misión es triajar vulnerabilidades con precisión quirúrgica sin falsos positivos."
+                "content": "Eres el Lead Security Analyst de OmniBreach v3.8. Tu misión es triajar vulnerabilidades con precisión quirúrgica sin falsos positivos."
             },
             {"role": "user", "content": prompt}
         ]
 
         raw, provider, latency = self.client.generate(messages, json_mode=True)
         try:
-            data = json.loads(raw)
+            parsed = json.loads(raw)
+            data: dict[str, Any] = parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             data = {
                 "human_explanation": raw[:300],
@@ -299,7 +300,8 @@ class RemediationGenerator:
 
         raw, provider, latency = self.client.generate(messages, json_mode=True)
         try:
-            data = json.loads(raw)
+            parsed = json.loads(raw)
+            data: dict[str, Any] = parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             data = {
                 "language": "python",
@@ -492,7 +494,8 @@ class ExecutiveSummaryGenerator:
 
         raw, provider, latency = self.client.generate(messages, json_mode=True)
         try:
-            data = json.loads(raw)
+            parsed = json.loads(raw)
+            data: dict[str, Any] = parsed if isinstance(parsed, dict) else {}
         except json.JSONDecodeError:
             posture = "CRÍTICA" if counts["critical"] > 0 else ("ALTA" if counts["high"] > 0 else "MODERADA")
             data = {

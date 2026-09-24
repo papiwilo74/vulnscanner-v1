@@ -1,4 +1,4 @@
-"""Motor de Cumplimiento Normativo (Compliance Engine) para OmniBreach Enterprise.
+"""Motor de Cumplimiento Normativo (Compliance Engine) para OmniBreach v3.8.
 
 Mapea hallazgos de seguridad contra los principales estándares y marcos regulatorios:
 - PCI-DSS v4.0 (Payment Card Industry Data Security Standard)

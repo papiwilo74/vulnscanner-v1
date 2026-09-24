@@ -168,7 +168,7 @@ class SubdomainTakeoverScanner:
             return None
 
         # Realizar prueba HTTP/HTTPS para validar si el servicio responde con el mensaje huérfano
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) OmniBreach-EASM-Takeover/3.5"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) OmniBreach-EASM-Takeover/3.8"}
         urls_to_try = [f"https://{subdomain}", f"http://{subdomain}"]
 
         for url in urls_to_try:

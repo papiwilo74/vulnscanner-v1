@@ -1,4 +1,4 @@
-# Política de Gestión de Vulnerabilidades y CVEs (VulnScanner Enterprise)
+# Política de Gestión de Vulnerabilidades y CVEs (OmniBreach v3.8)
 
 Esta política documenta los mecanismos, estándares y herramientas utilizadas por **VulnScanner** para la prevención, detección, seguimiento y mitigación de vulnerabilidades conocidas (CVEs) en su cadena de suministro de software (Software Supply Chain Security).
 

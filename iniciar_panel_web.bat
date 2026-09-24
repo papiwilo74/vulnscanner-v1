@@ -1,7 +1,7 @@
 @echo off
-title OmniBreach v2.5 - Real-Time SOC Dashboard
+title OmniBreach v3.8 - Real-Time SOC Dashboard
 echo ======================================================================
-echo          OmniBreach v2.5 - Panel Web SOC
+echo          OmniBreach v3.8 - Panel Web SOC
 echo ======================================================================
 echo.
 echo Iniciando servidor web de telemetria en vivo...

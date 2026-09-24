@@ -1,7 +1,7 @@
-# Guía Oficial de Despliegue en la Nube — OmniBreach v2.5
+# Guía Oficial de Despliegue en la Nube — OmniBreach v3.8
 ## Arquitectura Serverless: Vercel (Frontend) + Render (API Backend) + Neon (PostgreSQL)
 
-Esta guía detalla el procedimiento paso a paso para desplegar **OmniBreach v2.5** en un entorno de producción en la nube utilizando los niveles gratuitos (**Free Tier**) de **Vercel**, **Render** y **Neon**, optimizado para evitar cuellos de botella de memoria RAM y suspensión por inactividad.
+Esta guía detalla el procedimiento paso a paso para desplegar **OmniBreach v3.8** en un entorno en la nube utilizando los niveles gratuitos (**Free Tier**) de **Vercel**, **Render** y **Neon**, optimizado para evitar cuellos de botella de memoria RAM y suspensión por inactividad.
 
 ---
 
@@ -141,7 +141,7 @@ Una vez completados los pasos:
      {
        "status": "healthy",
        "service": "OmniBreach API",
-       "version": "2.5",
+       "version": "3.8",
        "database": "neon-postgresql",
        "lightweight_mode": true
      }

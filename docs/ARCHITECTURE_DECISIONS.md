@@ -1,7 +1,7 @@
 # Registros de Decisiones Arquitecturales (ADR)
-## VulnScanner Enterprise v2.4.0
+## OmniBreach v3.8
 
-Este documento formaliza las decisiones de diseño arquitectural clave adoptadas en el desarrollo de **VulnScanner Enterprise**, detallando el contexto técnico, las alternativas evaluadas, las razones de la elección y las consecuencias operativas.
+Este documento formaliza las decisiones de diseño arquitectural clave adoptadas en el desarrollo de **OmniBreach v3.8**, detallando el contexto técnico, las alternativas evaluadas, las razones de la elección y las consecuencias operativas.
 
 ---
 

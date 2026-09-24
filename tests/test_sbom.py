@@ -1,6 +1,7 @@
-﻿"""Unit tests for Software Bill of Materials (SBOM) Generator."""
+"""Unit tests for Software Bill of Materials (SBOM) Generator."""
 import json
 import os
+from pathlib import Path
 
 from scanner.sbom import SBOMGenerator
 
@@ -40,7 +41,7 @@ def test_sbom_spdx_generation() -> None:
     assert len(spdx["packages"]) >= 1
     assert any("omnibreach" in p["name"] for p in spdx["packages"])
 
-def test_sbom_export_file(tmp_path) -> None:
+def test_sbom_export_file(tmp_path: Path) -> None:
     gen = SBOMGenerator()
     out_file = str(tmp_path / "test_sbom.json")
     saved = gen.export_to_file(out_file, format_type="cyclonedx")

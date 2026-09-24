@@ -29,7 +29,7 @@ def test_github_pr_client_methods(sample_findings):
 
     # 1. Test generate_pr_body
     body = client.generate_pr_body(sample_findings, "https://ejemplo.com")
-    assert "VulnScanner Enterprise" in body
+    assert "OmniBreach v3.8" in body
     assert "X-Frame-Options" in body
     assert "CVSS v3.1" in body
     assert "CWE-693" in body
