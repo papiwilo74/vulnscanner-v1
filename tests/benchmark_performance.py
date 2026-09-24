@@ -1,5 +1,5 @@
 """
-Benchmark Estandarizado de Rendimiento para VulnScanner Enterprise v2.4.0.
+Benchmark Estandarizado de Rendimiento para OmniBreach v3.8.
 Mide de forma determinista y reproducible:
 - Throughput (Peticiones por segundo / RPS)
 - Consumo pico de memoria RAM (MB)
@@ -115,7 +115,7 @@ def run_engine_throughput_benchmark(target_url: str, num_requests: int = 100) ->
 
 def main() -> None:
     print("=" * 70)
-    print("  VulnScanner Enterprise v2.4.0 -- Standardized Performance Benchmark")
+    print("  OmniBreach v3.8 -- Standardized Performance Benchmark")
     print("=" * 70)
 
     server = LabServer()
@@ -146,7 +146,7 @@ def main() -> None:
     benchmark_json_path = os.path.join(reports_dir, "benchmark_performance.json")
 
     summary_payload = {
-        "scanner_version": "2.4.0 Enterprise Edition",
+        "scanner_version": "3.8",
         "benchmark_date": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
         "profiles": results,
         "engine_concurrency": engine_bench,
@@ -166,7 +166,7 @@ def main() -> None:
     normal_res = results.get("normal", {})
     norm_ram = f"{normal_res.get('peak_memory_mb', 'N/A')} MB"
     concurr_rps = f"{engine_bench.get('throughput_rps', 'N/A')} req/s"
-    print(f"{'VulnScanner v2.4 (Parallel)':<30} | {concurr_rps:<16} | {norm_ram:<12} | {'< 0.1s':<10}")
+    print(f"{'OmniBreach v3.8 (Parallel)':<30} | {concurr_rps:<16} | {norm_ram:<12} | {'< 0.1s':<10}")
     print("=" * 70)
     print(f"[OK] Reporte de benchmark guardado en: {benchmark_json_path}\n")
 

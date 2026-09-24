@@ -17,7 +17,7 @@ def test_oast_local_server_lifecycle():
     # Enviar una petición real al servidor de escucha local
     resp = requests.get(target_url, timeout=3)
     assert resp.status_code == 200
-    assert resp.headers.get("X-OAST-Engine") == "OmniBreach-Enterprise"
+    assert resp.headers.get("X-OAST-Engine") == "OmniBreach-OAST"
     assert "<!-- OAST Correlated -->" in resp.text
 
     hits = server.get_interactions_for_token(token)

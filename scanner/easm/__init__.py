@@ -1,5 +1,5 @@
 """
-OmniBreach v3.0 — External Attack Surface Management (EASM) Engine.
+OmniBreach v3.8 — External Attack Surface Management (EASM) Engine.
 Mapeo de perímetro digital, descubrimiento de activos en la nube, detección de puertos
 críticos para Ransomware y correlación de vulnerabilidades explotadas activamente (CISA KEV).
 """

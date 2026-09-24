@@ -46,7 +46,7 @@ class OASTHTTPHandler(BaseHTTPRequestHandler):
 
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
-        self.send_header("X-OAST-Engine", "OmniBreach-Enterprise")
+        self.send_header("X-OAST-Engine", "OmniBreach-OAST")
         self.end_headers()
         self.wfile.write(b"<!-- OAST Correlated -->")
 

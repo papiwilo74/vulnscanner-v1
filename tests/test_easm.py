@@ -1,5 +1,5 @@
 """
-Suite de pruebas unitarias y de integración para OmniBreach v3.0 EASM Engine.
+Suite de pruebas unitarias y de integración para OmniBreach v3.8 EASM Engine.
 Valida cartografía perimetral, escaneo de puertos de alto riesgo,
 correlación CISA KEV, inteligencia de amenazas y el API REST.
 """
