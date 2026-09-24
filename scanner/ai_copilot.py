@@ -93,6 +93,26 @@ class DataSanitizer:
 # Configuración y Cliente Híbrido LLM (Groq + Ollama Local)
 # ─────────────────────────────────────────────────────────────
 
+def _load_env_file() -> None:
+    """Carga variables desde el archivo .env si existe sin requerir dependencias externas."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.isfile(env_path):
+        try:
+            with open(env_path, encoding="utf-8") as f:
+                for line in f:
+                    s_line = line.strip()
+                    if s_line and not s_line.startswith("#") and "=" in s_line:
+                        k, v = s_line.split("=", 1)
+                        clean_k = k.strip()
+                        clean_v = v.strip().strip("'\"")
+                        if clean_k not in os.environ:
+                            os.environ[clean_k] = clean_v
+        except Exception:
+            pass
+
+_load_env_file()
+
+
 @dataclass
 class AIConfig:
     """Configuración del motor híbrido de Inteligencia Artificial."""
@@ -101,12 +121,12 @@ class AIConfig:
     groq_endpoint: str = "https://api.groq.com/openai/v1/chat/completions"
 
     ollama_url: str = field(default_factory=lambda: os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/"))
-    ollama_model: str = field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "qwen2.5:7b").strip())
+    ollama_model: str = field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "llama3.1:8b").strip())
 
     prefer_local: bool = field(
-        default_factory=lambda: os.getenv("COPILOT_PREFER_LOCAL", "false").lower() in ("true", "1", "yes")
+        default_factory=lambda: os.getenv("COPILOT_PREFER_LOCAL", "true").lower() in ("true", "1", "yes")
     )
-    timeout_seconds: float = 20.0
+    timeout_seconds: float = field(default_factory=lambda: float(os.getenv("COPILOT_TIMEOUT", "60.0")))
 
 
 class HybridLLMClient:
