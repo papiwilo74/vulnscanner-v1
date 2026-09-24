@@ -122,7 +122,7 @@ _EPHEMERAL_JWT_SECRET = secrets.token_hex(32)
 
 
 class JWTManager:
-    """Gestor criptográfico de tokens JWT (HS256) sin dependencias externas pesadas."""
+    """Gestor criptográfico de tokens JWT (HS256) con lista negra de revocación en tiempo real."""
 
     def __init__(self, secret: Optional[str] = None) -> None:
         configured_secret = (
@@ -136,6 +136,19 @@ class JWTManager:
                 "OMNIBREACH_JWT_SECRET con una clave de alta entropía (mínimo 32 caracteres)."
             )
         self.secret = (configured_secret or _EPHEMERAL_JWT_SECRET).encode("utf-8")
+        self._revoked_jtis: set[str] = set()
+        self._lock = threading.Lock()
+
+    def revoke_jti(self, jti: str) -> None:
+        """Añade un JTI a la lista negra de revocación."""
+        if jti:
+            with self._lock:
+                self._revoked_jtis.add(jti)
+
+    def is_jti_revoked(self, jti: str) -> bool:
+        """Comprueba si un JTI ha sido revocado."""
+        with self._lock:
+            return jti in self._revoked_jtis
 
     def create_token(self, user: User, expires_in_seconds: int = 86400) -> str:
         header = {"alg": "HS256", "typ": "JWT"}
@@ -176,6 +189,10 @@ class JWTManager:
             exp = payload.get("exp", 0)
             if datetime.datetime.now(datetime.timezone.utc).timestamp() > exp:
                 return None  # Token expirado
+
+            jti = payload.get("jti")
+            if jti and self.is_jti_revoked(jti):
+                return None  # Token revocado (Logout)
 
             return payload if isinstance(payload, dict) else None
         except Exception as e:
@@ -234,6 +251,18 @@ class TenancyManager:
                     FOREIGN KEY (org_id) REFERENCES organizations (id)
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS revoked_tokens (
+                    jti TEXT PRIMARY KEY,
+                    revoked_at TEXT NOT NULL,
+                    expires_at INTEGER NOT NULL
+                )
+            """)
+            # Cargar tokens revocados no expirados
+            now_ts = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+            rows = conn.execute("SELECT jti FROM revoked_tokens WHERE expires_at > ?", (now_ts,)).fetchall()
+            for r in rows:
+                self.jwt.revoke_jti(r["jti"])
             conn.commit()
 
         # Asegurar organización y usuario default para retrocompatibilidad local
@@ -428,3 +457,31 @@ class TenancyManager:
                 )
                 for r in rows
             ]
+
+    def revoke_token(self, token: str) -> bool:
+        """Revoca un token JWT de acceso en tiempo real y lo persiste en la base de datos."""
+        payload = self.jwt.decode_token(token)
+        if not payload or not payload.get("jti"):
+            return False
+
+        jti = str(payload["jti"])
+        self.jwt.revoke_jti(jti)
+        now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        exp = int(payload.get("exp", 0))
+
+        with self._lock, self._connection() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO revoked_tokens (jti, revoked_at, expires_at) VALUES (?, ?, ?)",
+                (jti, now_str, exp),
+            )
+            conn.commit()
+        logger.info("[AUTH] Token JWT revocado exitosamente (JTI: %s)", jti)
+        return True
+
+    def is_token_revoked(self, token: str) -> bool:
+        """Verifica si el token ha sido invalidado o revocado previamente."""
+        payload = self.jwt.decode_token(token)
+        if not payload:
+            return True
+        jti = payload.get("jti")
+        return bool(jti and self.jwt.is_jti_revoked(str(jti)))

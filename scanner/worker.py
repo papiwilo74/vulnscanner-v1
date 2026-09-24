@@ -52,6 +52,12 @@ def run_worker() -> None:
         default=float(os.environ.get("WORKER_POLL_INTERVAL", "2.5")),
         help="Intervalo en segundos entre consultas de tareas disponibles",
     )
+    parser.add_argument(
+        "--cluster-key",
+        type=str,
+        default=os.environ.get("OMNIBREACH_CLUSTER_KEY", os.environ.get("CLUSTER_KEY", None)),
+        help="Clave secreta de autenticación del cluster (OMNIBREACH_CLUSTER_KEY)",
+    )
     args = parser.parse_args()
 
     daemon = ScanningWorkerDaemon(
@@ -59,6 +65,7 @@ def run_worker() -> None:
         name=args.name,
         region=args.region,
         poll_interval=args.poll_interval,
+        cluster_key=args.cluster_key,
     )
 
     def _sig_handler(sig: int, frame: Any) -> None:

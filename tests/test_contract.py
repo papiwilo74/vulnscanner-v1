@@ -115,7 +115,8 @@ class TestFindingContract:
         assert len(sarif["runs"]) == 1
         run = sarif["runs"][0]
         assert "tool" in run
-        assert run["tool"]["driver"]["name"] == "VulnScanner"
+        assert run["tool"]["driver"]["name"] == "OmniBreach"
+        assert run["tool"]["driver"]["version"] == "3.8.0"
         assert len(run["results"]) == 1
 
 

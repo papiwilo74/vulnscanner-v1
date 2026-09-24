@@ -11,10 +11,12 @@ con cinco modos operativos:
 from __future__ import annotations
 
 import ast
+import copy
 import difflib
 import json
 import logging
 import os
+import re
 import shutil
 import time
 from dataclasses import dataclass, field
@@ -25,6 +27,66 @@ import requests
 from scanner.models import Finding
 
 logger = logging.getLogger("OmniBreach.AICopilot")
+
+
+# ─────────────────────────────────────────────────────────────
+# Saneador de Privacidad y Redactor de Datos Sensibles (Guardrails)
+# ─────────────────────────────────────────────────────────────
+
+class DataSanitizer:
+    """Saneador criptográfico y despersonalizador de evidencia para LLMs Cloud y Locales.
+
+    Garantiza que nunca se transmitan tokens Bearer, JWTs, contraseñas, claves API,
+    cookies de sesión ni direccionamiento IP privado/hostnames de intranet corporativa.
+    """
+
+    JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")
+    BEARER_PATTERN = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9_\-\.]{12,}\b")
+    BASIC_AUTH_PATTERN = re.compile(r"(?i)\bBasic\s+[A-Za-z0-9+/=]{12,}\b")
+    API_KEY_PATTERN = re.compile(
+        r"(?i)\b(api[_-]?key|secret|token|password|passwd|auth)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{8,})['\"]?"
+    )
+    COOKIE_PATTERN = re.compile(
+        r"(?i)\b(sessionid|connect\.sid|phpsessid|jsessionid|token)=([a-zA-Z0-9_\-]{8,})\b"
+    )
+    PRIVATE_IPV4_PATTERN = re.compile(
+        r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3})\b"
+    )
+    INTERNAL_HOST_PATTERN = re.compile(r"\b[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*\.(?:local|internal|corp|lan|intranet)\b", re.IGNORECASE)
+    AWS_KEY_PATTERN = re.compile(r"\b(?:AKIA|ABIA|ACCA|ASIA)[A-Z0-9]{16}\b")
+
+    @classmethod
+    def sanitize_text(cls, text: str | None) -> str:
+        """Sanea texto arbitrario reemplazando cadenas confidenciales por marcadores seguros."""
+        if not text:
+            return ""
+        sanitized = cls.JWT_PATTERN.sub("[REDACTED_JWT]", text)
+        sanitized = cls.BEARER_PATTERN.sub("Bearer [REDACTED_TOKEN]", sanitized)
+        sanitized = cls.BASIC_AUTH_PATTERN.sub("Basic [REDACTED_AUTH]", sanitized)
+        sanitized = cls.AWS_KEY_PATTERN.sub("[REDACTED_AWS_KEY]", sanitized)
+        sanitized = cls.COOKIE_PATTERN.sub(r"\1=[REDACTED_SESSION]", sanitized)
+        sanitized = cls.API_KEY_PATTERN.sub(r"\1=[REDACTED_SECRET]", sanitized)
+        sanitized = cls.PRIVATE_IPV4_PATTERN.sub("[REDACTED_IP]", sanitized)
+        sanitized = cls.INTERNAL_HOST_PATTERN.sub("[REDACTED_HOST]", sanitized)
+        return sanitized
+
+    @classmethod
+    def sanitize_finding(cls, finding: Finding) -> Finding:
+        """Crea una copia profunda segura del hallazgo sin secretos ni topología confidencial."""
+        cloned = copy.deepcopy(finding)
+        cloned.affected_url = cls.sanitize_text(cloned.affected_url)
+        cloned.title = cls.sanitize_text(cloned.title)
+        cloned.description = cls.sanitize_text(cloned.description)
+        if cloned.parameter:
+            cloned.parameter = cls.sanitize_text(cloned.parameter)
+        if cloned.evidence:
+            cloned.evidence.request_url = cls.sanitize_text(cloned.evidence.request_url)
+            if cloned.evidence.payload:
+                cloned.evidence.payload = cls.sanitize_text(cloned.evidence.payload)
+            if cloned.evidence.response_fragment:
+                cloned.evidence.response_fragment = cls.sanitize_text(cloned.evidence.response_fragment)
+        return cloned
+
 
 
 # ─────────────────────────────────────────────────────────────
@@ -115,9 +177,14 @@ class HybridLLMClient:
             "Content-Type": "application/json",
             "User-Agent": "OmniBreach-Copilot/3.8",
         }
+        # Sanitizar todo el contenido saliente para prevenir fuga de secretos o topología privada
+        sanitized_messages = [
+            {"role": m["role"], "content": DataSanitizer.sanitize_text(m.get("content", ""))}
+            for m in messages
+        ]
         payload: dict[str, Any] = {
             "model": self.config.groq_model,
-            "messages": messages,
+            "messages": sanitized_messages,
             "temperature": temperature,
         }
         if json_mode:
@@ -212,22 +279,23 @@ class FindingTriager:
 
     def triage_finding(self, finding: Finding) -> dict[str, Any]:
         """Genera el triaje contextual con severidad ajustada e impacto en el negocio."""
+        safe_finding = DataSanitizer.sanitize_finding(finding)
         evidence_str = ""
-        if finding.evidence:
+        if safe_finding.evidence:
             evidence_str = (
-                f"Método: {finding.evidence.request_method}, "
-                f"URL: {finding.evidence.request_url}, "
-                f"Payload: {finding.evidence.payload or 'N/A'}"
+                f"Método: {safe_finding.evidence.request_method}, "
+                f"URL: {safe_finding.evidence.request_url}, "
+                f"Payload: {safe_finding.evidence.payload or 'N/A'}"
             )
 
         prompt = (
             f"Analiza este hallazgo de ciberseguridad y provee un triaje riguroso en formato JSON:\n"
-            f"- Título: {finding.title}\n"
-            f"- Categoría: {finding.category} | Severidad: {finding.severity}\n"
-            f"- URL Afectada: {finding.affected_url or 'N/A'}\n"
-            f"- Parámetro: {finding.parameter or 'N/A'}\n"
-            f"- CWE: {finding.cwe_id} ({finding.cwe_name})\n"
-            f"- MITRE: {finding.mitre_attack_id} ({finding.mitre_attack_name})\n"
+            f"- Título: {safe_finding.title}\n"
+            f"- Categoría: {safe_finding.category} | Severidad: {safe_finding.severity}\n"
+            f"- URL Afectada: {safe_finding.affected_url or 'N/A'}\n"
+            f"- Parámetro: {safe_finding.parameter or 'N/A'}\n"
+            f"- CWE: {safe_finding.cwe_id} ({safe_finding.cwe_name})\n"
+            f"- MITRE: {safe_finding.mitre_attack_id} ({safe_finding.mitre_attack_name})\n"
             f"- Evidencia: {evidence_str}\n\n"
             f"Devuelve un objeto JSON con exactamente estas claves:\n"
             f"1. 'human_explanation': Explicación clara y técnica en español de qué significa esta falla.\n"
@@ -255,11 +323,39 @@ class FindingTriager:
                 "attack_vector": "Vector de ataque directo sobre el endpoint expuesto.",
                 "business_impact": "Posible compromiso de integridad o confidencialidad.",
                 "exploit_difficulty": "medium",
-                "recommended_severity": finding.severity,
+                "recommended_severity": safe_finding.severity,
             }
 
+        data = self._validate_and_reconcile_triage(finding, data)
         data["provider_used"] = provider
         data["latency_ms"] = round(latency, 2)
+        return data
+
+    def _validate_and_reconcile_triage(self, finding: Finding, data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Guardrail anti-alucinaciones:
+        Asegura que la IA no altere la severidad determinista arbitrariamente
+        (por ejemplo, transformar un header informativo en crítico) y que el
+        CWE sea consistente con la clasificación formal del motor.
+        """
+        valid_sevs = {"critical", "high", "medium", "low", "info"}
+        rec_sev = str(data.get("recommended_severity", finding.severity)).lower()
+        if rec_sev not in valid_sevs:
+            rec_sev = finding.severity
+
+        # Si el hallazgo original es 'info' o 'low', evitar que la IA alucine 'critical'
+        rank_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+        orig_rank = rank_order.get(finding.severity.lower(), 2)
+        rec_rank = rank_order.get(rec_sev, 2)
+        if orig_rank >= 3 and rec_rank == 0:
+            logger.warning(
+                "[GUARDRAIL AI] Bloqueada alucinación de severidad: %s -> %s para %s. Restableciendo a %s.",
+                finding.severity, rec_sev, finding.title, finding.severity
+            )
+            rec_sev = finding.severity
+
+        data["recommended_severity"] = rec_sev
+        data["cwe_id"] = finding.cwe_id or "CWE-693"
         return data
 
 
@@ -274,13 +370,14 @@ class RemediationGenerator:
         self.client = client
 
     def generate_patch(self, finding: Finding, tech_stack: list[str] | None = None) -> dict[str, Any]:
+        safe_finding = DataSanitizer.sanitize_finding(finding)
         stack_str = ", ".join(tech_stack) if tech_stack else "Python / FastAPI / Generic Web"
         prompt = (
             f"Genera un parche de código seguro listo para copiar y pegar para solucionar este hallazgo:\n"
-            f"- Vulnerabilidad: {finding.title} ({finding.cwe_id})\n"
-            f"- Categoría: {finding.category}\n"
+            f"- Vulnerabilidad: {safe_finding.title} ({safe_finding.cwe_id})\n"
+            f"- Categoría: {safe_finding.category}\n"
             f"- Stack Tecnológico del Objetivo: {stack_str}\n"
-            f"- Parámetro Vulnerable: {finding.parameter or 'N/A'}\n\n"
+            f"- Parámetro Vulnerable: {safe_finding.parameter or 'N/A'}\n\n"
             f"Devuelve un objeto JSON con estas claves:\n"
             f"1. 'language': lenguaje de programación (ej: 'python', 'javascript', 'nginx').\n"
             f"2. 'filename_hint': nombre típico del archivo (ej: 'security_middleware.py', 'routes.py').\n"
@@ -347,13 +444,15 @@ class AutoPatcher:
         Solicita a la IA la versión securizada de un código y valida su sintaxis antes de devolverla.
         Retorna: (codigo_securizado, diff_unificado).
         """
+        safe_finding = DataSanitizer.sanitize_finding(finding)
+        safe_code = DataSanitizer.sanitize_text(original_code)
         prompt = (
             f"Modifica el siguiente código para neutralizar de raíz la vulnerabilidad de seguridad descrita.\n"
-            f"- Vulnerabilidad: {finding.title} ({finding.cwe_id})\n"
-            f"- Parámetro vulnerable: {finding.parameter or 'N/A'}\n"
+            f"- Vulnerabilidad: {safe_finding.title} ({safe_finding.cwe_id})\n"
+            f"- Parámetro vulnerable: {safe_finding.parameter or 'N/A'}\n"
             f"- Instrucción estricta: Mantén EXACTAMENTE los mismos nombres de funciones, variables y lógica de negocio. "
             f"Solo securiza la entrada, salida o configuración vulnerable.\n\n"
-            f"CÓDIGO ORIGINAL:\n```\n{original_code}\n```\n\n"
+            f"CÓDIGO ORIGINAL:\n```\n{safe_code}\n```\n\n"
             f"Devuelve un JSON con exactamente esta clave:\n"
             f"'patched_code': el código completo resultante listo para compilar sin texto adicional."
         )
@@ -459,21 +558,24 @@ class ExecutiveSummaryGenerator:
         self.client = client
 
     def generate_summary(self, findings: list[Finding], target_url: str) -> dict[str, Any]:
+        safe_findings = [DataSanitizer.sanitize_finding(f) for f in findings]
+        safe_target_url = DataSanitizer.sanitize_text(target_url)
+
         counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
-        for f in findings:
+        for f in safe_findings:
             sev = f.severity.lower()
             if sev in counts:
                 counts[sev] += 1
 
         top_findings = [
-            f"- [{f.severity.upper()}] {f.title} (CWE: {f.cwe_id}) en {f.affected_url or target_url}"
-            for f in sorted(findings, key=lambda x: x.severity_rank)[:5]
+            f"- [{f.severity.upper()}] {f.title} (CWE: {f.cwe_id}) en {f.affected_url or safe_target_url}"
+            for f in sorted(safe_findings, key=lambda x: x.severity_rank)[:5]
         ]
         top_str = "\n".join(top_findings) if top_findings else "No se detectaron hallazgos de severidad alta."
 
         prompt = (
             f"Elabora el Resumen Ejecutivo de la auditoría de seguridad para el CISO y Comité Directivo:\n"
-            f"- Objetivo auditado: {target_url}\n"
+            f"- Objetivo auditado: {safe_target_url}\n"
             f"- Estadísticas de vulnerabilidades: Críticas={counts['critical']}, Altas={counts['high']}, "
             f"Medias={counts['medium']}, Bajas={counts['low']}\n"
             f"- Principales riesgos detectados:\n{top_str}\n\n"
@@ -513,7 +615,7 @@ class ExecutiveSummaryGenerator:
             }
 
         data["counts"] = counts
-        data["target_url"] = target_url
+        data["target_url"] = safe_target_url
         data["provider_used"] = provider
         data["latency_ms"] = round(latency, 2)
         return data
@@ -539,18 +641,22 @@ class InteractiveCopilot:
         """
         Responde preguntas interactivas del auditor basándose en los hallazgos reales.
         """
+        safe_findings = [DataSanitizer.sanitize_finding(f) for f in findings]
+        safe_target_url = DataSanitizer.sanitize_text(target_url)
+        safe_query = DataSanitizer.sanitize_text(query)
+
         # Contextualización resumida de hallazgos para la ventana de contexto
         findings_ctx = []
-        for idx, f in enumerate(findings[:10], start=1):
+        for idx, f in enumerate(safe_findings[:10], start=1):
             findings_ctx.append(
                 f"#{idx} [{f.severity.upper()}] {f.title} (CWE: {f.cwe_id}) | "
-                f"URL: {f.affected_url or target_url} | Param: {f.parameter or 'N/A'}"
+                f"URL: {f.affected_url or safe_target_url} | Param: {f.parameter or 'N/A'}"
             )
         ctx_str = "\n".join(findings_ctx) if findings_ctx else "No hay vulnerabilidades registradas."
 
         system_msg = (
             f"Eres el Copiloto de Seguridad Ofensiva y Remediación de OmniBreach.\n"
-            f"Estás auditando el objetivo: '{target_url}'.\n"
+            f"Estás auditando el objetivo: '{safe_target_url}'.\n"
             f"Vulnerabilidades detectadas en esta sesión:\n{ctx_str}\n\n"
             f"Tu tarea es responder preguntas técnicas con alta precisión: generar comandos cURL para reproducción, "
             f"explicar cómo mitigar con WAF o código, redactar tickets para Jira o priorizar remediaciones. "
@@ -559,8 +665,12 @@ class InteractiveCopilot:
 
         messages: list[dict[str, str]] = [{"role": "system", "content": system_msg}]
         if history:
-            messages.extend(history[-6:])  # Mantener últimas 3 interacciones
-        messages.append({"role": "user", "content": query})
+            sanitized_hist = [
+                {"role": h.get("role", "user"), "content": DataSanitizer.sanitize_text(h.get("content", ""))}
+                for h in history[-6:]
+            ]
+            messages.extend(sanitized_hist)
+        messages.append({"role": "user", "content": safe_query})
 
         raw_response, provider, latency = self.client.generate(messages, json_mode=False)
 

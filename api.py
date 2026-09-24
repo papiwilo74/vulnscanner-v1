@@ -19,7 +19,10 @@ from scanner.ai_copilot import AICopilot
 from scanner.cluster import ClusterCoordinator
 from scanner.db_adapter import UniversalConnection, create_connection
 from scanner.deception import DeceptionManager, SnippetGenerator
+from scanner.diff import compare_scans
+from scanner.migrations.runner import MigrationManager
 from scanner.models import Finding
+from scanner.rate_limiter import RateLimitMiddleware
 from scanner.tenancy import ROLE_PERMISSIONS, Role, TenancyManager, User
 
 logging.basicConfig(level=logging.INFO)
@@ -58,6 +61,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+app.add_middleware(RateLimitMiddleware)
 
 deception_mgr = DeceptionManager()
 tenancy_mgr = TenancyManager()
@@ -66,6 +70,38 @@ copilot_mgr = AICopilot()
 
 _db_path = os.environ.get("OMNIBREACH_DB", os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db")))
 _db_lock = Lock()
+
+# Aplicar automáticamente migraciones de base de datos pendientes en arranque
+with contextlib.suppress(Exception):
+    _m_conn = create_connection(_db_path)
+    MigrationManager(_m_conn).apply_pending_migrations()
+    _m_conn.close()
+
+_OMNIBREACH_CLUSTER_KEY = os.environ.get("OMNIBREACH_CLUSTER_KEY", os.environ.get("CLUSTER_KEY", ""))
+
+
+def _verify_cluster_auth(request: Request) -> None:
+    """Verifica autenticación en endpoints de workers del cluster distribuido."""
+    if not _OMNIBREACH_CLUSTER_KEY:
+        if _OMNIBREACH_ENV == "production":
+            raise HTTPException(
+                status_code=401,
+                detail="No se configuró OMNIBREACH_CLUSTER_KEY en producción. Acceso no autorizado al cluster.",
+            )
+        return
+
+    key_provided = request.headers.get("X-Cluster-Key", "")
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token_candidate = auth_header[7:].strip()
+        if not key_provided:
+            key_provided = token_candidate
+
+    if not key_provided or key_provided != _OMNIBREACH_CLUSTER_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Autenticación de worker inválida o no provista en el cluster distribuido.",
+        )
 
 
 class EventBroadcaster:
@@ -303,6 +339,7 @@ def get_current_user_optional(request: Request) -> User:
         user = tenancy_mgr.get_user_from_token(token)
         if user:
             return user
+        raise HTTPException(status_code=401, detail="Token de acceso revocado, expirado o inválido.")
     return tenancy_mgr.get_default_user()
 
 
@@ -899,6 +936,16 @@ def login_account(req: LoginRequest) -> dict[str, Any]:
     }
 
 
+@app.post("/api/auth/logout")
+def logout_account(request: Request) -> dict[str, Any]:
+    """Cierra la sesión del usuario revocando su token JWT de acceso en tiempo real."""
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        tenancy_mgr.revoke_token(token)
+    return {"message": "Sesión cerrada y token revocado exitosamente"}
+
+
 @app.get("/api/auth/me")
 def get_my_profile(request: Request) -> dict[str, Any]:
     """Retorna el perfil del usuario autenticado, su organización y permisos RBAC."""
@@ -948,9 +995,23 @@ class JobFailRequest(BaseModel):
     error: str
 
 
+class JobProgressRequest(BaseModel):
+    worker_id: str
+    progress_percent: int
+    current_stage: str
+
+
+class CompareScansRequest(BaseModel):
+    scan_a_id: Optional[str] = None
+    scan_b_id: Optional[str] = None
+    scan_a: Optional[dict[str, Any]] = None
+    scan_b: Optional[dict[str, Any]] = None
+
+
 @app.post("/api/cluster/workers/register")
-def register_cluster_worker(req: WorkerRegisterRequest) -> dict[str, Any]:
+def register_cluster_worker(req: WorkerRegisterRequest, request: Request) -> dict[str, Any]:
     """Registra un nodo worker en el cluster distribuido."""
+    _verify_cluster_auth(request)
     worker = cluster_mgr.register_worker(
         name=req.name,
         region=req.region,
@@ -962,15 +1023,17 @@ def register_cluster_worker(req: WorkerRegisterRequest) -> dict[str, Any]:
 
 
 @app.post("/api/cluster/workers/{worker_id}/heartbeat")
-def worker_heartbeat(worker_id: str, req: WorkerHeartbeatRequest) -> dict[str, Any]:
+def worker_heartbeat(worker_id: str, req: WorkerHeartbeatRequest, request: Request) -> dict[str, Any]:
     """Actualiza el heartbeat y telemetría de salud de un worker."""
+    _verify_cluster_auth(request)
     ok = cluster_mgr.heartbeat(worker_id, active_jobs=req.active_jobs, status=req.status)
     return {"status": "ok" if ok else "unknown_worker"}
 
 
 @app.get("/api/cluster/workers")
-def list_cluster_workers() -> dict[str, Any]:
+def list_cluster_workers(request: Request) -> dict[str, Any]:
     """Lista los workers del cluster, sus regiones cloud y estadísticas agregadas."""
+    _verify_cluster_auth(request)
     workers = cluster_mgr.list_workers()
     stats = cluster_mgr.get_stats()
     return {
@@ -981,8 +1044,9 @@ def list_cluster_workers() -> dict[str, Any]:
 
 
 @app.post("/api/cluster/jobs/claim")
-def claim_cluster_job(req: JobClaimRequest) -> dict[str, Any]:
+def claim_cluster_job(req: JobClaimRequest, request: Request) -> dict[str, Any]:
     """Un worker reclama la siguiente tarea de escaneo pendiente compatible con su región."""
+    _verify_cluster_auth(request)
     job = cluster_mgr.claim_job(worker_id=req.worker_id, worker_region=req.region)
     if not job:
         return {"claimed": False, "job": None}
@@ -990,8 +1054,9 @@ def claim_cluster_job(req: JobClaimRequest) -> dict[str, Any]:
 
 
 @app.post("/api/cluster/jobs/{task_id}/complete")
-def complete_cluster_job(task_id: str, req: JobCompleteRequest) -> dict[str, Any]:
+def complete_cluster_job(task_id: str, req: JobCompleteRequest, request: Request) -> dict[str, Any]:
     """Registra la finalización de una tarea ejecutada por un worker remoto y actualiza reportes."""
+    _verify_cluster_auth(request)
     cluster_mgr.complete_job(task_id=task_id, worker_id=req.worker_id, results=req.results)
     with _db_lock:
         conn = _get_db()
@@ -1020,8 +1085,9 @@ def complete_cluster_job(task_id: str, req: JobCompleteRequest) -> dict[str, Any
 
 
 @app.post("/api/cluster/jobs/{task_id}/fail")
-def fail_cluster_job(task_id: str, req: JobFailRequest) -> dict[str, Any]:
+def fail_cluster_job(task_id: str, req: JobFailRequest, request: Request) -> dict[str, Any]:
     """Registra el fallo de una tarea en el cluster distribuido."""
+    _verify_cluster_auth(request)
     cluster_mgr.fail_job(task_id=task_id, worker_id=req.worker_id, error_message=req.error)
     with _db_lock:
         conn = _get_db()
@@ -1034,6 +1100,78 @@ def fail_cluster_job(task_id: str, req: JobFailRequest) -> dict[str, Any]:
         "step": f"Fallo en worker {req.worker_id}: {req.error}",
     })
     return {"message": "Fallo registrado correctamente"}
+
+
+@app.post("/api/cluster/jobs/{task_id}/progress")
+def report_job_progress(task_id: str, req: JobProgressRequest, request: Request) -> dict[str, Any]:
+    """Reporta el progreso y etapa actual de una tarea en ejecución."""
+    _verify_cluster_auth(request)
+    ok = cluster_mgr.update_job_progress(
+        task_id=task_id,
+        worker_id=req.worker_id,
+        progress_percent=req.progress_percent,
+        current_stage=req.current_stage,
+    )
+    broadcast_event_sync(task_id, {
+        "event": "progress",
+        "percent": req.progress_percent,
+        "step": req.current_stage,
+    })
+    return {"status": "ok" if ok else "not_found"}
+
+
+@app.post("/api/cluster/jobs/{task_id}/cancel")
+def cancel_cluster_job(task_id: str, request: Request) -> dict[str, Any]:
+    """Cancela cooperativamente una tarea del cluster."""
+    _verify_cluster_auth(request)
+    ok = cluster_mgr.cancel_job(task_id)
+    broadcast_event_sync(task_id, {
+        "event": "cancelled",
+        "percent": 0,
+        "step": "Tarea cancelada por el usuario.",
+    })
+    return {"status": "cancelled" if ok else "not_found"}
+
+
+@app.get("/api/cluster/jobs/{task_id}/status")
+def get_cluster_job_status(task_id: str) -> dict[str, Any]:
+    """Obtiene el estado, reintentos y progreso de una tarea específica del cluster."""
+    job = cluster_mgr.get_job(task_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada en el cluster")
+    return job.to_dict()
+
+
+@app.get("/api/cluster/queue")
+def get_cluster_queue_telemetry() -> dict[str, Any]:
+    """Telemetría y monitor de salud del cluster para el dashboard del analista."""
+    workers = cluster_mgr.list_workers()
+    stats = cluster_mgr.get_stats()
+    return {
+        "stats": stats,
+        "workers": [w.to_dict() for w in workers],
+    }
+
+
+@app.post("/api/scans/compare")
+def compare_scans_endpoint(req: CompareScansRequest) -> dict[str, Any]:
+    """Compara dos escaneos (Scan A Línea Base vs Scan B Actual) y calcula el diferencial de riesgo."""
+    data_a = req.scan_a
+    data_b = req.scan_b
+
+    with _db_lock:
+        conn = _get_db()
+        if not data_a and req.scan_a_id:
+            data_a = _get_task(conn, req.scan_a_id)
+        if not data_b and req.scan_b_id:
+            data_b = _get_task(conn, req.scan_b_id)
+        conn.close()
+
+    if not data_a or not data_b:
+        raise HTTPException(status_code=400, detail="Debe proveer scan_a y scan_b o IDs válidos de tareas existentes.")
+
+    diff_res = compare_scans(data_a, data_b)
+    return diff_res.to_dict()
 
 
 # ==============================================================================
@@ -1142,6 +1280,7 @@ class CopilotAutofixRequest(BaseModel):
     file_path: str
     finding: dict[str, Any]
     dry_run: bool = True
+    confirm: bool = False
 
 
 class CopilotExecutiveSummaryRequest(BaseModel):
@@ -1220,7 +1359,12 @@ def copilot_remediation_endpoint(req: CopilotRemediationRequest) -> dict[str, An
 
 @app.post("/api/v1/copilot/autofix", tags=["AI Copilot"])
 def copilot_autofix_endpoint(req: CopilotAutofixRequest) -> dict[str, Any]:
-    """Modo 3: Auto-parcheo de archivos de código fuente locales con verificación AST y backups."""
+    """Modo 3: Auto-parcheo de archivos de código fuente locales con verificación AST, guardrail Human-in-the-Loop y backups."""
+    if not req.dry_run and not req.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Human-in-the-loop: Se requiere confirmación explícita (confirm: true) para modificar archivos de código fuente en disco.",
+        )
     finding_obj = _dict_to_finding(req.finding)
     result = copilot_mgr.autofix_file(req.file_path, finding_obj, dry_run=req.dry_run)
     return {

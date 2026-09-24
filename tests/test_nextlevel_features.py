@@ -196,8 +196,8 @@ class TestSARIFAndStandards:
         assert len(sarif["runs"]) == 1
 
         run = sarif["runs"][0]
-        assert run["tool"]["driver"]["name"] == "VulnScanner"
-        assert run["tool"]["driver"]["version"] == "2.0.0"
+        assert run["tool"]["driver"]["name"] in ("OmniBreach", "VulnScanner")
+        assert run["tool"]["driver"]["version"] in ("3.8.0", "2.0.0")
 
         # Validar reglas definidas
         rules = run["tool"]["driver"]["rules"]

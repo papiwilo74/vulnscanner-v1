@@ -78,11 +78,13 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["."]
+source = ["scanner", "utils"]
 branch = true
 omit = ["tests/*", "reports/*", "models/*", "venv/*", ".venv/*"]
 
 [tool.coverage.report]
+fail_under = 80
+show_missing = true
 exclude_also = [
     "if __name__ == .__main__.:",
     "def __repr__",

@@ -174,10 +174,10 @@ def generate_sarif_v210(url: str, findings: list[Any], duration: float = 0.0) ->
             {
                 "tool": {
                     "driver": {
-                        "name": "VulnScanner",
-                        "organization": "VulnScanner Security",
-                        "semanticVersion": "2.0.0",
-                        "version": "2.0.0",
+                        "name": "OmniBreach",
+                        "organization": "OmniBreach Security",
+                        "semanticVersion": "3.8.0",
+                        "version": "3.8.0",
                         "informationUri": "https://github.com/papiwilo74/vulnscanner-v1",
                         "rules": list(rules_dict.values())
                     },

@@ -167,3 +167,160 @@ def test_api_cluster_endpoints(monkeypatch: pytest.MonkeyPatch, temp_cluster: Cl
         },
     )
     assert comp_res.status_code == 200
+
+
+def test_cluster_job_retries_and_exhaustion(temp_cluster: ClusterCoordinator) -> None:
+    worker = temp_cluster.register_worker(name="Retry-Worker", region="local")
+    _ = temp_cluster.enqueue_job(
+        task_id="task_retry_test",
+        tenant_id="org_default",
+        url="http://target.local",
+    )
+
+    # 1. Fallo 1 (retry_count: 0 -> 1, reencolado)
+    temp_cluster.claim_job(worker_id=worker.id, worker_region="local")
+    ok1 = temp_cluster.fail_job("task_retry_test", worker.id, "Timeout de red en etapa 1", allow_retry=True)
+    assert ok1 is True
+    j1 = temp_cluster.get_job("task_retry_test")
+    assert j1 is not None
+    assert j1.status == "queued"
+    assert j1.retry_count == 1
+
+    # 2. Fallo 2 (retry_count: 1 -> 2, reencolado)
+    temp_cluster.claim_job(worker_id=worker.id, worker_region="local")
+    temp_cluster.fail_job("task_retry_test", worker.id, "Timeout de red en etapa 2", allow_retry=True)
+    j2 = temp_cluster.get_job("task_retry_test")
+    assert j2 is not None
+    assert j2.retry_count == 2
+    assert j2.status == "queued"
+
+    # 3. Fallo 3 (retry_count: 2 -> 3, reencolado)
+    temp_cluster.claim_job(worker_id=worker.id, worker_region="local")
+    temp_cluster.fail_job("task_retry_test", worker.id, "Timeout de red en etapa 3", allow_retry=True)
+    j3 = temp_cluster.get_job("task_retry_test")
+    assert j3 is not None
+    assert j3.retry_count == 3
+    assert j3.status == "queued"
+
+    # 4. Fallo 4 (excede max_retries=3 -> estado failed definitivo)
+    temp_cluster.claim_job(worker_id=worker.id, worker_region="local")
+    temp_cluster.fail_job("task_retry_test", worker.id, "Fallo irrecuperable", allow_retry=True)
+    j_final = temp_cluster.get_job("task_retry_test")
+    assert j_final is not None
+    assert j_final.status == "failed"
+    assert j_final.current_stage == "failed"
+
+
+def test_cluster_progress_and_cancellation(temp_cluster: ClusterCoordinator) -> None:
+    worker = temp_cluster.register_worker(name="Prog-Worker", region="local")
+    temp_cluster.enqueue_job(task_id="task_prog_test", tenant_id="org_default", url="http://target.local")
+    temp_cluster.claim_job(worker_id=worker.id, worker_region="local")
+
+    # Actualizar progreso
+    ok_prog = temp_cluster.update_job_progress("task_prog_test", worker.id, 45, "crawling_deep")
+    assert ok_prog is True
+    job = temp_cluster.get_job("task_prog_test")
+    assert job is not None
+    assert job.progress_percent == 45
+    assert job.current_stage == "crawling_deep"
+
+    # Cancelar tarea
+    assert temp_cluster.is_job_cancelled("task_prog_test") is False
+    ok_cancel = temp_cluster.cancel_job("task_prog_test")
+    assert ok_cancel is True
+    assert temp_cluster.is_job_cancelled("task_prog_test") is True
+
+    job_cancelled = temp_cluster.get_job("task_prog_test")
+    assert job_cancelled is not None
+    assert job_cancelled.status == "cancelled"
+
+
+def test_cluster_authentication_enforcement(monkeypatch: pytest.MonkeyPatch, temp_cluster: ClusterCoordinator) -> None:
+    monkeypatch.setattr("api.cluster_mgr", temp_cluster)
+    monkeypatch.setattr("api._OMNIBREACH_CLUSTER_KEY", "super_secret_cluster_key_12345")
+    client = TestClient(app)
+
+    # 1. Petición sin cabecera X-Cluster-Key -> 401 Unauthorized
+    resp_unauth = client.post(
+        "/api/cluster/workers/register",
+        json={"name": "Attacker-Node", "region": "local"},
+    )
+    assert resp_unauth.status_code == 401
+
+    # 2. Petición con clave errónea -> 401 Unauthorized
+    resp_wrong = client.post(
+        "/api/cluster/workers/register",
+        json={"name": "Attacker-Node", "region": "local"},
+        headers={"X-Cluster-Key": "wrong_key"},
+    )
+    assert resp_wrong.status_code == 401
+
+    # 3. Petición con clave legítima -> 200 OK
+    resp_ok = client.post(
+        "/api/cluster/workers/register",
+        json={"name": "Legit-Node", "region": "local"},
+        headers={"X-Cluster-Key": "super_secret_cluster_key_12345"},
+    )
+    assert resp_ok.status_code == 200
+
+
+def test_human_in_the_loop_autofix_guardrail() -> None:
+    client = TestClient(app)
+    # Intentar aplicar cambios a disco con dry_run=False sin confirm=True
+    resp = client.post(
+        "/api/v1/copilot/autofix",
+        json={
+            "file_path": "test.py",
+            "finding": {"title": "XSS", "category": "xss", "severity": "medium"},
+            "dry_run": False,
+            "confirm": False,
+        }
+    )
+    assert resp.status_code == 400
+    assert "Human-in-the-loop" in resp.json()["detail"]
+
+
+def test_jwt_logout_and_revocation() -> None:
+    client = TestClient(app)
+    # Registrar e iniciar sesión
+    login_res = client.post("/api/auth/register", json={
+        "email": "logout_test@example.com",
+        "password": "Password123!",
+        "full_name": "Logout Tester",
+        "org_name": "Test Org"
+    })
+    assert login_res.status_code == 200
+    token = login_res.json()["access_token"]
+
+    # Acceso a /api/auth/me exitoso con token activo
+    me_res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+
+    # Cerrar sesión (Logout)
+    logout_res = client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token}"})
+    assert logout_res.status_code == 200
+
+    # Acceso posterior a /api/auth/me debe ser rechazado con 401
+    me_revoked_res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_revoked_res.status_code == 401
+
+
+def test_scan_compare_endpoint() -> None:
+    client = TestClient(app)
+    res = client.post("/api/scans/compare", json={
+        "scan_a": {
+            "task_id": "scan_1",
+            "security_score": 70.0,
+            "results": {"security_score": 70.0, "vulnerabilities": [{"category": "xss", "cwe_id": "CWE-79"}]}
+        },
+        "scan_b": {
+            "task_id": "scan_2",
+            "security_score": 90.0,
+            "results": {"security_score": 90.0, "vulnerabilities": []}
+        }
+    })
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total_resolved"] == 1
+    assert data["risk_score_delta"] == 20.0
+

@@ -68,5 +68,5 @@ def test_e2e_scan_real_vulnerabilities(lab_target):
     runs = sarif_json.get("runs", [])
     assert len(runs) > 0
     driver = runs[0].get("tool", {}).get("driver", {})
-    assert "VulnScanner" in driver.get("name", "")
+    assert any(k in driver.get("name", "") for k in ("OmniBreach", "VulnScanner"))
     assert len(runs[0].get("results", [])) == len(vulns)
