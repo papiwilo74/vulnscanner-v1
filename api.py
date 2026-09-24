@@ -26,9 +26,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OmniBreachAPI")
 
 app = FastAPI(
-    title="OmniBreach v5.0.0 Enterprise API",
-    description="Framework Unificado CTEM & Evaluación Perimetral: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad de Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV, Copiloto IA Híbrido y Telemetría en Tiempo Real.",
-    version="5.0.0"
+    title="OmniBreach v3.8 API",
+    description="Framework Modular de DAST y Evaluación de Superficie Externa (EASM): Fuzzing Contextual (AST), Grafos de Ataque, SBOM, Copiloto IA Híbrido y Telemetría en Tiempo Real.",
+    version="3.8"
 )
 
 # Configuración Segura de CORS (Cumple con W3C / Fetch CORS Specification)
@@ -537,7 +537,7 @@ def health_check() -> dict[str, Any]:
     return {
         "status": "healthy",
         "service": "OmniBreach API",
-        "version": "5.0.0",
+        "version": "3.8",
         "database": "neon-postgresql" if is_postgres else "sqlite",
         "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
     }
@@ -546,8 +546,8 @@ def health_check() -> dict[str, Any]:
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a OmniBreach v5.0.0 Enterprise API",
-        "version": "5.0.0",
+        "message": "Bienvenido a OmniBreach v3.8 API",
+        "version": "3.8",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST", "EASM CISA KEV"],
         "dashboard_url": "/dashboard",
         "health_url": "/health",

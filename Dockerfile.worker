@@ -1,4 +1,4 @@
-# OmniBreach v5.0.0 Enterprise — Distributed Worker Node Dockerfile
+# OmniBreach v3.8 — Distributed Worker Node Dockerfile
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \

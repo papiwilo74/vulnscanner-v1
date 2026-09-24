@@ -1,14 +1,14 @@
-# OmniBreach v5.0.0 Enterprise
+# OmniBreach v3.8 — DAST & Security Scanner
 
 <p align="center">
-  <img src="https://img.shields.io/badge/OmniBreach-v5.0.0%20Enterprise-blue?style=for-the-badge&logo=shield" alt="OmniBreach v5.0.0" />
+  <img src="https://img.shields.io/badge/OmniBreach-v3.8-blue?style=for-the-badge&logo=shield" alt="OmniBreach v3.8" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v5.0.0"><img src="https://img.shields.io/badge/Release-v5.0.0%20Enterprise-007EC6.svg?logo=github" alt="Release v5.0.0" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.8"><img src="https://img.shields.io/badge/Release-v3.8-007EC6.svg?logo=github" alt="Release v3.8" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-brightgreen.svg?logo=github-actions" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(117%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
-  <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(13.9k%20LOC)-green.svg" alt="Bandit" /></a>
+  <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(14.7k%20LOC)-green.svg" alt="Bandit" /></a>
   <a href="https://osv.dev/"><img src="https://img.shields.io/badge/SCA%20Intel-OSV.dev%20Live%20Synced-blueviolet.svg" alt="OSV.dev Synced" /></a>
   <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"><img src="https://img.shields.io/badge/Threat%20Intel-CISA%20KEV%20Synced-orange.svg" alt="CISA KEV" /></a>
   <a href="https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html"><img src="https://img.shields.io/badge/Standard-SARIF%20v2.1.0%20OASIS-brightgreen.svg" alt="SARIF v2.1.0" /></a>
@@ -18,23 +18,23 @@
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach v5.0.0 Enterprise** es una plataforma unificada de **Continuous Threat Exposure Management (CTEM)**, **Dynamic Application Security Testing (DAST)** heurístico de alta precisión y **Modelado Causal de Amenazas**.
+> **OmniBreach v3.8** es un proyecto personal avanzado y de investigación académica enfocado en **Dynamic Application Security Testing (DAST)** heurístico, auditoría de superficie externa (EASM) y modelado causal de amenazas.
 > 
-> Diseñada para cerrar la brecha entre el escaneo perimetral superficial y la auditoría profunda de aplicaciones web modernas, unifica:
-> - **SCA Dinámico en Tiempo Real**: Consultas activas a la base de datos abierta de Google/OpenSSF (**OSV.dev**) para identificar CVEs y GHSAs en vivo.
-> - **State-Aware Sessions & Macro Replay**: Auditoría profunda en aplicaciones SaaS y SPAs complejas sin pérdida de sesión mediante centinelas y automatización con **Playwright**.
+> Desarrollado como proyecto de portafolio y opción de grado, unifica prácticas reales de ingeniería de software y seguridad defensiva:
+> - **SCA Dinámico en Tiempo Real**: Consultas activas a la base de datos abierta de Google/OpenSSF (**OSV.dev**) para identificar CVEs y GHSAs en dependencias.
+> - **State-Aware Sessions & Macro Replay**: Auditoría profunda en aplicaciones SaaS y SPAs sin pérdida de sesión mediante centinelas y automatización con **Playwright**.
 > - **Fuzzing Contextual (AST)**: Análisis sintáctico del punto de reflejo en el DOM (HTML body, atributos, scripts JS, comentarios) y disparo quirúrgico de payloads de escape.
 > - **Harness de Benchmark Automatizado**: Detección continua de regresiones y validación empírica en CI/CD contra **OWASP Juice Shop** y **OWASP PyGoat** (**100% Precisión comprobada**).
 > - **Taint Tracking Dinámico & OAST**: Captura de Stack Traces de JavaScript en navegadores reales y servidor local para detección de **Blind XXE y Blind SSRF**.
 > - **Modelado de Ataques y Choke Points**: Grafo dirigido con cálculo matemático de **Centralidad de Brandes** y simulaciones analíticas *What-If*.
-> - **Cumplimiento Corporativo & DevSecOps**: Exportador nativo **SARIF v2.1.0** para GitHub Advanced Security y matriz de cumplimiento **PCI-DSS v4.0 / OWASP Top 10**.
+> - **Cumplimiento y DevSecOps**: Exportador nativo **SARIF v2.1.0** para GitHub Advanced Security y matriz de cumplimiento **PCI-DSS v4.0 / OWASP Top 10**.
 
 ---
 
 ## Tabla de Contenidos
 
 - [Arquitectura General](#arquitectura-general)
-- [Los 11 Pilares Diferenciales de OmniBreach (v5.0 Enterprise)](#los-11-pilares-diferenciales-de-omnibreach-v50-enterprise)
+- [Los 11 Pilares Técnicos de OmniBreach (v3.8)](#los-11-pilares-tecnicos-de-omnibreach-v38)
 - [Validación Empírica Cuantitativa (Juice Shop & PyGoat)](#validacion-empirica-cuantitativa-juice-shop--pygoat)
 - [Base de Conocimiento y Módulos de Estudio (`docs_notebox/`)](#base-de-conocimiento-y-modulos-de-estudio-docs_notebox)
 - [Instalación Rápida](#instalacion-rapida)
@@ -107,7 +107,7 @@ graph TD
 
 ---
 
-## Los 11 Pilares Diferenciales de OmniBreach (v5.0 Enterprise)
+## Los 11 Pilares Técnicos de OmniBreach (v3.8)
 
 ### 1. Fuzzing Quirúrgico Contextual (AST DOM Analysis)
 En lugar de disparar decenas de payloads a ciegas que saturan el WAF, OmniBreach envía una sonda benigna alfanumérica previa (`vScanProbe74`) y clasifica el punto de reflejo en el DOM:
@@ -195,7 +195,7 @@ El repositorio incluye **8 documentos maestros** listos para importar en **NoteB
 | **05** | [`05_arquitectura_del_escaner_y_filtros_anti_falsos_positivos.md`](docs_notebox/05_arquitectura_del_escaner_y_filtros_anti_falsos_positivos.md) | Concurrencia con `ThreadPoolExecutor`, canarios Soft-404 en SPAs y doble verificación Open Redirect. |
 | **06** | [`06_superficie_externa_easm_fuzzing_y_sca.md`](docs_notebox/06_superficie_externa_easm_fuzzing_y_sca.md) | Shadow IT, Certificate Transparency, Subdomain Takeover en S3/GitHub y fuga de secretos. |
 | **07** | [`07_seguridad_corporativa_pci_dss_sarif_devsecops.md`](docs_notebox/07_seguridad_corporativa_pci_dss_sarif_devsecops.md) | PCI-DSS v4.0, OWASP Top 10, exportador SARIF v2.1.0 y flujo DevSecOps continuo. |
-| **08** | [`08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md`](docs_notebox/08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md) | Novedades de v5.0: SCA dinámico con OSV.dev, macros State-Aware, AST DOM Fuzzing y Benchmark CI. |
+| **08** | [`08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md`](docs_notebox/08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md) | Novedades de v3.8: SCA dinámico con OSV.dev, macros State-Aware, AST DOM Fuzzing y Benchmark CI. |
 
 ---
 
@@ -246,7 +246,7 @@ docker compose --profile cli run --rm cli https://ejemplo.com/ --stealth
 python main.py https://mi-aplicacion.com
 ```
 
-### 2. Escaneo Autenticado con Macro de Sesión y Centinela en Caliente (v5.0)
+### 2. Escaneo Autenticado con Macro de Sesión y Centinela en Caliente (v3.8)
 ```bash
 python main.py https://portal.empresa.com \
   --session-macro auth_flow.json \
@@ -333,12 +333,12 @@ VulnScanner/
 ├── docker-compose.yml          # Orquestador multi-servicio (API + CLI + Workers)
 │
 ├── scanner/                    # Módulos de detección y motores nucleares
-│   ├── ai_copilot.py           # [v5.0] Copiloto IA híbrido (Groq + Ollama) y Auto-Fix AST
-│   ├── db_adapter.py           # [v5.0] Conector agnóstico PostgreSQL (Neon) y SQLite
-│   ├── worker.py               # [v5.0] CLI daemon para workers distribuidos de escaneo
-│   ├── context_fuzzer.py       # [v5.0] Fuzzing contextual con análisis de reflejo en AST DOM
-│   ├── session_macro.py        # [v5.0] State-Aware Session Manager y macro replay en caliente
-│   ├── sca.py                  # [v5.0] SCA dinámico con API de OSV.dev y fallback local
+│   ├── ai_copilot.py           # [v3.8] Copiloto IA híbrido (Groq + Ollama) y Auto-Fix AST
+│   ├── db_adapter.py           # [v3.8] Conector agnóstico PostgreSQL (Neon) y SQLite
+│   ├── worker.py               # [v3.8] CLI daemon para workers distribuidos de escaneo
+│   ├── context_fuzzer.py       # [v3.8] Fuzzing contextual con análisis de reflejo en AST DOM
+│   ├── session_macro.py        # [v3.8] State-Aware Session Manager y macro replay en caliente
+│   ├── sca.py                  # [v3.8] SCA dinámico con API de OSV.dev y fallback local
 │   ├── sqli.py                 # SQLi booleano diferencial, time-based y firmas DB
 │   ├── dom_xss.py              # DOM Taint Tracking dinámico con hooks en Playwright
 │   ├── oast.py                 # Servidor local Out-of-Band HTTP/DNS para Blind Injection
@@ -367,7 +367,7 @@ VulnScanner/
 │   └── github_pr.py            # Integración para apertura autónoma de Pull Requests
 │
 ├── scripts/                    # Scripts de soporte y automatización
-│   ├── run_benchmarks.py       # [v5.0] Harness automatizado con detección de regresiones
+│   ├── run_benchmarks.py       # [v3.8] Harness automatizado con detección de regresiones
 │   └── __init__.py
 │
 ├── docs_notebox/               # Base de conocimiento modular para NoteBox / NotebookLM
@@ -381,18 +381,18 @@ VulnScanner/
 │   └── 08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md
 │
 ├── tests/                      # Suite de 347 pruebas automatizadas
-│   ├── test_ai_copilot.py      # [v5.0] Pruebas del copiloto IA, Groq/Ollama y Auto-Fix
-│   ├── test_context_fuzzer.py  # [v5.0] Pruebas de detección contextual de DOM
-│   ├── test_session_macro.py   # [v5.0] Pruebas de macros y centinelas de sesión
-│   ├── test_osv_sca.py         # [v5.0] Pruebas de integración con OSV.dev y fallback
-│   ├── test_benchmark_harness.py # [v5.0] Pruebas del guardián de regresiones
+│   ├── test_ai_copilot.py      # [v3.8] Pruebas del copiloto IA, Groq/Ollama y Auto-Fix
+│   ├── test_context_fuzzer.py  # [v3.8] Pruebas de detección contextual de DOM
+│   ├── test_session_macro.py   # [v3.8] Pruebas de macros y centinelas de sesión
+│   ├── test_osv_sca.py         # [v3.8] Pruebas de integración con OSV.dev y fallback
+│   ├── test_benchmark_harness.py # [v3.8] Pruebas del guardián de regresiones
 │   ├── benchmark_juiceshop.py  # Benchmark empírico contra OWASP Juice Shop
 │   ├── benchmark_pygoat.py     # Benchmark empírico contra OWASP PyGoat
 │   └── ...                     # Pruebas de DAST, compliance, IAST, cluster, etc.
 │
 └── .github/workflows/          # Automatización CI/CD
     ├── ci.yml                  # Pipeline de calidad (Ruff, Mypy, Bandit, Pytest)
-    └── security_benchmark.yml  # [v5.0] Runner de benchmark con Juice Shop en Docker
+    └── security_benchmark.yml  # [v3.8] Runner de benchmark con Juice Shop en Docker
 ```
 
 ---

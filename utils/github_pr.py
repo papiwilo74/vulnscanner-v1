@@ -35,7 +35,7 @@ class GitHubPRClient:
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "OmniBreach-Enterprise-Bot/5.0.0",
+            "User-Agent": "OmniBreach-Bot/3.8",
         }
 
     def _get(self, endpoint: str) -> dict[str, Any]:
@@ -137,7 +137,7 @@ class GitHubPRClient:
             "- Mitigación contra ataques de Cross-Site Scripting (XSS), Clickjacking, MIME-Sniffing y SSL Stripping.",
             "\n### 🧪 Verificación:",
             "Se recomienda ejecutar la suite de pruebas unitarias y volver a escanear con `python main.py <url>` tras desplegar.",
-            "\n---\n*Generado automáticamente por OmniBreach Enterprise v5.0.0 DevSecOps Bot.*"
+            "\n---\n*Generado automáticamente por OmniBreach v3.8 DevSecOps Bot.*"
         ])
         return "\n".join(body)
 

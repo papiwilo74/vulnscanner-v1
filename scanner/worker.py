@@ -1,7 +1,7 @@
-"""OmniBreach Enterprise — Servicio Autónomo de Worker Distribuido (Cluster Node).
+"""OmniBreach v3.8 — Servicio Autónomo de Worker Distribuido (Cluster Node).
 
 Permite ejecutar nodos de escaneo independientes en diferentes regiones de red/cloud
-(AWS, GCP, Azure, On-Premise) que reclaman tareas de la cola persistente del coordinador.
+que reclaman tareas de la cola persistente del coordinador.
 """
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ logger = logging.getLogger("OmniBreach.Worker")
 
 def run_worker() -> None:
     parser = argparse.ArgumentParser(
-        description="OmniBreach v5.0.0 Enterprise — Nodo Worker de Escaneo Distribuido",
-        epilog="Ejemplo: python -m scanner.worker --coordinator http://api.empresa.com --region us-east-1",
+        description="OmniBreach v3.8 — Nodo Worker de Escaneo Distribuido",
+        epilog="Ejemplo: python -m scanner.worker --coordinator http://localhost:8000 --region local-node",
     )
     parser.add_argument(
         "--coordinator",
@@ -70,7 +70,7 @@ def run_worker() -> None:
     signal.signal(signal.SIGTERM, _sig_handler)
 
     logger.info("=================================================================")
-    logger.info("  OmniBreach v5.0.0 Enterprise — Nodo Worker Distribuido")
+    logger.info("  OmniBreach v3.8 — Nodo Worker Distribuido")
     logger.info("  Coordinador: %s | Región: %s", args.coordinator, args.region)
     logger.info("=================================================================")
 

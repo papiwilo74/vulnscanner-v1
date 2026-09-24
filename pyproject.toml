@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnibreach"
-version = "5.0.0"
-description = "OmniBreach Enterprise Web Security, Continuous Threat Exposure Management (CTEM) & Attack Surface Management (EASM) Scanner"
+version = "3.8"
+description = "OmniBreach — Escáner DAST y Cartografía de Superficie de Ataque (Proyecto de Portafolio / Opción de Grado)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
