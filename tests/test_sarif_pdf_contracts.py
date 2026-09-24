@@ -5,9 +5,13 @@ Valida que las salidas estructuradas cumplan rigurosamente con los estándares
 de la industria (OASIS SARIF v2.1.0, especificación PDF ISO 32000-1) y los contratos
 de integración del analista.
 """
+from unittest.mock import MagicMock
+
+from starlette.requests import Request
+
 from scanner.diff import ScanDiffResult, compare_scans
 from scanner.models import Evidence, Finding
-from scanner.rate_limiter import InMemorySlidingWindowLimiter
+from scanner.rate_limiter import InMemorySlidingWindowLimiter, RateLimitMiddleware
 from utils.pdf_report import generate_pdf_report
 from utils.sarif import generate_sarif_v210
 
@@ -205,3 +209,33 @@ class TestRateLimiterContract:
         assert allowed is False
         assert remaining == 0
         assert retry_after > 0.0
+
+    def test_rate_limiter_rejects_spoofed_x_forwarded_for_from_untrusted_peer(self) -> None:
+        # Configurar middleware con proxy de confianza exclusivo en 127.0.0.1
+        middleware = RateLimitMiddleware(app=MagicMock(), trusted_proxies=["127.0.0.1"])
+
+        # Petición proveniente de atacante directo (IP pública 203.0.113.195)
+        # El atacante intenta engañar al rate limiter inyectando X-Forwarded-For: 10.0.0.1
+        mock_request = MagicMock(spec=Request)
+        mock_request.client = MagicMock()
+        mock_request.client.host = "203.0.113.195"
+        mock_request.headers = {"X-Forwarded-For": "10.0.0.1, 10.0.0.2"}
+
+        client_id = middleware._get_client_identifier(mock_request)
+        # La cabecera X-Forwarded-For DEBE ser ignorada porque 203.0.113.195 NO es un proxy confiable
+        assert client_id == "203.0.113.195"
+        assert client_id != "10.0.0.1"
+
+    def test_rate_limiter_accepts_x_forwarded_for_from_trusted_proxy(self) -> None:
+        # Configurar middleware confiando en la red interna 10.0.0.0/8
+        middleware = RateLimitMiddleware(app=MagicMock(), trusted_proxies=["10.0.0.0/8"])
+
+        # Petición enviada a través del reverse proxy interno Nginx (10.0.1.5)
+        mock_request = MagicMock(spec=Request)
+        mock_request.client = MagicMock()
+        mock_request.client.host = "10.0.1.5"
+        mock_request.headers = {"X-Forwarded-For": "198.51.100.42, 10.0.1.5"}
+
+        client_id = middleware._get_client_identifier(mock_request)
+        # Como 10.0.1.5 está en la red de confianza 10.0.0.0/8, se extrae la IP real del cliente
+        assert client_id == "198.51.100.42"

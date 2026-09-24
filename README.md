@@ -7,13 +7,13 @@
 <p align="center">
   <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.8"><img src="https://img.shields.io/badge/Release-v3.8-007EC6.svg?logo=github" alt="Release v3.8" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-brightgreen.svg?logo=github-actions" alt="CI Pipeline" /></a>
-  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(124%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
-  <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(28.1k%20LOC)-green.svg" alt="Bandit" /></a>
+  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(126%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
+  <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(28.6k%20LOC)-green.svg" alt="Bandit" /></a>
   <a href="https://osv.dev/"><img src="https://img.shields.io/badge/SCA%20Intel-OSV.dev%20Live%20Synced-blueviolet.svg" alt="OSV.dev Synced" /></a>
   <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"><img src="https://img.shields.io/badge/Threat%20Intel-CISA%20KEV%20Synced-orange.svg" alt="CISA KEV" /></a>
   <a href="https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html"><img src="https://img.shields.io/badge/Standard-SARIF%20v2.1.0%20OASIS-brightgreen.svg" alt="SARIF v2.1.0" /></a>
-  <a href="reports/benchmark_history.json"><img src="https://img.shields.io/badge/Validation-100%25%20Precision%20%7C%20Juice%20Shop%20%26%20PyGoat-brightgreen.svg" alt="Empirical Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-371%20passing%20(100%25)-brightgreen.svg" alt="371 Tests" /></a>
+  <a href="reports/ai_benchmark_report.md"><img src="https://img.shields.io/badge/AI%20Copilot-100%25%20Precision%20%7C%20100%25%20Noise%20Reduction-brightgreen.svg" alt="AI Empirical Benchmark" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-378%20passing%20(100%25)-brightgreen.svg" alt="378 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>

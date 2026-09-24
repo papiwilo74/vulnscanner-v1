@@ -14,6 +14,8 @@ ENV/
 reports/
 !reports/benchmark_performance.json
 !reports/benchmark_juiceshop.json
+!reports/ai_benchmark_report.json
+!reports/ai_benchmark_report.md
 *.db
 
 # Configuración del editor / IDE

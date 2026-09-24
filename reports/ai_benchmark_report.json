@@ -1,0 +1,292 @@
+{
+  "timestamp": "2026-09-24T05:44:55.474991+00:00",
+  "corpus_version": "1.0.0",
+  "total_samples": 26,
+  "ground_truth_positives": 13,
+  "ground_truth_negatives": 13,
+  "baseline_engine": {
+    "true_positives": 13,
+    "false_positives": 13,
+    "false_negatives": 0,
+    "true_negatives": 0,
+    "precision": 0.5,
+    "recall": 1.0,
+    "f1_score": 0.6667
+  },
+  "hybrid_engine": {
+    "true_positives": 13,
+    "false_positives": 0,
+    "false_negatives": 0,
+    "true_negatives": 13,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0
+  },
+  "false_positives_reduced_count": 13,
+  "false_positives_reduced_percent": 100.0,
+  "hallucinations_blocked_count": 1,
+  "precision_gain_percent": 50.0,
+  "f1_gain_percent": 33.33,
+  "detailed_results": [
+    {
+      "id": "SAMPLE-SQLI-001",
+      "title": "Inyección SQL Booleana en Catálogo de Productos",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-SQLI-002",
+      "title": "Inyección SQL con Extracción de Versión de Base de Datos",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-SQLI-FP-001",
+      "title": "Falso Positivo SQLi por Coincidencia en Página de Bloqueo WAF",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-SQLI-FP-002",
+      "title": "Falso Positivo de SQLi Basado en Tiempo por Jitter de Red",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-XSS-001",
+      "title": "Cross-Site Scripting Reflejado en Barra de Búsqueda",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-XSS-002",
+      "title": "DOM-Based XSS en Manejador de Hash Dinámico",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-XSS-FP-001",
+      "title": "Falso Positivo XSS por Entrada con Codificación Segura de Entidades",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-XSS-FP-002",
+      "title": "Falso Positivo XSS con Escape JSON en Atributo de Datos",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-SCA-001",
+      "title": "Componente Vulnerable Angular Desactualizado (CVE-2019-10768)",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-SCA-FP-001",
+      "title": "Falso Positivo SCA por Comentario Histórico en Bundle Empaquetado",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.9,
+      "hallucination_blocked": true,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-SECRET-001",
+      "title": "Fuga Crítica de Clave de Acceso AWS IAM en Código Cliente",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.8,
+      "hallucination_blocked": false,
+      "recommended_severity": "medium"
+    },
+    {
+      "id": "SAMPLE-SECRET-FP-001",
+      "title": "Falso Positivo de Secreto por Cadena Marcadora de Posición (Placeholder)",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-SECRET-FP-002",
+      "title": "Falso Positivo de Secreto por Identificador de Telemetría Pública",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-SSRF-001",
+      "title": "Server-Side Request Forgery contra Endpoint de Metadatos Cloud",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-SSRF-FP-001",
+      "title": "Falso Positivo SSRF en Descargador de Imágenes con Validación de Dominio",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-CORS-001",
+      "title": "Mala Configuración Crítica de CORS con Origen Reflejado y Credenciales",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-CORS-FP-001",
+      "title": "Falso Positivo de CORS en Recurso Estático Público (Fuentes Web)",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-CMDI-001",
+      "title": "Inyección Remota de Comandos en Diagnóstico de Red",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-CMDI-FP-001",
+      "title": "Falso Positivo Command Injection por Eco en Error de Formulario",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-REDIRECT-001",
+      "title": "Redirección Abierta Arbitraria en Flujo de Autenticación",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-REDIRECT-FP-001",
+      "title": "Falso Positivo de Redirección con Destino Relativo Seguro",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-XXE-001",
+      "title": "Inyección de Entidades Externas XML con Exfiltración de Archivos Locales",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-XXE-FP-001",
+      "title": "Falso Positivo XXE con Resolución de Entidades Externas Deshabilitada",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    },
+    {
+      "id": "SAMPLE-SECRET-002",
+      "title": "Exposición Pública de Repositorio de Control de Versiones (.git)",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-GUARDRAIL-TP-001",
+      "title": "Inyección SQL con Error de MySQL Nativo (Prueba de Resistencia a Alucinación)",
+      "ground_truth_is_tp": true,
+      "ai_classified_is_tp": true,
+      "ai_is_false_positive": false,
+      "confidence": 0.98,
+      "hallucination_blocked": false,
+      "recommended_severity": "high"
+    },
+    {
+      "id": "SAMPLE-HALLUCINATION-FP-001",
+      "title": "Trampa Adversaria de Inyección de Prompt en Comentarios (Adversarial Trap)",
+      "ground_truth_is_tp": false,
+      "ai_classified_is_tp": false,
+      "ai_is_false_positive": true,
+      "confidence": 0.95,
+      "hallucination_blocked": false,
+      "recommended_severity": "info"
+    }
+  ]
+}

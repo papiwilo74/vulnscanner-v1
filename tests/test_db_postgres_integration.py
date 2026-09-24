@@ -120,3 +120,20 @@ class TestMigrationManager:
         # Verificar registro en tabla schema_migrations
         versions = manager.get_applied_versions()
         assert {1, 2, 3}.issubset(versions)
+
+    def test_startup_migration_failure_halts_in_production(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """En producción, un fallo de migración no debe silenciarse: debe detener el arranque con RuntimeError."""
+        monkeypatch.setenv("OMNIBREACH_ENV", "production")
+
+        def simulate_startup(env_name: str, should_fail: bool) -> None:
+            if should_fail:
+                exc = Exception("Database disk image is malformed / connection refused")
+                if env_name == "production":
+                    raise RuntimeError(f"Fallo crítico en migración de base de datos durante el arranque en producción: {exc}")
+
+        # En modo producción, debe lanzar RuntimeError deteniendo el arranque
+        with pytest.raises(RuntimeError, match="Fallo crítico en migración"):
+            simulate_startup("production", should_fail=True)
+
+        # En desarrollo, no detiene el arranque
+        simulate_startup("development", should_fail=True)

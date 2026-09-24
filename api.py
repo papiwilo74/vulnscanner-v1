@@ -72,10 +72,18 @@ _db_path = os.environ.get("OMNIBREACH_DB", os.environ.get("VULNSCANNER_DB", os.p
 _db_lock = Lock()
 
 # Aplicar automáticamente migraciones de base de datos pendientes en arranque
-with contextlib.suppress(Exception):
+try:
     _m_conn = create_connection(_db_path)
     MigrationManager(_m_conn).apply_pending_migrations()
     _m_conn.close()
+    logger.info("[DB MIGRATIONS] Esquema de base de datos sincronizado con éxito.")
+except Exception as exc:
+    logger.critical("[DB MIGRATIONS ERROR] Fallo crítico aplicando migraciones en arranque: %s", exc, exc_info=True)
+    if _OMNIBREACH_ENV == "production" or os.environ.get("STRICT_MIGRATIONS", "").lower() in ("true", "1", "yes"):
+        raise RuntimeError(
+            f"Fallo crítico en migración de base de datos durante el arranque en producción: {exc}"
+        ) from exc
+    logger.warning("[DB MIGRATIONS WARNING] Continuando arranque en modo no-producción a pesar del error de migración.")
 
 _OMNIBREACH_CLUSTER_KEY = os.environ.get("OMNIBREACH_CLUSTER_KEY", os.environ.get("CLUSTER_KEY", ""))
 

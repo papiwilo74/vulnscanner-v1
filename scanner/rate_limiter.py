@@ -6,11 +6,13 @@ con políticas diferenciadas por criticidad de endpoint (autenticación, escaneo
 """
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -71,18 +73,81 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     }
     DEFAULT_LIMIT: int = 300
 
-    def __init__(self, app: Any, enabled: bool = True) -> None:
+    def __init__(
+        self,
+        app: Any,
+        enabled: bool = True,
+        trusted_proxies: Iterable[str] | None = None,
+    ) -> None:
         super().__init__(app)
         self.enabled = enabled
         self.limiter = InMemorySlidingWindowLimiter(window_seconds=60.0)
 
+        # Configurar proxies de confianza para evitar evasión por spoofing de X-Forwarded-For
+        self._trust_all_proxies: bool = False
+        self._trusted_addresses: set[ipaddress.IPv4Address | ipaddress.IPv6Address] = set()
+        self._trusted_networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+        self._trusted_raw_strings: set[str] = set()
+
+        raw_list: list[str] = []
+        if trusted_proxies is not None:
+            raw_list = [p.strip() for p in trusted_proxies if p.strip()]
+        else:
+            env_proxies = os.environ.get("OMNIBREACH_TRUSTED_PROXIES", "127.0.0.1,::1,localhost")
+            raw_list = [p.strip() for p in env_proxies.split(",") if p.strip()]
+
+        for item in raw_list:
+            if item == "*":
+                self._trust_all_proxies = True
+                continue
+            self._trusted_raw_strings.add(item)
+            try:
+                if "/" in item:
+                    self._trusted_networks.append(ipaddress.ip_network(item, strict=False))
+                else:
+                    self._trusted_addresses.add(ipaddress.ip_address(item))
+            except ValueError:
+                # Hostname como 'localhost' o entrada no IP
+                pass
+
+    def _is_trusted_proxy(self, ip_str: str) -> bool:
+        """Verifica si la IP inmediata de conexión pertenece a un reverse proxy confiable."""
+        if not ip_str:
+            return False
+        if self._trust_all_proxies:
+            return True
+        if ip_str in self._trusted_raw_strings:
+            return True
+        try:
+            addr = ipaddress.ip_address(ip_str)
+            if addr in self._trusted_addresses:
+                return True
+            for net in self._trusted_networks:
+                if addr in net:
+                    return True
+        except ValueError:
+            pass
+        return False
+
     def _get_client_identifier(self, request: Request) -> str:
-        # Priorizar cabecera X-Forwarded-For si está detrás de un reverse proxy (Cloudflare/Nginx)
-        forwarded = request.headers.get("X-Forwarded-For")
-        if forwarded:
-            return forwarded.split(",")[0].strip()
+        """
+        Determina la dirección IP del cliente de forma segura.
+        Solo se confía en la cabecera 'X-Forwarded-For' si la conexión peer proviene
+        de un reverse proxy previamente autorizado (ej: Nginx, Cloudflare, Loopback).
+        """
         client = request.client
-        return client.host if client else "unknown_client"
+        peer_ip = client.host if client else "unknown_client"
+
+        # Si el socket peer es un proxy confiable, evaluamos la cabecera X-Forwarded-For
+        if self._is_trusted_proxy(peer_ip):
+            forwarded = request.headers.get("X-Forwarded-For")
+            if forwarded:
+                client_candidate = forwarded.split(",")[0].strip()
+                if client_candidate:
+                    return client_candidate
+
+        # Si la conexión no viene de un proxy confiable, usar peer_ip para impedir spoofing
+        return peer_ip
 
     def _get_limit_for_path(self, path: str) -> int:
         for prefix, limit in self.ENDPOINT_LIMITS.items():
