@@ -236,6 +236,11 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          param_fuzz: bool = False,
          session_macro_file: Optional[str] = None,
          sentinel_url: Optional[str] = None,
+         copilot: bool = False,
+         autofix: bool = False,
+         source_dir: Optional[str] = None,
+         dry_run: bool = False,
+         prefer_local_ai: bool = False,
          progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
@@ -501,11 +506,43 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         except Exception as e:
             logger.error("[DevSecOps] Error al crear Pull Request en GitHub: %s", e)
 
+    # 8. Copiloto de Seguridad IA Híbrido (Triaje, Auto-Fix y Resumen Ejecutivo)
+    copilot_summary: Optional[dict[str, Any]] = None
+    if (copilot or autofix) and all_findings:
+        from scanner.ai_copilot import AIConfig, AICopilot
+        copilot_inst = AICopilot(AIConfig(prefer_local=prefer_local_ai))
+
+        if autofix and source_dir:
+            logger.info("[Auto-Fix] 🛠️ Analizando código fuente en '%s' para aplicar auto-remediación...", source_dir)
+            for finding_item in all_findings:
+                candidates: list[str] = []
+                if finding_item.iast_source_file and os.path.isfile(finding_item.iast_source_file):
+                    candidates.append(finding_item.iast_source_file)
+                if finding_item.autofix and finding_item.autofix.get("filename"):
+                    hint_path = os.path.join(source_dir, str(finding_item.autofix["filename"]))
+                    if os.path.isfile(hint_path):
+                        candidates.append(hint_path)
+
+                for c_file in candidates:
+                    p_res = copilot_inst.autofix_file(c_file, finding_item, dry_run=dry_run)
+                    if p_res.applied:
+                        logger.info("[Auto-Fix] ✅ Código parcheado con éxito en: %s (Backup: %s)", c_file, p_res.backup_path)
+                    elif p_res.diff:
+                        logger.info("[Auto-Fix] [DRY-RUN] Simulación de parche para %s:\n%s", c_file, p_res.diff)
+
+        if copilot:
+            logger.info("[Copilot] 🧠 Generando Resumen Ejecutivo y Evaluación de Compliance CISO...")
+            copilot_summary = copilot_inst.executive_summary(all_findings, url)
+            logger.info("[Copilot] Postura General: %s | Acciones prioritarias: %d",
+                        copilot_summary.get("overall_posture"), len(copilot_summary.get("top_immediate_actions", [])))
+
     engine_summary = engine.get_summary()
     if attack_graph_dict:
         engine_summary["attack_graph"] = attack_graph_dict
     if pr_result:
         engine_summary["github_pr"] = pr_result
+    if copilot_summary:
+        engine_summary["ai_copilot"] = copilot_summary
     SCAN_STATS["total_requests"] = engine.request_count
 
     return print_report(
@@ -546,6 +583,16 @@ def main() -> None:
                         help="Token de acceso personal (PAT) de GitHub para Auto-PR")
     parser.add_argument("--base-branch", type=str, default="main",
                         help="Rama base en GitHub sobre la cual abrir el Pull Request (defecto: main)")
+    parser.add_argument("--copilot", action="store_true",
+                        help="Activa el Copiloto de Seguridad IA Híbrido (Groq + Ollama) para triaje y resumen ejecutivo CISO")
+    parser.add_argument("--autofix", action="store_true",
+                        help="Activa el motor de auto-corrección de código seguro en archivos fuente locales")
+    parser.add_argument("--source-dir", type=str, default=None,
+                        help="Ruta al directorio de código fuente del proyecto local para aplicar auto-correcciones")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Muestra el diff de las correcciones de código sin modificar los archivos originales")
+    parser.add_argument("--prefer-local-ai", action="store_true",
+                        help="Fuerza el uso de Ollama local (RTX 4060) en lugar de Groq Cloud")
     parser.add_argument("--cookie", type=str, default=None,
                         help="Cookies de sesión en formato 'nombre=valor; nombre2=valor2'")
     parser.add_argument("--auth", type=str, default=None,
@@ -913,6 +960,11 @@ def main() -> None:
             param_fuzz=args.param_fuzz,
             session_macro_file=args.session_macro,
             sentinel_url=args.sentinel_url,
+            copilot=args.copilot,
+            autofix=args.autofix,
+            source_dir=args.source_dir,
+            dry_run=args.dry_run,
+            prefer_local_ai=args.prefer_local_ai,
         )
     finally:
         if lab_server:

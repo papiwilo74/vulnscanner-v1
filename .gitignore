@@ -36,5 +36,9 @@ coverage.xml
 # Build & packaging artifacts
 build/
 dist/
+# Environment and secrets
+.env
+*.env
+*.bak
 *.egg-info/
 

@@ -16,8 +16,10 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from pydantic import BaseModel
 
 from main import scan
+from scanner.ai_copilot import AICopilot
 from scanner.cluster import ClusterCoordinator
 from scanner.deception import DeceptionManager, SnippetGenerator
+from scanner.models import Finding
 from scanner.tenancy import ROLE_PERMISSIONS, Role, TenancyManager, User
 
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +46,7 @@ app.add_middleware(
 deception_mgr = DeceptionManager()
 tenancy_mgr = TenancyManager()
 cluster_mgr = ClusterCoordinator()
+copilot_mgr = AICopilot()
 
 _db_path = os.environ.get("OMNIBREACH_DB", os.environ.get("VULNSCANNER_DB", os.path.join("reports", "tasks.db")))
 _db_lock = Lock()
@@ -1087,5 +1090,125 @@ def submit_ai_feedback(req: AIFeedbackRequest) -> dict[str, Any]:
     return {"status": "success", "message": "Feedback de analista registrado para Active Learning."}
 
 
+# ==============================================================================
+# 12. ENDPOINTS: AI SECURITY COPILOT & AUTO-REMEDIATION (5 MODOS)
+# ==============================================================================
 
+class CopilotChatRequest(BaseModel):
+    query: str
+    task_id: Optional[str] = None
+    target_url: Optional[str] = None
+    findings: Optional[list[dict[str, Any]]] = None
+    history: Optional[list[dict[str, str]]] = None
+
+
+class CopilotTriageRequest(BaseModel):
+    finding: dict[str, Any]
+
+
+class CopilotRemediationRequest(BaseModel):
+    finding: dict[str, Any]
+    tech_stack: Optional[list[str]] = None
+
+
+class CopilotAutofixRequest(BaseModel):
+    file_path: str
+    finding: dict[str, Any]
+    dry_run: bool = True
+
+
+class CopilotExecutiveSummaryRequest(BaseModel):
+    task_id: Optional[str] = None
+    target_url: Optional[str] = None
+    findings: Optional[list[dict[str, Any]]] = None
+
+
+def _dict_to_finding(d: dict[str, Any], default_url: str = "") -> Finding:
+    return Finding(
+        category=d.get("category", "default"),
+        title=d.get("title", d.get("vuln", "Vulnerabilidad detectada")),
+        severity=d.get("severity", d.get("risk", "medium")).lower(),
+        affected_url=d.get("affected_url", default_url),
+        parameter=d.get("parameter"),
+        cwe_id=d.get("cwe_id", ""),
+        description=d.get("description", d.get("detail", "")),
+    )
+
+
+def _resolve_copilot_context(
+    task_id: Optional[str],
+    raw_findings: Optional[list[dict[str, Any]]],
+    provided_url: Optional[str] = None
+) -> tuple[list[Finding], str]:
+    target_url = provided_url or "https://target.local"
+    findings_list: list[Finding] = []
+
+    if raw_findings:
+        for f_dict in raw_findings:
+            findings_list.append(_dict_to_finding(f_dict, target_url))
+            if not provided_url and f_dict.get("affected_url"):
+                target_url = f_dict["affected_url"]
+    elif task_id:
+        with _db_lock:
+            conn = _get_db()
+            task = _get_task(conn, task_id)
+            conn.close()
+        if task:
+            target_url = task.get("url") or target_url
+            res = task.get("results")
+            if isinstance(res, dict):
+                vulns = res.get("vulnerabilities", [])
+                for v in vulns:
+                    if isinstance(v, dict):
+                        findings_list.append(_dict_to_finding(v, target_url))
+
+    return findings_list, target_url
+
+
+@app.post("/api/v1/copilot/chat", tags=["AI Copilot"])
+def copilot_chat_endpoint(req: CopilotChatRequest) -> dict[str, Any]:
+    """Modo 5: Chat interactivo contextual de seguridad con el escaneo actual."""
+    findings, target_url = _resolve_copilot_context(req.task_id, req.findings, req.target_url)
+    return copilot_mgr.chat(
+        query=req.query,
+        findings=findings,
+        target_url=target_url,
+        history=req.history,
+    )
+
+
+@app.post("/api/v1/copilot/triage", tags=["AI Copilot"])
+def copilot_triage_endpoint(req: CopilotTriageRequest) -> dict[str, Any]:
+    """Modo 1: Triage y explicación contextual de capacidades de ataque y riesgo."""
+    finding_obj = _dict_to_finding(req.finding)
+    return copilot_mgr.triage(finding_obj)
+
+
+@app.post("/api/v1/copilot/remediation", tags=["AI Copilot"])
+def copilot_remediation_endpoint(req: CopilotRemediationRequest) -> dict[str, Any]:
+    """Modo 2: Generador de parches de código seguro listos para producción."""
+    finding_obj = _dict_to_finding(req.finding)
+    return copilot_mgr.generate_remediation(finding_obj, tech_stack=req.tech_stack)
+
+
+@app.post("/api/v1/copilot/autofix", tags=["AI Copilot"])
+def copilot_autofix_endpoint(req: CopilotAutofixRequest) -> dict[str, Any]:
+    """Modo 3: Auto-parcheo de archivos de código fuente locales con verificación AST y backups."""
+    finding_obj = _dict_to_finding(req.finding)
+    result = copilot_mgr.autofix_file(req.file_path, finding_obj, dry_run=req.dry_run)
+    return {
+        "success": result.success,
+        "file_path": result.file_path,
+        "applied": result.applied,
+        "diff": result.diff,
+        "backup_path": result.backup_path,
+        "error": result.error,
+    }
+
+
+@app.post("/api/v1/copilot/executive-summary", tags=["AI Copilot"])
+def copilot_executive_summary_endpoint(req: CopilotExecutiveSummaryRequest) -> dict[str, Any]:
+    """Modo 4: Resumen ejecutivo estratégico y matriz de cumplimiento (OWASP / PCI-DSS) para CISOs."""
+    findings, target_url = _resolve_copilot_context(req.task_id, req.findings, req.target_url)
+    return copilot_mgr.executive_summary(findings, target_url)
 
