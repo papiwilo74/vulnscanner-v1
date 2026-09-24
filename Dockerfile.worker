@@ -1,0 +1,22 @@
+# OmniBreach v5.0.0 Enterprise — Distributed Worker Node Dockerfile
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    WORKER_REGION=sa-east-1 \
+    COORDINATOR_URL=http://api:8000
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
+
+COPY . .
+
+CMD ["python", "-m", "scanner.worker"]

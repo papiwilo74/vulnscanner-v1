@@ -115,11 +115,27 @@ class PasswordHasher:
             return False
 
 
+def _is_production() -> bool:
+    return os.environ.get("OMNIBREACH_ENV", os.environ.get("ENV", "development")).lower() == "production"
+
+_EPHEMERAL_JWT_SECRET = secrets.token_hex(32)
+
+
 class JWTManager:
     """Gestor criptográfico de tokens JWT (HS256) sin dependencias externas pesadas."""
 
     def __init__(self, secret: Optional[str] = None) -> None:
-        self.secret = (secret or os.environ.get("VULNSCANNER_JWT_SECRET") or "vulnscanner_enterprise_secret_key_32bytes!").encode("utf-8")
+        configured_secret = (
+            secret
+            or os.environ.get("OMNIBREACH_JWT_SECRET")
+            or os.environ.get("VULNSCANNER_JWT_SECRET")
+        )
+        if _is_production() and not configured_secret:
+            raise RuntimeError(
+                "FATAL: En modo producción es obligatorio definir la variable de entorno "
+                "OMNIBREACH_JWT_SECRET con una clave de alta entropía (mínimo 32 caracteres)."
+            )
+        self.secret = (configured_secret or _EPHEMERAL_JWT_SECRET).encode("utf-8")
 
     def create_token(self, user: User, expires_in_seconds: int = 86400) -> str:
         header = {"alg": "HS256", "typ": "JWT"}
@@ -239,7 +255,14 @@ class TenancyManager:
             row_user = conn.execute("SELECT id FROM users WHERE id = ?", (default_user_id,)).fetchone()
             if not row_user:
                 now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
-                pw_hash = PasswordHasher.hash_password("admin_vulnscanner_2026")
+                admin_pw = os.environ.get("OMNIBREACH_ADMIN_PASSWORD") or os.environ.get("VULNSCANNER_ADMIN_PASSWORD")
+                if _is_production() and not admin_pw:
+                    raise RuntimeError(
+                        "FATAL: En modo producción debe configurar la variable de entorno "
+                        "OMNIBREACH_ADMIN_PASSWORD para la inicialización segura del usuario administrador."
+                    )
+                final_pw = admin_pw or "admin_vulnscanner_2026"
+                pw_hash = PasswordHasher.hash_password(final_pw)
                 conn.execute(
                     "INSERT INTO users (id, org_id, email, password_hash, full_name, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (default_user_id, default_org_id, "admin@vulnscanner.local", pw_hash, "SecOps Admin", Role.ADMIN.value, 1, now_str),

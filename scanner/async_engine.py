@@ -16,9 +16,15 @@ log = logging.getLogger("VulnScanner.AsyncEngine")
 class AsyncScanEngine:
     """Motor asíncrono con control de concurrencia, rate limiting no bloqueante y circuit breaker."""
 
-    def __init__(self, config: ScanConfig, max_concurrency: int = 15):
+    def __init__(
+        self,
+        config: ScanConfig,
+        max_concurrency: int = 15,
+        transport: Optional[httpx.AsyncBaseTransport] = None,
+    ):
         self.config = config
         self.max_concurrency = max_concurrency
+        self.transport = transport
         self.semaphore = asyncio.Semaphore(max_concurrency)
         self._request_count = 0
         self._start_time = 0.0
@@ -56,6 +62,7 @@ class AsyncScanEngine:
             headers["Cookie"] = self.config.cookie
 
         self.client = httpx.AsyncClient(
+            transport=self.transport,
             limits=limits,
             timeout=timeout,
             headers=headers,

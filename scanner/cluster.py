@@ -475,11 +475,27 @@ class ScanningWorkerDaemon:
 
             self.send_heartbeat(active_jobs=1)
             try:
+                # Desempaquetar y preservar toda la configuración de la tarea
+                cfg_json = job_data.get("config_json") or "{}"
+                task_cfg: dict[str, Any] = {}
+                with contextlib.suppress(Exception):
+                    task_cfg = json.loads(cfg_json)
+
                 html_path, json_path, report_data = scan(
                     url=target_url,
                     profile=profile,
                     no_open=True,
                     generate_pdf=True,
+                    cookie_str=task_cfg.get("cookie"),
+                    auth_header=task_cfg.get("auth"),
+                    crawl_pages=int(task_cfg.get("crawl", 1)),
+                    run_subdomains=bool(task_cfg.get("subdomains", False)),
+                    delay=float(task_cfg.get("delay", 0.0)),
+                    stealth=bool(task_cfg.get("stealth", False)),
+                    passive=bool(task_cfg.get("passive", False)),
+                    enable_oast=bool(not task_cfg.get("no_oast", False)),
+                    allow_private=bool(task_cfg.get("allow_private", False)),
+                    param_fuzz=bool(task_cfg.get("param_fuzz", False)),
                 )
                 # Enviar resultados al coordinador
                 requests.post(

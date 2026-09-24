@@ -66,7 +66,7 @@ OMNIBREACH_BANNER = (
     r" / / / / __ `__ \/ __ \/ / __  / ___/ _ \/ __ `/ ___/ __ \ " + "\n"
     r"/ /_/ / / / / / / / / / / /_/ / /  /  __/ /_/ / /__/ / / / " + "\n"
     r"\____/_/ /_/ /_/_/ /_/_/_____/_/   \___/\__,_/\___/_/ /_/  " + "\n"
-    "                      v3.0 EASM\n"
+    "                      v5.0.0 Enterprise\n"
 )
 
 CATEGORY_MAP: dict[str, str] = {
@@ -556,10 +556,10 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="OmniBreach v3.0 — Framework Unificado CTEM: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV y Telemetría en Vivo",
+        description="OmniBreach v5.0.0 Enterprise — Framework Unificado CTEM: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV, Copiloto IA Híbrido y Telemetría en Vivo",
         epilog="Ejemplo: python main.py --easm empresa.com.co"
     )
-    parser.add_argument("--version", "-V", action="version", version="OmniBreach v3.0")
+    parser.add_argument("--version", "-V", action="version", version="OmniBreach v5.0.0 Enterprise")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--easm", type=str, default=None, metavar="DOMINIO",
                         help="Auditoría de Superficie Externa (EASM): Cartografía de subdominios, puertos de ransomware y CISA KEV")

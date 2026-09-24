@@ -20,9 +20,7 @@ async def test_async_engine_fetch_and_limits():
 
     transport = httpx.MockTransport(handler)
 
-    async with AsyncScanEngine(config, max_concurrency=5) as engine:
-        engine.client._transport = transport  # Inyectar mock transport
-
+    async with AsyncScanEngine(config, max_concurrency=5, transport=transport) as engine:
         resp = await engine.fetch("https://api.mock.local/status")
         assert resp is not None
         assert resp.status_code == 200
@@ -62,8 +60,7 @@ async def test_async_engine_run_batch():
 
     test_urls = [f"https://mock.local/page{i}" for i in range(5)]
 
-    async with AsyncScanEngine(config, max_concurrency=4) as engine:
-        engine.client._transport = transport
+    async with AsyncScanEngine(config, max_concurrency=4, transport=transport) as engine:
         findings = await engine.run_batch(test_urls, mock_worker)
 
         assert len(findings) == 5

@@ -22,5 +22,20 @@ services:
     volumes:
       - vulnscanner_reports:/app/reports
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: vulnscanner-worker
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-}
+      - VULNSCANNER_DB=/app/reports/tasks.db
+      - SCANNER_WORKER_CONCURRENCY=4
+    volumes:
+      - vulnscanner_reports:/app/reports
+    restart: unless-stopped
+    depends_on:
+      - api
+
 volumes:
   vulnscanner_reports:

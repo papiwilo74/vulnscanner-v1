@@ -3,7 +3,6 @@ import contextlib
 import json
 import logging
 import os
-import sqlite3
 import uuid
 from threading import Lock
 from typing import Any, Optional
@@ -18,6 +17,7 @@ from pydantic import BaseModel
 from main import scan
 from scanner.ai_copilot import AICopilot
 from scanner.cluster import ClusterCoordinator
+from scanner.db_adapter import UniversalConnection, create_connection
 from scanner.deception import DeceptionManager, SnippetGenerator
 from scanner.models import Finding
 from scanner.tenancy import ROLE_PERMISSIONS, Role, TenancyManager, User
@@ -26,20 +26,36 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OmniBreachAPI")
 
 app = FastAPI(
-    title="OmniBreach v3.0 API",
-    description="Framework Unificado CTEM & Evaluación Perimetral: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad de Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV y Telemetría en Tiempo Real.",
-    version="3.0"
+    title="OmniBreach v5.0.0 Enterprise API",
+    description="Framework Unificado CTEM & Evaluación Perimetral: Cartografía EASM, Grafos de Ataque Probabilísticos (Centralidad de Brandes & What-If), SBOM (CycloneDX/SPDX), Container Security, Correlación CISA KEV, Copiloto IA Híbrido y Telemetría en Tiempo Real.",
+    version="5.0.0"
 )
 
-# Soporte CORS para despliegue distribuido (Frontend Vercel <-> Backend Render)
-_allowed_origins_raw = os.environ.get("CORS_ORIGINS", "*")
-_allowed_origins = [orig.strip() for orig in _allowed_origins_raw.split(",") if orig.strip()] or ["*"]
+# Configuración Segura de CORS (Cumple con W3C / Fetch CORS Specification)
+_OMNIBREACH_ENV = os.environ.get("OMNIBREACH_ENV", os.environ.get("ENV", "development")).lower()
+_allowed_origins_raw = os.environ.get("CORS_ORIGINS", "")
+
+if _OMNIBREACH_ENV == "production":
+    if not _allowed_origins_raw or "*" in _allowed_origins_raw:
+        logger.warning(
+            "[SECURITY ALERT] En producción no se permite wildcard '*' con credenciales en CORS. "
+            "Defina CORS_ORIGINS explícito (ej: https://app.empresa.com)."
+        )
+    _allowed_origins = [orig.strip() for orig in _allowed_origins_raw.split(",") if orig.strip() and orig.strip() != "*"]
+    _allow_credentials = bool(_allowed_origins)
+else:
+    # Modo desarrollo local: whitelist segura de hosts locales habituales
+    _allowed_origins = (
+        [orig.strip() for orig in _allowed_origins_raw.split(",") if orig.strip() and orig.strip() != "*"]
+        or ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://localhost:8000"]
+    )
+    _allow_credentials = True
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins if "*" not in _allowed_origins else ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
+    allow_origins=_allowed_origins,
+    allow_credentials=_allow_credentials,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -138,16 +154,13 @@ def broadcast_event_sync(task_id: str, event_data: dict[str, Any]) -> None:
             new_loop.close()
 
 
-def _get_db() -> sqlite3.Connection:
-    os.makedirs(os.path.dirname(_db_path), exist_ok=True)
-    conn = sqlite3.connect(_db_path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+def _get_db() -> UniversalConnection:
+    conn = create_connection(_db_path)
     _init_db(conn)
     return conn
 
 
-def _init_db(conn: sqlite3.Connection) -> None:
+def _init_db(conn: UniversalConnection) -> None:
     conn.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
             task_id TEXT PRIMARY KEY,
@@ -169,16 +182,30 @@ def _init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _ensure_column(conn: sqlite3.Connection, table: str, column: str, declaration: str) -> None:
-    existing_columns = {
-        row["name"] if isinstance(row, sqlite3.Row) else row[1]
-        for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
-    }
-    if column not in existing_columns:
-        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+def _ensure_column(conn: UniversalConnection, table: str, column: str, declaration: str) -> None:
+    if getattr(conn, "is_postgres", False):
+        check_sql = "SELECT column_name FROM information_schema.columns WHERE table_name = %s AND column_name = %s"
+        row = conn.execute(check_sql, (table, column)).fetchone()
+        if not row:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+    else:
+        def _extract_name(r: Any) -> str:
+            if isinstance(r, dict):
+                return str(r.get("name", ""))
+            try:
+                return str(r["name"])
+            except Exception:
+                return str(r[1])
+
+        existing_columns = {
+            _extract_name(row)
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column not in existing_columns:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
 
 
-def _save_task(conn: sqlite3.Connection, task_id: str, **fields: Any) -> None:
+def _save_task(conn: UniversalConnection, task_id: str, **fields: Any) -> None:
     valid = {"task_id", "url", "status", "html_report_path", "json_report_path", "sarif_report_path", "pdf_report_path", "results", "tenant_id", "region"}
     updates = {k: fields[k] for k in fields if k in valid}
     if "results" in updates and not isinstance(updates["results"], str):
@@ -238,7 +265,7 @@ def _save_task(conn: sqlite3.Connection, task_id: str, **fields: Any) -> None:
     conn.commit()
 
 
-def _get_task(conn: sqlite3.Connection, task_id: str) -> Optional[dict[str, Any]]:
+def _get_task(conn: UniversalConnection, task_id: str) -> Optional[dict[str, Any]]:
     row = conn.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
     if row is None:
         return None
@@ -249,7 +276,7 @@ def _get_task(conn: sqlite3.Connection, task_id: str) -> Optional[dict[str, Any]
     return data
 
 
-def _list_tasks(conn: sqlite3.Connection, tenant_id: Optional[str] = None) -> list[dict[str, Any]]:
+def _list_tasks(conn: UniversalConnection, tenant_id: Optional[str] = None) -> list[dict[str, Any]]:
     if tenant_id:
         rows = conn.execute("SELECT task_id, url, status, created_at, tenant_id, region FROM tasks WHERE tenant_id = ? ORDER BY created_at DESC", (tenant_id,)).fetchall()
     else:
@@ -510,7 +537,7 @@ def health_check() -> dict[str, Any]:
     return {
         "status": "healthy",
         "service": "OmniBreach API",
-        "version": "3.0",
+        "version": "5.0.0",
         "database": "neon-postgresql" if is_postgres else "sqlite",
         "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
     }
@@ -519,8 +546,8 @@ def health_check() -> dict[str, Any]:
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a OmniBreach v3.0 API",
-        "version": "3.0",
+        "message": "Bienvenido a OmniBreach v5.0.0 Enterprise API",
+        "version": "5.0.0",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST", "EASM CISA KEV"],
         "dashboard_url": "/dashboard",
         "health_url": "/health",

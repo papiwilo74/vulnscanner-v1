@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from api import app
-from scanner.tenancy import PasswordHasher, Role, TenancyManager
+from scanner.tenancy import JWTManager, PasswordHasher, Role, TenancyManager
 
 
 @pytest.fixture
@@ -147,3 +147,28 @@ def test_api_auth_and_tenant_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
     task_res = client.get(f"/scan/{task_b_id}", headers={"Authorization": f"Bearer {token_b}"})
     assert task_res.status_code == 200
     assert task_res.json()["task_id"] == task_b_id
+
+
+def test_jwt_production_lockout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OMNIBREACH_ENV", "production")
+    monkeypatch.delenv("OMNIBREACH_JWT_SECRET", raising=False)
+    monkeypatch.delenv("VULNSCANNER_JWT_SECRET", raising=False)
+    with pytest.raises(RuntimeError, match="OMNIBREACH_JWT_SECRET"):
+        JWTManager()
+
+    # Si se suministra un secreto explícito, debe inicializarse correctamente
+    valid_mgr = JWTManager(secret="my_super_secure_production_secret_key_12345")
+    assert valid_mgr.secret == b"my_super_secure_production_secret_key_12345"
+
+
+def test_admin_production_lockout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OMNIBREACH_ENV", "production")
+    monkeypatch.delenv("OMNIBREACH_ADMIN_PASSWORD", raising=False)
+    monkeypatch.delenv("VULNSCANNER_ADMIN_PASSWORD", raising=False)
+    # Proporcionamos JWT secret para que no falle antes en caso de usarlo
+    monkeypatch.setenv("OMNIBREACH_JWT_SECRET", "prod_secret_key_32_characters_long_min")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "lockout_tenancy.db")
+        with pytest.raises(RuntimeError, match="OMNIBREACH_ADMIN_PASSWORD"):
+            TenancyManager(db_path=db_path)
+

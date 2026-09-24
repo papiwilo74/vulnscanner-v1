@@ -7,13 +7,13 @@
 <p align="center">
   <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v5.0.0"><img src="https://img.shields.io/badge/Release-v5.0.0%20Enterprise-007EC6.svg?logo=github" alt="Release v5.0.0" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-brightgreen.svg?logo=github-actions" alt="CI Pipeline" /></a>
-  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(114%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
+  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(117%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(13.9k%20LOC)-green.svg" alt="Bandit" /></a>
   <a href="https://osv.dev/"><img src="https://img.shields.io/badge/SCA%20Intel-OSV.dev%20Live%20Synced-blueviolet.svg" alt="OSV.dev Synced" /></a>
   <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"><img src="https://img.shields.io/badge/Threat%20Intel-CISA%20KEV%20Synced-orange.svg" alt="CISA KEV" /></a>
   <a href="https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html"><img src="https://img.shields.io/badge/Standard-SARIF%20v2.1.0%20OASIS-brightgreen.svg" alt="SARIF v2.1.0" /></a>
   <a href="reports/benchmark_history.json"><img src="https://img.shields.io/badge/Validation-100%25%20Precision%20%7C%20Juice%20Shop%20%26%20PyGoat-brightgreen.svg" alt="Empirical Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-335%20passing%20(100%25)-brightgreen.svg" alt="335 Tests" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-347%20passing%20(100%25)-brightgreen.svg" alt="347 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
@@ -34,7 +34,7 @@
 ## Tabla de Contenidos
 
 - [Arquitectura General](#arquitectura-general)
-- [Los 8 Pilares Diferenciales de OmniBreach](#los-8-pilares-diferenciales-de-omnibreach)
+- [Los 11 Pilares Diferenciales de OmniBreach (v5.0 Enterprise)](#los-11-pilares-diferenciales-de-omnibreach-v50-enterprise)
 - [Validación Empírica Cuantitativa (Juice Shop & PyGoat)](#validacion-empirica-cuantitativa-juice-shop--pygoat)
 - [Base de Conocimiento y Módulos de Estudio (`docs_notebox/`)](#base-de-conocimiento-y-modulos-de-estudio-docs_notebox)
 - [Instalación Rápida](#instalacion-rapida)
@@ -74,6 +74,7 @@ graph TD
         DAG["Grafo Dirigido de Ataque (DAG)"]
         Brandes["Centralidad de Brandes (Choke Points)"]
         WhatIf["Simulador Predictivo What-If"]
+        AICopilot["Copiloto IA Híbrido (Groq + Ollama)"]
     end
 
     subgraph Salidas["5. Cumplimiento & Exportación"]
@@ -81,6 +82,7 @@ graph TD
         PCIDSS["Matriz PCI-DSS v4.0 / OWASP"]
         Bench["Benchmark Harness (Regresión CI)"]
         Dashboard["SOC Web Dashboard (WebSockets)"]
+        Worker["Worker Distribuido Multi-Nodo"]
     end
 
     Target --> Engine
@@ -95,15 +97,17 @@ graph TD
     Deteccion --> DAG
     DAG --> Brandes
     Brandes --> WhatIf
+    WhatIf --> AICopilot
     WhatIf --> SARIF
     WhatIf --> PCIDSS
     Deteccion --> Bench
     Deteccion --> Dashboard
+    Engine --> Worker
 ```
 
 ---
 
-## Los 8 Pilares Diferenciales de OmniBreach
+## Los 11 Pilares Diferenciales de OmniBreach (v5.0 Enterprise)
 
 ### 1. Fuzzing Quirúrgico Contextual (AST DOM Analysis)
 En lugar de disparar decenas de payloads a ciegas que saturan el WAF, OmniBreach envía una sonda benigna alfanumérica previa (`vScanProbe74`) y clasifica el punto de reflejo en el DOM:
@@ -143,6 +147,24 @@ Resuelve el talón de Aquiles de los escáneres DAST en aplicaciones SaaS:
 ### 8. Cumplimiento Normativo y DevSecOps
 * Mapeo contra **PCI-DSS v4.0** (Req 6.2.4, 6.4.1, 6.4.3, 8.3.1, 4.1.2), **OWASP Top 10 (2021)**, **ISO/IEC 27001:2022** y **NIST SP 800-53 Rev 5**.
 * Exportación oficial en formato **SARIF v2.1.0** para integración nativa con GitHub Advanced Security, GitLab y DefectDojo.
+
+### 9. Copiloto IA Híbrido (Groq LPUs + Ollama Local GPU) & Auto-Fix
+* **Arquitectura Híbrida**: Conmutación transparente entre inferencia ultra-rápida en la nube con LPUs (**Groq** con LLaMA 3.3 / Qwen) y privacidad total en hardware local (**Ollama** con GPU local sin fuga de datos sensibles).
+* **5 Modos Operativos Especializados**:
+  1. *Explicación Ejecutiva*: Síntesis del impacto de negocio y vectores de ataque para comités directivos.
+  2. *Remediation PR*: Generación de diffs Git y comandos de aplicación directa.
+  3. *Triage de Falsos Positivos*: Análisis probabilístico de atenuantes y verificación de contexto.
+  4. *Modelado de Amenazas*: Clasificación formal bajo frameworks STRIDE y MITRE ATT&CK.
+  5. *Auto-Fix con AST*: Análisis sintáctico y aplicación autónoma de parches directamente sobre el código fuente con backup de seguridad `.bak`.
+
+### 10. Hardening de Producción, RBAC Multi-Tenant & W3C CORS
+* **Aislamiento Criptográfico**: Segregación estricta por Organización y Roles granulares (`ADMIN`, `AUDITOR`, `DEVELOPER`).
+* **Bloqueo Incondicional en Producción (Fail-Closed Security)**: La plataforma rehúsa arrancar en producción si `OMNIBREACH_JWT_SECRET` o `OMNIBREACH_ADMIN_PASSWORD` no han sido provistos con suficiente entropía, erradicando credenciales predecibles.
+* **CORS Estricto**: Rechazo tajante de comodines `*` combinados con cabeceras de autorización conforme a la especificación W3C Fetch.
+
+### 11. Arquitectura Distribuida y Persistencia Agnóstica (PostgreSQL Neon / SQLite)
+* **Worker Desacoplado & Docker (`Dockerfile.worker`)**: Worker asíncrono con control de concurrencia, heartbeat resiliente, manejo elegante de señales `SIGTERM`/`SIGINT` y propagación íntegra de `config_json` (cookies, proxies, rate-limits, OAST, stealth).
+* **Adaptador Universal de Base de Datos (`UniversalConnection`)**: Soporte nativo para PostgreSQL Serverless (**Neon**) con fallback transparente a SQLite para desarrollo sin cambios en la lógica de aplicación.
 
 ---
 
@@ -284,13 +306,13 @@ OmniBreach se desarrolla bajo un estándar riguroso de ingeniería de software c
 # 1. Linter y formato estricto (0 errores garantizados)
 ruff check .
 
-# 2. Tipado estático exhaustivo (0 errores en los 114 archivos del proyecto)
+# 2. Tipado estático exhaustivo (0 errores en los 117 archivos del proyecto)
 mypy --explicit-package-bases scanner utils api.py main.py tests scripts
 
 # 3. Auditoría de seguridad de código AST (0 vulnerabilidades en 13.9k LOC)
 bandit -c bandit.yaml -r scanner api.py main.py utils scripts
 
-# 4. Suite completa de pruebas unitarias y de integración (335 pruebas pasando al 100%)
+# 4. Suite completa de pruebas unitarias y de integración (347 pruebas pasando al 100%)
 pytest tests -v
 ```
 
@@ -307,9 +329,13 @@ VulnScanner/
 ├── requirements-dev.txt        # Dependencias de desarrollo, linters y pruebas
 ├── pyproject.toml              # Configuración de empaquetado y herramientas
 ├── Dockerfile                  # Contenedor Docker de producción
-├── docker-compose.yml          # Orquestador multi-servicio (API + CLI)
+├── Dockerfile.worker           # Contenedor para worker distribuido desacoplado
+├── docker-compose.yml          # Orquestador multi-servicio (API + CLI + Workers)
 │
 ├── scanner/                    # Módulos de detección y motores nucleares
+│   ├── ai_copilot.py           # [v5.0] Copiloto IA híbrido (Groq + Ollama) y Auto-Fix AST
+│   ├── db_adapter.py           # [v5.0] Conector agnóstico PostgreSQL (Neon) y SQLite
+│   ├── worker.py               # [v5.0] CLI daemon para workers distribuidos de escaneo
 │   ├── context_fuzzer.py       # [v5.0] Fuzzing contextual con análisis de reflejo en AST DOM
 │   ├── session_macro.py        # [v5.0] State-Aware Session Manager y macro replay en caliente
 │   ├── sca.py                  # [v5.0] SCA dinámico con API de OSV.dev y fallback local
@@ -319,6 +345,7 @@ VulnScanner/
 │   ├── xxe.py                  # Detección de XML External Entities clásico y ciego
 │   ├── attack_graph.py         # Grafo de ataque probabilístico y Centralidad de Brandes
 │   ├── engine.py               # ScanEngine concurrente, circuit breaker y perfiles
+│   ├── async_engine.py         # Motor de escaneo asíncrono con httpx para alto throughput
 │   ├── cookies.py              # Auditoría de cookies con discriminación sesión vs cliente
 │   ├── cors.py                 # CORS con detección de origen null y filtro de estáticos
 │   ├── headers.py              # Auditoría de cabeceras HTTP y detección de CSP débil
@@ -353,7 +380,8 @@ VulnScanner/
 │   ├── 07_seguridad_corporativa_pci_dss_sarif_devsecops.md
 │   └── 08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md
 │
-├── tests/                      # Suite de 335 pruebas automatizadas
+├── tests/                      # Suite de 347 pruebas automatizadas
+│   ├── test_ai_copilot.py      # [v5.0] Pruebas del copiloto IA, Groq/Ollama y Auto-Fix
 │   ├── test_context_fuzzer.py  # [v5.0] Pruebas de detección contextual de DOM
 │   ├── test_session_macro.py   # [v5.0] Pruebas de macros y centinelas de sesión
 │   ├── test_osv_sca.py         # [v5.0] Pruebas de integración con OSV.dev y fallback
