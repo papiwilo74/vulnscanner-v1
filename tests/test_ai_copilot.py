@@ -99,7 +99,7 @@ def test_hybrid_client_offline_rule_fallback() -> None:
 # ─────────────────────────────────────────────────────────────
 
 def test_finding_triage_mode(sample_finding: Finding) -> None:
-    client = HybridLLMClient(AIConfig(groq_api_key=""))
+    client = HybridLLMClient(AIConfig(groq_api_key="", ollama_url=""))
     triager = FindingTriager(client)
 
     # Probando con el fallback determinista
@@ -115,7 +115,7 @@ def test_finding_triage_mode(sample_finding: Finding) -> None:
 # ─────────────────────────────────────────────────────────────
 
 def test_remediation_patch_generator(sample_finding: Finding) -> None:
-    client = HybridLLMClient(AIConfig(groq_api_key=""))
+    client = HybridLLMClient(AIConfig(groq_api_key="", ollama_url=""))
     remediator = RemediationGenerator(client)
 
     patch_data = remediator.generate_patch(sample_finding, tech_stack=["FastAPI", "Python"])

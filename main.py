@@ -304,6 +304,21 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
     all_findings: list[Finding] = []
     global_tech_stack: set[str] = set()
 
+    def _notify(pct: int, step_desc: str) -> None:
+        if progress_callback:
+            with contextlib.suppress(Exception):
+                progress_callback({
+                    "event": "progress",
+                    "step": step_desc,
+                    "percent": pct,
+                    "current_rps": getattr(engine, "current_rps", 10.0) or 10.0,
+                    "total_requests": getattr(engine, "total_requests", 0),
+                    "circuit_state": getattr(getattr(engine, "circuit_breaker", None), "state", "CLOSED"),
+                    "waf_detected": getattr(engine, "waf_detected", False),
+                })
+
+    _notify(15, "Iniciando motor de auditoría y análisis de entorno...")
+
     session = None
 
     # 1. Autenticación desde archivo HAR si se especifica
@@ -339,6 +354,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
     # 3. Detección Inteligente de WAF y adaptación perimetral
     if not no_waf_detect and not engine.is_cancelled:
+        _notify(20, "Detectando presencia de WAF o protección perimetral...")
         logger.info("Detectando presencia de WAF o protección perimetral...")
         try:
             from scanner.waf_detector import WAFDetector
@@ -379,6 +395,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             target_urls = har_matching[:min(crawl_pages * 2, config.max_crawl_pages)]
 
     if crawl_pages > 1 and not engine.is_cancelled and not har_discovered_urls:
+        _notify(30, f"Rastreando estructura web y formularios ({min(crawl_pages, config.max_crawl_pages)} páginas máx)...")
         target_urls = crawl_site(
             url,
             max_pages=min(crawl_pages, config.max_crawl_pages),
@@ -387,6 +404,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         )
 
     if target_urls and not engine.is_cancelled and (param_fuzz or profile == "aggressive"):
+        _notify(40, f"Descubriendo parámetros ocultos en {len(target_urls)} URL(s)...")
         logger.info("[PARAM-FUZZ] Ejecutando descubrimiento diferencial de parámetros en %d URL(s)...", len(target_urls))
         new_param_urls: list[str] = []
         for u in target_urls[:5]:
@@ -401,21 +419,25 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             target_urls = list(dict.fromkeys(target_urls + new_param_urls))
 
     if not engine.is_cancelled:
+        _notify(50, "Buscando archivos sensibles expuestos (.env, .git, backups)...")
         logger.info("Búsqueda de archivos sensibles expuestos...")
         raw = check_exposed_files(url, session=session)
         all_findings += _legacy_to_findings(raw, "fuzzer", url)
 
     if not engine.is_cancelled:
+        _notify(60, "Auditando cifrado SSL/TLS y certificados digitales...")
         logger.info("Certificado SSL/TLS...")
         raw = check_ssl(url, session=session)
         all_findings += _legacy_to_findings(raw, "ssl", url)
 
     if not engine.is_cancelled:
+        _notify(65, "Escaneando puertos y servicios perimetrales expuestos...")
         logger.info("Escaneando puertos y servicios expuestos...")
         raw = check_ports(url)
         all_findings += _legacy_to_findings(raw, "ports", url)
 
     if target_urls and not engine.is_cancelled:
+        _notify(75, f"Ejecutando pruebas de seguridad DAST en {len(target_urls)} página(s)...")
         logger.info("Escaneando %d página(s)...", len(target_urls))
         scan_func = partial(
             _scan_single_page,
@@ -474,6 +496,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             logger.info("[IAST] Correlación exitosa: %d hallazgo(s) enriquecido(s) con archivo y línea de código exacta.", enriched_count)
 
     # 6. Orquestador de Grafos de Ataque y Análisis de Choke Points Defensivos
+    _notify(90, "Correlacionando hallazgos y construyendo grafos de ataque...")
     attack_graph_dict = None
     if attack_chain and all_findings:
         attack_graph = engine.build_attack_graph(all_findings)
@@ -879,7 +902,7 @@ def main() -> None:
         logger.info("[WEB] Iniciando Servidor Web y Panel SOC en %s ...", web_url)
         with contextlib.suppress(Exception):
             webbrowser.open(web_url)
-        uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=False)
+        uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=False, ws="auto")
         sys.exit(0)
 
     lab_server = None

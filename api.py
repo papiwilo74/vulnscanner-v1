@@ -28,10 +28,22 @@ from scanner.tenancy import ROLE_PERMISSIONS, Role, TenancyManager, User
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("OmniBreachAPI")
 
+_main_event_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> Any:
+    global _main_event_loop
+    with contextlib.suppress(Exception):
+        _main_event_loop = asyncio.get_running_loop()
+    yield
+
+
 app = FastAPI(
     title="OmniBreach v3.8 API",
     description="Framework Modular de DAST y Evaluación de Superficie Externa (EASM): Fuzzing Contextual (AST), Grafos de Ataque, SBOM, Copiloto IA Híbrido y Telemetría en Tiempo Real.",
-    version="3.8"
+    version="3.8",
+    lifespan=lifespan,
 )
 
 # Configuración Segura de CORS (Cumple con W3C / Fetch CORS Specification)
@@ -50,7 +62,7 @@ else:
     # Modo desarrollo local: whitelist segura de hosts locales habituales
     _allowed_origins = (
         [orig.strip() for orig in _allowed_origins_raw.split(",") if orig.strip() and orig.strip() != "*"]
-        or ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://localhost:8000"]
+        or ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://localhost:8000", "http://127.0.0.1:8000"]
     )
     _allow_credentials = True
 
@@ -149,6 +161,32 @@ class EventBroadcaster:
 broadcaster = EventBroadcaster()
 
 
+def _dispatch_coroutine_threadsafe(coro: Any) -> None:
+    """Ejecuta una corutina asíncrona de forma segura en el bucle principal de ASGI/uvicorn."""
+    global _main_event_loop
+    target_loop = _main_event_loop
+    if target_loop is not None and not target_loop.is_closed():
+        try:
+            asyncio.run_coroutine_threadsafe(coro, target_loop)
+            return
+        except Exception:
+            pass
+
+    try:
+        loop = asyncio.get_running_loop()
+        if loop is not None and not loop.is_closed():
+            asyncio.run_coroutine_threadsafe(coro, loop)
+            return
+    except RuntimeError:
+        pass
+
+    new_loop = asyncio.new_event_loop()
+    try:
+        new_loop.run_until_complete(coro)
+    finally:
+        new_loop.close()
+
+
 def broadcast_deception_alert(event_data: dict[str, Any]) -> None:
     """Envía alerta de canario detonado a todas las conexiones activas y al canal 'deception'."""
     sockets = broadcaster.record_and_get_targets("deception", event_data)
@@ -163,15 +201,7 @@ def broadcast_deception_alert(event_data: dict[str, Any]) -> None:
             with contextlib.suppress(Exception):
                 await ws.send_text(msg)
 
-    try:
-        loop = asyncio.get_running_loop()
-        asyncio.run_coroutine_threadsafe(_send_all(), loop)
-    except RuntimeError:
-        new_loop = asyncio.new_event_loop()
-        try:
-            new_loop.run_until_complete(_send_all())
-        finally:
-            new_loop.close()
+    _dispatch_coroutine_threadsafe(_send_all())
 
 
 def broadcast_event_sync(task_id: str, event_data: dict[str, Any]) -> None:
@@ -187,15 +217,7 @@ def broadcast_event_sync(task_id: str, event_data: dict[str, Any]) -> None:
             with contextlib.suppress(Exception):
                 await ws.send_text(msg)
 
-    try:
-        loop = asyncio.get_running_loop()
-        asyncio.run_coroutine_threadsafe(_send_all(), loop)
-    except RuntimeError:
-        new_loop = asyncio.new_event_loop()
-        try:
-            new_loop.run_until_complete(_send_all())
-        finally:
-            new_loop.close()
+    _dispatch_coroutine_threadsafe(_send_all())
 
 
 def _get_db() -> UniversalConnection:
@@ -612,9 +634,14 @@ def get_dashboard() -> HTMLResponse:
     return HTMLResponse(content=content)
 
 
+
 @app.websocket("/ws/scan/{task_id}")
 async def websocket_scan_stream(websocket: WebSocket, task_id: str) -> None:
     """Canal WebSocket para transmisión reactiva de telemetría, hallazgos y estado del escaneo."""
+    global _main_event_loop
+    with contextlib.suppress(Exception):
+        _main_event_loop = asyncio.get_running_loop()
+
     await websocket.accept()
     past_events = broadcaster.connect(task_id, websocket)
 
@@ -629,7 +656,7 @@ async def websocket_scan_stream(websocket: WebSocket, task_id: str) -> None:
         while True:
             # Mantener la conexión abierta recibiendo pings o mensajes del cliente
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, Exception):
         broadcaster.disconnect(task_id, websocket)
 
 
@@ -749,6 +776,10 @@ class DeceptionGenerateRequest(BaseModel):
 @app.websocket("/ws/deception")
 async def websocket_deception_stream(websocket: WebSocket) -> None:
     """Canal WebSocket para transmisión en tiempo real de alertas de intrusión HoneyTokens."""
+    global _main_event_loop
+    with contextlib.suppress(Exception):
+        _main_event_loop = asyncio.get_running_loop()
+
     await websocket.accept()
     past_events = broadcaster.connect("deception", websocket)
     for evt in past_events[-25:]:
@@ -759,7 +790,7 @@ async def websocket_deception_stream(websocket: WebSocket) -> None:
     try:
         while True:
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, Exception):
         broadcaster.disconnect("deception", websocket)
 
 

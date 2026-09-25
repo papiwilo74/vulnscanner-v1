@@ -782,6 +782,9 @@
         let ws = null;
         let chartInstance = null;
         let severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+        let pollingInterval = null;
+        let scanCompleted = false;
+        let reconnectTimeout = null;
 
         function initChart() {
             const ctx = document.getElementById('severityChart').getContext('2d');
@@ -811,10 +814,21 @@
             const socketUrl = wsUrl(`/ws/scan/${taskId}`);
             
             if (ws) {
-                ws.close();
+                try { ws.close(); } catch(e) {}
+            }
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
             }
 
-            ws = new WebSocket(socketUrl);
+            try {
+                ws = new WebSocket(socketUrl);
+            } catch (err) {
+                console.warn("WebSocket init error:", err);
+                document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+                document.getElementById('conn-text').textContent = 'WebSocket: Polling activo';
+                return;
+            }
 
             ws.onopen = () => {
                 document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 live-dot';
@@ -832,12 +846,21 @@
 
             ws.onclose = () => {
                 document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
-                document.getElementById('conn-text').textContent = 'WebSocket: Desconectado';
+                if (!scanCompleted && currentTaskId === taskId) {
+                    document.getElementById('conn-text').textContent = 'WebSocket: Reconectando (Polling activo)';
+                    reconnectTimeout = setTimeout(() => {
+                        if (!scanCompleted && currentTaskId === taskId) {
+                            connectWebSocket(taskId);
+                        }
+                    }, 3000);
+                } else {
+                    document.getElementById('conn-text').textContent = 'WebSocket: Desconectado';
+                }
             };
 
             ws.onerror = () => {
                 document.getElementById('conn-dot').className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
-                document.getElementById('conn-text').textContent = 'WebSocket: Error';
+                document.getElementById('conn-text').textContent = 'WebSocket: En espera (Polling activo)';
             };
         }
 
@@ -865,6 +888,11 @@
             } else if (msg.event === 'finding') {
                 appendFinding(msg.finding);
             } else if (msg.event === 'completed') {
+                scanCompleted = true;
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
                 document.getElementById('scan-percent-text').textContent = '100%';
                 document.getElementById('scan-progress-bar').style.width = '100%';
                 document.getElementById('scan-step-text').textContent = '¡Auditoría Finalizada!';
@@ -890,7 +918,66 @@
                     mContainer.innerHTML = `<pre class="mermaid">${msg.attack_graph.mermaid_source}</pre>`;
                     mermaid.run({ nodes: [mContainer.querySelector('.mermaid')] });
                 }
+            } else if (msg.event === 'failed') {
+                scanCompleted = true;
+                if (pollingInterval) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                }
+                document.getElementById('scan-step-text').textContent = 'Error: ' + (msg.error || msg.step || 'Fallo durante el escaneo');
+                document.getElementById('scan-progress-bar').className = 'bg-rose-500 h-full rounded-full transition-all duration-300';
+                document.getElementById('btn-launch').disabled = false;
+                document.getElementById('btn-launch').innerHTML = '<i class="fa-solid fa-play"></i> Reintentar Escaneo';
             }
+        }
+
+        function startPollingFallback(taskId) {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(async () => {
+                if (scanCompleted || currentTaskId !== taskId) {
+                    clearInterval(pollingInterval);
+                    pollingInterval = null;
+                    return;
+                }
+                try {
+                    const res = await fetch(apiUrl(`/scan/${taskId}`));
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    
+                    if (data.status === 'completed' && !scanCompleted) {
+                        let results = data.results;
+                        if (typeof results === 'string') {
+                            try { results = JSON.parse(results); } catch(e) {}
+                        }
+                        if (results && results.vulnerabilities && Array.isArray(results.vulnerabilities)) {
+                            const list = document.getElementById('findings-list');
+                            if (list.children.length <= 1) {
+                                results.vulnerabilities.forEach(v => appendFinding(v));
+                            }
+                        }
+                        handleSocketMessage({
+                            event: 'completed',
+                            percent: 100,
+                            html_path: data.html_report_path,
+                            json_path: data.json_report_path,
+                            sarif_path: data.sarif_report_path,
+                            pdf_path: data.pdf_report_path,
+                            attack_graph: results && results.engine ? results.engine.attack_graph : null
+                        });
+                    } else if (data.status === 'failed' && !scanCompleted) {
+                        let results = data.results;
+                        if (typeof results === 'string') {
+                            try { results = JSON.parse(results); } catch(e) {}
+                        }
+                        handleSocketMessage({
+                            event: 'failed',
+                            error: (results && results.error) || 'Fallo durante la auditoría'
+                        });
+                    }
+                } catch(e) {
+                    console.debug("Fallback poll error:", e);
+                }
+            }, 2500);
         }
 
         function appendFinding(f) {
@@ -971,6 +1058,7 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Auditando...';
 
             // Reset UI
+            scanCompleted = false;
             severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
             document.getElementById('metric-high').textContent = '0';
             document.getElementById('metric-med').textContent = '0';
@@ -979,6 +1067,7 @@
             document.getElementById('findings-list').innerHTML = '';
             document.getElementById('progress-container').classList.remove('hidden');
             document.getElementById('downloads-container').classList.add('hidden');
+            document.getElementById('scan-progress-bar').className = 'bg-indigo-500 h-full rounded-full transition-all duration-300';
             document.getElementById('scan-progress-bar').style.width = '5%';
             document.getElementById('scan-percent-text').textContent = '5%';
             document.getElementById('scan-step-text').textContent = 'Conectando con el motor...';
@@ -1006,6 +1095,7 @@
                 if (data.task_id) {
                     currentTaskId = data.task_id;
                     connectWebSocket(currentTaskId);
+                    startPollingFallback(currentTaskId);
                 } else {
                     throw new Error("No se recibió task_id");
                 }

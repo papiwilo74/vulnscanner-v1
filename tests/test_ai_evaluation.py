@@ -195,7 +195,8 @@ class TestQuantitativeAIEvaluation:
     """Valida la evaluación cuantitativa de precisión contra el corpus de referencia con ground truth."""
 
     def test_ai_evaluator_against_ground_truth_corpus(self) -> None:
-        evaluator = AIEvaluator(DEFAULT_CORPUS_PATH)
+        triager = FindingTriager(HybridLLMClient(AIConfig(groq_api_key="", ollama_url="")))
+        evaluator = AIEvaluator(DEFAULT_CORPUS_PATH, triager=triager)
         report = evaluator.evaluate()
 
         assert report.total_samples == 26
@@ -215,7 +216,8 @@ class TestQuantitativeAIEvaluation:
         assert report.precision_gain_percent > 30.0
 
     def test_ai_evaluator_report_generation(self, tmp_path: Any) -> None:
-        evaluator = AIEvaluator(DEFAULT_CORPUS_PATH)
+        triager = FindingTriager(HybridLLMClient(AIConfig(groq_api_key="", ollama_url="")))
+        evaluator = AIEvaluator(DEFAULT_CORPUS_PATH, triager=triager)
         json_file = tmp_path / "test_report.json"
         md_file = tmp_path / "test_report.md"
         report = evaluator.run_and_save_reports(json_file, md_file)
