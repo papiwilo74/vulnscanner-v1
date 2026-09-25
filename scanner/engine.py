@@ -88,6 +88,8 @@ class ScanConfig:
     iast_url: Optional[str] = None
     enable_attack_chain: bool = True
     session_macro: Any = None
+    totp_secret: Optional[str] = None
+    sentinel_url: Optional[str] = None
 
     @classmethod
     def from_profile(cls, profile: ScanProfile, target: str = "", **overrides: Any) -> "ScanConfig":
@@ -122,6 +124,23 @@ class ScanEngine:
         if getattr(self.config, "session_macro", None):
             from scanner.session_macro import StateAwareSessionManager
             self.session_manager = StateAwareSessionManager(macro=self.config.session_macro)
+        elif self.config.login_url and (self.config.totp_secret or self.config.sentinel_url):
+            from scanner.auth_helper import parse_credentials
+            from scanner.session_macro import StateAwareSessionManager, build_smart_auth_macro
+            parsed = parse_credentials(self.config.login_creds or "")
+            username = parsed.get("username") or parsed.get("user") or parsed.get("email") or ""
+            password = parsed.get("password") or parsed.get("pass") or ""
+            macro = build_smart_auth_macro(
+                login_url=self.config.login_url,
+                username=username,
+                password=password,
+                totp_secret=self.config.totp_secret,
+                sentinel_url=self.config.sentinel_url,
+                extra_data=parsed,
+            )
+            self.config.session_macro = macro
+            self.session_manager = StateAwareSessionManager(macro=macro)
+
 
     @property
     def current_rps(self) -> float:

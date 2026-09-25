@@ -416,6 +416,10 @@ class ScanRequest(BaseModel):
     base_branch: str = "main"
     region: Optional[str] = None
     dispatch_to_cluster: bool = False
+    login_url: Optional[str] = None
+    login_creds: Optional[str] = None
+    totp_secret: Optional[str] = None
+    sentinel_url: Optional[str] = None
 
 
 def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
@@ -464,6 +468,10 @@ def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
             stealth=req.stealth,
             passive=req.passive,
             enable_oast=req.enable_oast,
+            login_url=req.login_url,
+            login_creds=req.login_creds,
+            totp_secret=req.totp_secret,
+            sentinel_url=req.sentinel_url,
             profile=req.profile,
             allow_private=req.allow_private,
             har_file=req.har_file,

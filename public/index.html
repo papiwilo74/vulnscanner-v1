@@ -133,6 +133,38 @@
                     </button>
                 </div>
             </div>
+            <!-- Advanced Authentication & MFA/TOTP Accordion -->
+            <div class="mt-4 border-t border-slate-800/80 pt-3">
+                <button type="button" onclick="toggleAuthSection()" class="flex items-center justify-between w-full text-xs font-semibold text-slate-400 hover:text-indigo-400 transition py-1 focus:outline-none">
+                    <span class="flex items-center gap-2">
+                        <i class="fa-solid fa-key text-indigo-400"></i>
+                        <span>Autenticación Avanzada, MFA / TOTP (RFC 6238) y Sesiones</span>
+                    </span>
+                    <i id="auth-chevron" class="fa-solid fa-chevron-down text-slate-500 transition-transform duration-200"></i>
+                </button>
+                <div id="auth-advanced-container" class="hidden mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                    <div>
+                        <label for="login-url" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Login URL</label>
+                        <input type="text" id="login-url" placeholder="https://app.com/login" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
+                    </div>
+                    <div>
+                        <label for="login-creds" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Credenciales (user=u;pass=p)</label>
+                        <input type="text" id="login-creds" placeholder="username=admin;password=secret" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
+                    </div>
+                    <div>
+                        <label for="totp-secret" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Secreto TOTP (Base32)</label>
+                        <input type="text" id="totp-secret" placeholder="JBSWY3DPEHPK3PXP" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
+                    </div>
+                    <div>
+                        <label for="sentinel-url" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">URL Centinela de Sesión</label>
+                        <input type="text" id="sentinel-url" placeholder="https://app.com/api/profile" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
+                    </div>
+                    <div class="col-span-full flex items-center gap-2 mt-1">
+                        <input type="checkbox" id="headless-login" class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                        <label for="headless-login" class="text-xs text-slate-300">Navegador Headless Interactivo (Playwright para SPAs, React, Angular, Vue)</label>
+                    </div>
+                </div>
+            </div>
             <!-- Progress Bar -->
             <div id="progress-container" class="mt-5 hidden">
                 <div class="flex justify-between text-xs font-mono text-slate-400 mb-1">
@@ -1044,6 +1076,19 @@
             list.prepend(item);
         }
 
+        function toggleAuthSection() {
+            const container = document.getElementById('auth-advanced-container');
+            const chevron = document.getElementById('auth-chevron');
+            if (!container || !chevron) return;
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                chevron.classList.add('rotate-180');
+            } else {
+                container.classList.add('hidden');
+                chevron.classList.remove('rotate-180');
+            }
+        }
+
         async function launchScan() {
             const urlInput = document.getElementById('target-url');
             const targetUrl = urlInput.value.trim();
@@ -1079,6 +1124,12 @@
             const selectedRegion = regionSelect ? regionSelect.value : 'local';
             const isCluster = selectedRegion !== 'local';
 
+            const loginUrl = document.getElementById('login-url')?.value.trim() || null;
+            const loginCreds = document.getElementById('login-creds')?.value.trim() || null;
+            const totpSecret = document.getElementById('totp-secret')?.value.trim() || null;
+            const sentinelUrl = document.getElementById('sentinel-url')?.value.trim() || null;
+            const headlessLogin = document.getElementById('headless-login')?.checked || false;
+
             try {
                 const res = await fetch(apiUrl('/scan'), {
                     method: 'POST',
@@ -1089,6 +1140,11 @@
                         generate_pdf: true,
                         region: isCluster ? (selectedRegion === 'cluster' ? null : selectedRegion) : 'local',
                         dispatch_to_cluster: isCluster,
+                        login_url: loginUrl,
+                        login_creds: loginCreds,
+                        totp_secret: totpSecret,
+                        sentinel_url: sentinelUrl,
+                        headless_login: headlessLogin,
                     })
                 });
                 const data = await res.json();

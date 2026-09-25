@@ -236,6 +236,7 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          param_fuzz: bool = False,
          session_macro_file: Optional[str] = None,
          sentinel_url: Optional[str] = None,
+         totp_secret: Optional[str] = None,
          copilot: bool = False,
          autofix: bool = False,
          source_dir: Optional[str] = None,
@@ -252,6 +253,8 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         allow_private=allow_private,
         iast_url=iast_url,
         enable_attack_chain=attack_chain,
+        totp_secret=totp_secret,
+        sentinel_url=sentinel_url,
     )
     if delay > 0:
         config.delay = delay
@@ -278,6 +281,22 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
                 logger.info("[SESSION MACRO] Macro de sesión cargado: %s", config.session_macro.name)
         except Exception as err:
             logger.error("Error al cargar macro de sesión '%s': %s", session_macro_file, err)
+    elif not config.session_macro and login_url and (totp_secret or sentinel_url):
+        from scanner.auth_helper import parse_credentials
+        from scanner.session_macro import build_smart_auth_macro
+        parsed = parse_credentials(login_creds or "")
+        username = parsed.get("username") or parsed.get("user") or parsed.get("email") or ""
+        password = parsed.get("password") or parsed.get("pass") or ""
+        config.session_macro = build_smart_auth_macro(
+            login_url=login_url,
+            username=username,
+            password=password,
+            totp_secret=totp_secret,
+            sentinel_url=sentinel_url,
+            is_spa=headless_login,
+            extra_data=parsed,
+        )
+        logger.info("[SESSION MACRO] Macro inteligente auto-configurado para login con MFA/TOTP: %s", config.session_macro.name)
 
     engine = ScanEngine(config)
     try:
@@ -336,11 +355,14 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
     # 2. Login dinámico o headless si se especifica
     if session is None and login_url and login_creds:
         if headless_login:
-            auth_session = headless_browser_login(login_url, login_creds)
+            auth_session = headless_browser_login(login_url, login_creds, totp_secret=totp_secret)
         else:
-            auth_session = dynamic_login(login_url, login_creds)
+            auth_session = dynamic_login(login_url, login_creds, totp_secret=totp_secret)
         if auth_session is not None:
             session = auth_session
+            if getattr(engine, "session_manager", None):
+                engine.session_manager.session = session
+
 
     if stealth:
         if session is None:
@@ -684,6 +706,8 @@ def main() -> None:
                         help="Ruta a archivo JSON con la definición del macro de autenticación interactiva")
     parser.add_argument("--sentinel-url", type=str, default=None,
                         help="URL centinela para comprobar sesión viva y forzar re-autenticación automática")
+    parser.add_argument("--totp-secret", type=str, default=None,
+                        help="Secreto Base32 para generación autónoma de códigos MFA/TOTP (RFC 6238)")
     parser.add_argument("--benchmark", action="store_true",
                         help="Ejecuta el arnés de benchmark automatizado contra aplicaciones locales (Juice Shop / PyGoat)")
 
@@ -983,6 +1007,7 @@ def main() -> None:
             param_fuzz=args.param_fuzz,
             session_macro_file=args.session_macro,
             sentinel_url=args.sentinel_url,
+            totp_secret=args.totp_secret,
             copilot=args.copilot,
             autofix=args.autofix,
             source_dir=args.source_dir,

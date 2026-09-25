@@ -679,6 +679,10 @@ class ScanningWorkerDaemon:
                     enable_oast=bool(not task_cfg.get("no_oast", False)),
                     allow_private=bool(task_cfg.get("allow_private", False)),
                     param_fuzz=bool(task_cfg.get("param_fuzz", False)),
+                    login_url=task_cfg.get("login_url"),
+                    login_creds=task_cfg.get("login_creds"),
+                    totp_secret=task_cfg.get("totp_secret"),
+                    sentinel_url=task_cfg.get("sentinel_url"),
                 )
 
                 self.update_progress(task_id, 90, "sincronizando_reportes")

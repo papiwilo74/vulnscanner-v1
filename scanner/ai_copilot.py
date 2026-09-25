@@ -544,6 +544,20 @@ class RemediationGenerator:
                 "defense_in_depth": "Revisar políticas de seguridad y validadores de esquema."
             }
 
+        # Garantizar claves contractuales del schema ante respuestas incompletas de LLMs locales
+        data.setdefault("language", "python")
+        data.setdefault("filename_hint", "security_middleware.py")
+        data.setdefault("before_code", "# Código vulnerable detectado")
+        data.setdefault(
+            "after_code",
+            data.get("fixed_code")
+            or data.get("remediation_code")
+            or data.get("secure_code")
+            or "# Código seguro sugerido por OmniBreach",
+        )
+        data.setdefault("explanation", "Mitigación generada por el Copiloto de Seguridad.")
+        data.setdefault("defense_in_depth", "Implementar validación estricta y cabeceras de seguridad.")
+
         data["provider_used"] = provider
         data["latency_ms"] = round(latency, 2)
         return data

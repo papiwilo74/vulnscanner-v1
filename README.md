@@ -338,6 +338,7 @@ VulnScanner/
 │   ├── worker.py               # [v3.8] CLI daemon para workers distribuidos de escaneo
 │   ├── context_fuzzer.py       # [v3.8] Fuzzing contextual con análisis de reflejo en AST DOM
 │   ├── session_macro.py        # [v3.8] State-Aware Session Manager y macro replay en caliente
+│   ├── totp.py                 # [v3.8] Generador y validador de códigos TOTP/HOTP RFC 6238/4226
 │   ├── sca.py                  # [v3.8] SCA dinámico con API de OSV.dev y fallback local
 │   ├── sqli.py                 # SQLi booleano diferencial, time-based y firmas DB
 │   ├── dom_xss.py              # DOM Taint Tracking dinámico con hooks en Playwright
@@ -380,7 +381,8 @@ VulnScanner/
 │   ├── 07_seguridad_corporativa_pci_dss_sarif_devsecops.md
 │   └── 08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md
 │
-├── tests/                      # Suite de 347 pruebas automatizadas
+├── tests/                      # Suite de pruebas automatizadas (+395 pruebas)
+│   ├── test_totp.py            # [v3.8] Pruebas de generador TOTP/HOTP RFC 6238 y re-auth MFA
 │   ├── test_ai_copilot.py      # [v3.8] Pruebas del copiloto IA, Groq/Ollama y Auto-Fix
 │   ├── test_context_fuzzer.py  # [v3.8] Pruebas de detección contextual de DOM
 │   ├── test_session_macro.py   # [v3.8] Pruebas de macros y centinelas de sesión

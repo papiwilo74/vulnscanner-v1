@@ -28,6 +28,7 @@ class MacroStep:
     headers: dict[str, str] = field(default_factory=dict)
     data: dict[str, Any] = field(default_factory=dict)
     json_data: dict[str, Any] = field(default_factory=dict)
+    totp_secret: str | None = None
 
 
 @dataclass
@@ -106,7 +107,7 @@ class StateAwareSessionManager:
             return False
 
         target_session = session if session is not None else self.session
-        has_browser_step = any(s.action in ["fill", "click", "wait_for_selector"] for s in self.macro.steps)
+        has_browser_step = any(s.action in ["fill", "click", "wait_for_selector", "fill_totp"] for s in self.macro.steps)
 
         if has_browser_step and is_playwright_available():
             return self._execute_playwright_macro(target_session)
@@ -122,10 +123,27 @@ class StateAwareSessionManager:
                 if step.action == "goto" and step.url:
                     target_session.get(step.url, headers=step.headers, timeout=8)
                 elif step.action == "http_post" and step.url:
-                    if step.json_data:
-                        r = target_session.post(step.url, json=step.json_data, headers=step.headers, timeout=8)
+                    # Inyección dinámica de TOTP si se solicita
+                    json_payload = dict(step.json_data) if step.json_data else None
+                    form_payload = dict(step.data) if step.data else None
+                    if step.totp_secret or (step.value and step.value.startswith("totp:")):
+                        sec = step.totp_secret or (step.value[5:] if step.value else "")
+                        if sec:
+                            from scanner.totp import generate_totp
+                            code = generate_totp(sec)
+                            if json_payload is not None:
+                                for k, v in json_payload.items():
+                                    if v in ["{{TOTP}}", "totp", "otp"]:
+                                        json_payload[k] = code
+                            if form_payload is not None:
+                                for k, v in form_payload.items():
+                                    if v in ["{{TOTP}}", "totp", "otp"]:
+                                        form_payload[k] = code
+
+                    if json_payload:
+                        r = target_session.post(step.url, json=json_payload, headers=step.headers, timeout=8)
                     else:
-                        r = target_session.post(step.url, data=step.data, headers=step.headers, timeout=8)
+                        r = target_session.post(step.url, data=form_payload or {}, headers=step.headers, timeout=8)
 
                     # Si el paso de login devolvió un token Bearer en JSON
                     with contextlib.suppress(Exception):
@@ -133,6 +151,15 @@ class StateAwareSessionManager:
                         token = data.get("token") or data.get("access_token") or data.get("jwt")
                         if token:
                             target_session.headers["Authorization"] = f"Bearer {token}"
+                elif step.action == "fill_totp" and step.url:
+                    totp_key = step.totp_secret or step.value or ""
+                    if totp_key:
+                        from scanner.totp import generate_totp
+                        code = generate_totp(totp_key)
+                        post_data = dict(step.data)
+                        field_name = step.selector or "totp"
+                        post_data[field_name] = code
+                        target_session.post(step.url, data=post_data, headers=step.headers, timeout=8)
                 elif step.action == "set_header" and step.selector and step.value:
                     target_session.headers[step.selector] = step.value
 
@@ -163,6 +190,13 @@ class StateAwareSessionManager:
                         page.goto(step.url, timeout=15000, wait_until="domcontentloaded")
                     elif step.action == "fill" and step.selector and step.value is not None:
                         page.fill(step.selector, step.value)
+                    elif step.action == "fill_totp" and step.selector:
+                        totp_key = step.totp_secret or step.value or ""
+                        if totp_key:
+                            from scanner.totp import generate_totp
+                            code = generate_totp(totp_key)
+                            page.fill(step.selector, code)
+                            logger.info("[MACRO-PLAYWRIGHT] Código TOTP generado y completado: %s", code)
                     elif step.action == "click" and step.selector:
                         page.click(step.selector)
                     elif step.action == "wait_ms" and step.value:
@@ -177,6 +211,25 @@ class StateAwareSessionManager:
                         domain=c.get("domain", ""),
                         path=c.get("path", "/"),
                     )
+
+                # Extraer posibles tokens JWT / Bearer de localStorage (SPAs)
+                with contextlib.suppress(Exception):
+                    tokens_dict = page.evaluate("""() => {
+                        const res = {};
+                        for (let i = 0; i < localStorage.length; i++) {
+                            const k = localStorage.key(i);
+                            if (k && /token|jwt|auth|access/i.test(k)) {
+                                res[k] = localStorage.getItem(k);
+                            }
+                        }
+                        return res;
+                    }""")
+                    if isinstance(tokens_dict, dict):
+                        for val in tokens_dict.values():
+                            if isinstance(val, str) and (len(val) > 20 or val.startswith("eyJ")):
+                                target_session.headers["Authorization"] = f"Bearer {val}"
+                                logger.info("[MACRO-PLAYWRIGHT] Token Bearer recuperado de localStorage y persistido.")
+                                break
 
                 # Persistir cabeceras fijas adicionales
                 for k, v in self.macro.headers_to_persist.items():
@@ -201,3 +254,78 @@ class StateAwareSessionManager:
                 logger.info("Detectada expiración de sesión. Iniciando re-autenticación...")
                 return self.execute_macro(session)
         return True
+
+
+def build_smart_auth_macro(
+    login_url: str,
+    username: str = "",
+    password: str = "",
+    totp_secret: str | None = None,
+    sentinel_url: str | None = None,
+    is_spa: bool = False,
+    extra_data: dict[str, Any] | None = None,
+) -> SessionMacro:
+    """
+    Construye una macro de sesión inteligente adaptable tanto para arquitecturas HTTP
+    tradicionales como para Single-Page Applications (SPAs) con Playwright y soporte 2FA/TOTP.
+    """
+    steps: list[MacroStep] = []
+
+    if is_spa:
+        steps.append(MacroStep(action="goto", url=login_url))
+        if username:
+            steps.append(
+                MacroStep(
+                    action="fill",
+                    selector="input[type='email'], input[name*='user'], input[name*='email'], input[type='text']",
+                    value=username,
+                )
+            )
+        if password:
+            steps.append(
+                MacroStep(
+                    action="fill",
+                    selector="input[type='password']",
+                    value=password,
+                )
+            )
+        if totp_secret:
+            steps.append(
+                MacroStep(
+                    action="fill_totp",
+                    selector="input[name*='totp'], input[name*='otp'], input[name*='code'], input[name*='mfa'], input[autocomplete*='one-time-code']",
+                    totp_secret=totp_secret,
+                )
+            )
+        steps.append(MacroStep(action="click", selector="button[type='submit'], input[type='submit'], form button"))
+        steps.append(MacroStep(action="wait_ms", value="2000"))
+    else:
+        # Petición GET previa para obtener cookies iniciales o CSRF tokens
+        steps.append(MacroStep(action="goto", url=login_url))
+        post_data: dict[str, Any] = {}
+        if username:
+            post_data["username"] = username
+        if password:
+            post_data["password"] = password
+        if extra_data:
+            post_data.update(extra_data)
+        if totp_secret:
+            post_data["totp"] = "{{TOTP}}"
+            post_data["otp"] = "{{TOTP}}"
+            post_data["code"] = "{{TOTP}}"
+
+        steps.append(
+            MacroStep(
+                action="http_post",
+                url=login_url,
+                data=post_data,
+                totp_secret=totp_secret,
+            )
+        )
+
+    return SessionMacro(
+        name="smart_auth_macro",
+        steps=steps,
+        sentinel_url=sentinel_url,
+    )
+

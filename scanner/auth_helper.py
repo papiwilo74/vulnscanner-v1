@@ -27,15 +27,29 @@ def parse_credentials(credentials_str: str) -> dict[str, str]:
     return credentials
 
 
-def dynamic_login(login_url: str, credentials_str: str) -> Optional[requests.Session]:
+def dynamic_login(
+    login_url: str,
+    credentials_str: str,
+    totp_secret: Optional[str] = None,
+) -> Optional[requests.Session]:
     """
     Realiza un inicio de sesión automático contra un endpoint web y retorna
-    una sesión autenticada lista para usar en el escáner.
+    una sesión autenticada lista para usar en el escáner (con soporte opcional para TOTP/2FA).
     """
     credentials = parse_credentials(credentials_str)
     if not credentials:
         logger.warning("[AUTH] No se pudieron parsear las credenciales de login.")
         return None
+
+    if totp_secret:
+        with contextlib.suppress(Exception):
+            from scanner.totp import generate_totp
+            totp_val = generate_totp(totp_secret)
+            credentials.setdefault("totp", totp_val)
+            credentials.setdefault("otp", totp_val)
+            credentials.setdefault("code", totp_val)
+            credentials.setdefault("mfa_code", totp_val)
+            logger.info("[AUTH] Código TOTP generado e incorporado a credenciales: %s", totp_val)
 
     session = requests.Session()
     session.headers.update({
@@ -114,16 +128,18 @@ def headless_browser_login(
     username_selector: Optional[str] = None,
     password_selector: Optional[str] = None,
     submit_selector: Optional[str] = None,
-    timeout: int = 15000
+    totp_secret: Optional[str] = None,
+    timeout: int = 15000,
 ) -> Optional[requests.Session]:
     """
     Realiza un login simulando un usuario en un navegador Chromium real (Playwright).
     Rellena los inputs de usuario/contraseña, hace clic en el botón de submit,
-    espera la navegación y extrae las cookies de sesión y almacenamiento local.
+    gestiona el segundo factor 2FA/TOTP si se especifica, y extrae cookies de sesión
+    y tokens Bearer de almacenamiento local (localStorage).
     """
     if not is_playwright_available():
         logger.warning("Playwright no disponible para login headless. Intentando login HTTP clásico.")
-        return dynamic_login(login_page_url, credentials_str)
+        return dynamic_login(login_page_url, credentials_str, totp_secret=totp_secret)
 
     creds = parse_credentials(credentials_str)
     if not creds:
@@ -165,14 +181,55 @@ def headless_browser_login(
             with contextlib.suppress(Exception):
                 page.wait_for_load_state("networkidle", timeout=5000)
 
+            # Si se proveyó clave secreta TOTP / 2FA, verificar si la página solicita código
+            if totp_secret:
+                from scanner.totp import generate_totp
+                totp_sel = (
+                    "input[name*='totp'], input[name*='otp'], input[name*='mfa'], "
+                    "input[name*='2fa'], input[name*='code'], input[placeholder*='6'], "
+                    "input[autocomplete='one-time-code'], input[id*='totp'], input[id*='otp'], input[id*='code']"
+                )
+                with contextlib.suppress(Exception):
+                    otp_el = page.wait_for_selector(totp_sel, timeout=4000)
+                    if otp_el and otp_el.is_visible():
+                        code = generate_totp(totp_secret)
+                        logger.info("[AUTH-HEADLESS] Pantalla 2FA/TOTP detectada. Inyectando código calculado: %s", code)
+                        otp_el.fill(code)
+                        page.keyboard.press("Enter")
+                        with contextlib.suppress(Exception):
+                            page.wait_for_load_state("networkidle", timeout=5000)
+
             # Extraer cookies del contexto del navegador
             browser_cookies = context.cookies()
+
+            # Extraer posibles tokens JWT / Bearer de localStorage (común en SPAs)
+            bearer_token: Optional[str] = None
+            with contextlib.suppress(Exception):
+                tokens_dict = page.evaluate("""() => {
+                    const res = {};
+                    for (let i = 0; i < localStorage.length; i++) {
+                        const k = localStorage.key(i);
+                        if (k && /token|jwt|auth|access/i.test(k)) {
+                            res[k] = localStorage.getItem(k);
+                        }
+                    }
+                    return res;
+                }""")
+                if isinstance(tokens_dict, dict):
+                    for val in tokens_dict.values():
+                        if isinstance(val, str) and (len(val) > 20 or val.startswith("eyJ")):
+                            bearer_token = val
+                            break
+
             browser.close()
 
-            if browser_cookies:
+            if browser_cookies or bearer_token:
                 session = requests.Session()
                 for c in browser_cookies:
                     session.cookies.set(c["name"], c["value"], domain=c.get("domain", ""), path=c.get("path", "/"))
+                if bearer_token:
+                    session.headers["Authorization"] = f"Bearer {bearer_token}"
+                    logger.info("[AUTH-HEADLESS] Token Bearer recuperado de localStorage y persistido.")
                 logger.info("[AUTH-HEADLESS] Login exitoso. Extraídas %d cookies.", len(browser_cookies))
                 return session
 
