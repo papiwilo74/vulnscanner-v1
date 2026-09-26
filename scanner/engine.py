@@ -1,4 +1,5 @@
 """Motor de escaneo con perfiles, rate limiting, deduplicacion y cancelacion."""
+import contextlib
 import ipaddress
 import logging
 import socket
@@ -90,6 +91,10 @@ class ScanConfig:
     session_macro: Any = None
     totp_secret: Optional[str] = None
     sentinel_url: Optional[str] = None
+    enable_oast: bool = True
+    oast_server: Optional[str] = None
+    oast_dns_port: Optional[int] = None
+    oast_http_port: Optional[int] = None
 
     @classmethod
     def from_profile(cls, profile: ScanProfile, target: str = "", **overrides: Any) -> "ScanConfig":
@@ -141,6 +146,28 @@ class ScanEngine:
             self.config.session_macro = macro
             self.session_manager = StateAwareSessionManager(macro=macro)
 
+        self.oast_server: Optional[Any] = None
+        self.oast_client: Optional[Any] = None
+        if getattr(self.config, "enable_oast", True):
+            from scanner.oast import DedicatedOASTServer, OASTClient
+            if self.config.oast_server and self.config.oast_server not in ("oast.live", "oast.online"):
+                self.oast_client = OASTClient(server_domain=self.config.oast_server)
+            else:
+                try:
+                    server = DedicatedOASTServer(
+                        host="127.0.0.1",
+                        domain=self.config.oast_server or "oast.local",
+                        dns_port=self.config.oast_dns_port or 0,
+                        http_port=self.config.oast_http_port or 0,
+                    )
+                    server.start()
+                    self.oast_server = server
+                    self.oast_client = OASTClient(dedicated_server=server)
+                except Exception as exc:
+                    log.warning("[OAST] No se pudo iniciar el servidor OAST embebido: %s", exc)
+                    self.oast_client = OASTClient()
+
+
 
     @property
     def current_rps(self) -> float:
@@ -165,6 +192,15 @@ class ScanEngine:
     def cancel(self) -> None:
         log.warning("Escaneo cancelado por el usuario tras %d requests", self._request_count)
         self._cancelled.set()
+        self.stop()
+
+    def stop(self) -> None:
+        """Detiene recursos en ejecución (servidores OAST, timers, etc.)."""
+        if self.oast_server:
+            with contextlib.suppress(Exception):
+                self.oast_server.stop()
+                self.oast_server = None
+
 
     def start(self) -> None:
         self._cancelled.clear()

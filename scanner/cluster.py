@@ -683,6 +683,9 @@ class ScanningWorkerDaemon:
                     login_creds=task_cfg.get("login_creds"),
                     totp_secret=task_cfg.get("totp_secret"),
                     sentinel_url=task_cfg.get("sentinel_url"),
+                    oast_server=task_cfg.get("oast_server"),
+                    oast_dns_port=task_cfg.get("oast_dns_port"),
+                    oast_http_port=task_cfg.get("oast_http_port"),
                 )
 
                 self.update_progress(task_id, 90, "sincronizando_reportes")

@@ -420,6 +420,9 @@ class ScanRequest(BaseModel):
     login_creds: Optional[str] = None
     totp_secret: Optional[str] = None
     sentinel_url: Optional[str] = None
+    oast_server: Optional[str] = None
+    oast_dns_port: Optional[int] = None
+    oast_http_port: Optional[int] = None
 
 
 def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
@@ -472,6 +475,9 @@ def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
             login_creds=req.login_creds,
             totp_secret=req.totp_secret,
             sentinel_url=req.sentinel_url,
+            oast_server=req.oast_server,
+            oast_dns_port=req.oast_dns_port,
+            oast_http_port=req.oast_http_port,
             profile=req.profile,
             allow_private=req.allow_private,
             har_file=req.har_file,
@@ -1429,4 +1435,36 @@ def copilot_executive_summary_endpoint(req: CopilotExecutiveSummaryRequest) -> d
     """Modo 4: Resumen ejecutivo estratégico y matriz de cumplimiento (OWASP / PCI-DSS) para CISOs."""
     findings, target_url = _resolve_copilot_context(req.task_id, req.findings, req.target_url)
     return copilot_mgr.executive_summary(findings, target_url)
+
+
+_global_oast_server: Optional[Any] = None
+
+
+@app.get("/api/v1/oast/status", tags=["OAST"])
+def get_oast_status() -> dict[str, Any]:
+    """Retorna el estado de la infraestructura OAST dedicada (DNS autoritativo y HTTP)."""
+    global _global_oast_server
+    if _global_oast_server is None:
+        return {
+            "running": False,
+            "domain": "oast.local",
+            "message": "Servidor OAST embebido inactivo. Se inicia bajo demanda durante escaneos activos.",
+            "total_interactions": 0,
+        }
+    return _global_oast_server.get_stats()
+
+
+@app.get("/api/v1/oast/interactions/{token}", tags=["OAST"])
+def get_oast_token_interactions(token: str) -> dict[str, Any]:
+    """Consulta interacciones DNS y HTTP capturadas para un token específico."""
+    global _global_oast_server
+    if _global_oast_server is None:
+        return {"token": token, "interactions": [], "count": 0}
+    hits = _global_oast_server.get_interactions_for_token(token)
+    return {
+        "token": token,
+        "interactions": hits,
+        "count": len(hits),
+    }
+
 

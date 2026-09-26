@@ -180,7 +180,7 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
         ("Datos sensibles", "sensitive_data", check_sensitive_data, page_url, dom_html, session),
         ("SCA", "sca", check_sca, page_url, dom_html, session),
         ("Path Traversal", "path_traversal", check_path_traversal, page_url, session),
-        ("XXE", "xxe", check_xxe, page_url, dom_html, session),
+        ("XXE", "xxe", check_xxe, page_url, dom_html, session, getattr(engine, "oast_client", None)),
         ("Open Redirect", "open_redirect", check_open_redirect, page_url, session),
         ("JWT Attacks", "jwt", check_jwt_attacks, page_url, dom_html, session),
         ("File Upload", "file_upload", check_file_upload, page_url, dom_html, session),
@@ -195,7 +195,8 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
         tasks.append(("Inyecciones (Comandos/SSTI)", "injections", check_injections, page_url, session))
         tasks.append(("Fuzzing de Parámetros Ocultos", "param_fuzzer", check_param_fuzzer, page_url, session))
         if enable_oast:
-            tasks.append(("OAST (Blind SSRF / RCE / Log4j)", "oast", check_oast_vulnerabilities, page_url, session))
+            oast_cl = getattr(engine, "oast_client", None)
+            tasks.append(("OAST (Blind SSRF / RCE / Log4j)", "oast", check_oast_vulnerabilities, page_url, session, oast_cl))
 
     results: list[Finding] = []
 
@@ -237,6 +238,9 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          session_macro_file: Optional[str] = None,
          sentinel_url: Optional[str] = None,
          totp_secret: Optional[str] = None,
+         oast_server: Optional[str] = None,
+         oast_dns_port: Optional[int] = None,
+         oast_http_port: Optional[int] = None,
          copilot: bool = False,
          autofix: bool = False,
          source_dir: Optional[str] = None,
@@ -255,6 +259,10 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         enable_attack_chain=attack_chain,
         totp_secret=totp_secret,
         sentinel_url=sentinel_url,
+        enable_oast=enable_oast,
+        oast_server=oast_server,
+        oast_dns_port=oast_dns_port,
+        oast_http_port=oast_http_port,
     )
     if delay > 0:
         config.delay = delay
@@ -708,12 +716,47 @@ def main() -> None:
                         help="URL centinela para comprobar sesión viva y forzar re-autenticación automática")
     parser.add_argument("--totp-secret", type=str, default=None,
                         help="Secreto Base32 para generación autónoma de códigos MFA/TOTP (RFC 6238)")
+    parser.add_argument("--oast-server", type=str, default=None,
+                        help="Dominio o IP del servidor OAST dedicado autoritativo (ej: oast.miempresa.com)")
+    parser.add_argument("--oast-dns-port", type=int, default=None,
+                        help="Puerto de escucha UDP para el servidor DNS autoritativo OAST (defecto: 1053 o aleatorio)")
+    parser.add_argument("--oast-http-port", type=int, default=None,
+                        help="Puerto de escucha HTTP para el servidor OAST (defecto: 8088 o aleatorio)")
+    parser.add_argument("--oast-standalone", action="store_true",
+                        help="Inicia la infraestructura OAST dedicada (DNS + HTTP) como daemon autónomo de red")
     parser.add_argument("--benchmark", action="store_true",
                         help="Ejecuta el arnés de benchmark automatizado contra aplicaciones locales (Juice Shop / PyGoat)")
 
     args = parser.parse_args()
-    if not args.worker:
+    if not args.worker and not args.oast_standalone:
         print(OMNIBREACH_BANNER)
+
+    if args.oast_standalone:
+        from scanner.oast import DedicatedOASTServer
+        standalone_server = DedicatedOASTServer(
+            host="0.0.0.0",
+            domain=args.oast_server or "oast.local",
+            dns_port=args.oast_dns_port or 53,
+            http_port=args.oast_http_port or 80,
+        )
+        print("\n" + "=" * 75)
+        print(" [🌐 INFRAESTRUCTURA OAST DEDICADA] INICIANDO SERVIDORES AUTORITATIVOS")
+        print("=" * 75)
+        print(f" Dominio OAST: {standalone_server.domain}")
+        res_info = standalone_server.start()
+        print(f" Servidor DNS (UDP): Puerto {res_info['dns_port']} (Resolución autoritativa de registros A)")
+        print(f" Servidor HTTP (TCP): Puerto {res_info['http_port']} (Callbacks web y correlación)")
+        print(" Esperando interacciones fuera de banda (Blind SSRF, Blind RCE, SQLi, Log4j)...")
+        print(" Presione Ctrl+C para detener el servicio.")
+        print("=" * 75 + "\n")
+        try:
+            import time
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            standalone_server.stop()
+            print("\n[OAST] Infraestructura detenida limpiamente.")
+            sys.exit(0)
 
     if args.benchmark:
         from scripts.run_benchmarks import main as run_benchmarks_main
@@ -1013,6 +1056,9 @@ def main() -> None:
             source_dir=args.source_dir,
             dry_run=args.dry_run,
             prefer_local_ai=args.prefer_local_ai,
+            oast_server=args.oast_server,
+            oast_dns_port=args.oast_dns_port,
+            oast_http_port=args.oast_http_port,
         )
     finally:
         if lab_server:
