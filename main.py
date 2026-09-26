@@ -609,10 +609,10 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="OmniBreach v3.8 — Escáner DAST y Evaluación de Superficie Externa (Proyecto de Portafolio / Opción de Grado)",
+        description="OmniBreach v3.9 — Escáner DAST y Evaluación de Superficie Externa (Proyecto de Portafolio / Opción de Grado)",
         epilog="Ejemplo: python main.py --easm empresa.com.co"
     )
-    parser.add_argument("--version", "-V", action="version", version="OmniBreach v3.8")
+    parser.add_argument("--version", "-V", action="version", version="OmniBreach v3.9")
     parser.add_argument("url", nargs="?", default=None, help="URL del sitio web a escanear")
     parser.add_argument("--easm", type=str, default=None, metavar="DOMINIO",
                         help="Auditoría de Superficie Externa (EASM): Cartografía de subdominios, puertos de ransomware y CISA KEV")

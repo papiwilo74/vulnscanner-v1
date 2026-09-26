@@ -40,9 +40,9 @@ async def lifespan(app: FastAPI) -> Any:
 
 
 app = FastAPI(
-    title="OmniBreach v3.8 API",
+    title="OmniBreach v3.9 API",
     description="Framework Modular de DAST y Evaluación de Superficie Externa (EASM): Fuzzing Contextual (AST), Grafos de Ataque, SBOM, Copiloto IA Híbrido y Telemetría en Tiempo Real.",
-    version="3.8",
+    version="3.9",
     lifespan=lifespan,
 )
 
@@ -618,7 +618,7 @@ def health_check() -> dict[str, Any]:
     return {
         "status": "healthy",
         "service": "OmniBreach API",
-        "version": "3.8",
+        "version": "3.9",
         "database": "neon-postgresql" if is_postgres else "sqlite",
         "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
     }
@@ -627,8 +627,8 @@ def health_check() -> dict[str, Any]:
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a OmniBreach v3.8 API",
-        "version": "3.8",
+        "message": "Bienvenido a OmniBreach v3.9 API",
+        "version": "3.9",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST", "EASM CISA KEV"],
         "dashboard_url": "/dashboard",
         "health_url": "/health",

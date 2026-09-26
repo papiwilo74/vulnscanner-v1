@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnibreach"
-version = "3.8"
+version = "3.9"
 description = "OmniBreach — Escáner DAST y Cartografía de Superficie de Ataque (Proyecto de Portafolio / Opción de Grado)"
 readme = "README.md"
 license = "MIT"
