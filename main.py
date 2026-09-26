@@ -599,6 +599,21 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         engine_summary["ai_copilot"] = copilot_summary
     SCAN_STATS["total_requests"] = engine.request_count
 
+    # 9. Despacho automatizado a Jira, Slack, Teams o GitHub Issues
+    if all_findings:
+        try:
+            from scanner.integrations import NotificationDispatcher
+            dispatcher = NotificationDispatcher.from_environment()
+            if dispatcher.jira or dispatcher.slack or dispatcher.teams or dispatcher.github:
+                dispatch_stats = dispatcher.dispatch_all(all_findings)
+                logger.info(
+                    "[DevSecOps] Alertas despachadas: %d Jira, %d Slack, %d Teams, %d GitHub",
+                    dispatch_stats["jira"], dispatch_stats["slack"], dispatch_stats["teams"], dispatch_stats["github"]
+                )
+                engine_summary["integrations_dispatched"] = dispatch_stats
+        except Exception as e:
+            logger.debug("[DevSecOps] Error al despachar alertas: %s", e)
+
     return print_report(
         url,
         all_findings,
@@ -729,8 +744,29 @@ def main() -> None:
                         help="Ejecuta la suite de benchmark científico y evaluación empírica con matriz de confusión y métricas formales")
     parser.add_argument("--benchmark-target", type=str, default=None,
                         help="URL objetivo externa para benchmark (si se omite, usa el testbed sintético OWASP embebido)")
+    parser.add_argument("--slack-webhook", type=str, default=None,
+                        help="URL de Webhook entrante de Slack para alertas automáticas")
+    parser.add_argument("--teams-webhook", type=str, default=None,
+                        help="URL de Webhook entrante de Microsoft Teams para tarjetas de incidente")
+    parser.add_argument("--jira-url", type=str, default=None,
+                        help="URL base de Jira Cloud (ej: https://miempresa.atlassian.net)")
+    parser.add_argument("--jira-project", type=str, default=None,
+                        help="Clave del proyecto Jira donde radicar los tickets (ej: SEC)")
+    parser.add_argument("--notify-min-severity", type=str, default="high",
+                        choices=["critical", "high", "medium", "low", "info"],
+                        help="Severidad mínima para despachar alertas y tickets (defecto: high)")
 
     args = parser.parse_args()
+
+    # Propagar flags de integración a variables de entorno para NotificationDispatcher
+    if args.slack_webhook:
+        os.environ["SLACK_WEBHOOK_URL"] = args.slack_webhook
+    if args.teams_webhook:
+        os.environ["TEAMS_WEBHOOK_URL"] = args.teams_webhook
+    if args.jira_url:
+        os.environ["JIRA_URL"] = args.jira_url
+    if args.jira_project:
+        os.environ["JIRA_PROJECT_KEY"] = args.jira_project
     if not args.worker and not args.oast_standalone:
         print(OMNIBREACH_BANNER)
 
