@@ -6,6 +6,12 @@ from typing import Any, Optional
 
 import requests
 
+from scanner.api_security import (
+    test_bfla,
+    test_bola_idor,
+    test_mass_assignment,
+    test_resource_consumption,
+)
 from scanner.engine import ScanEngine
 from scanner.models import Finding
 
@@ -120,6 +126,31 @@ class OpenAPIScanner:
                     sqli_finding = self._check_parameter_sqli(full_url, pname)
                     if sqli_finding:
                         findings.append(sqli_finding)
+
+            # 5. Chequeo API1:2023 - Broken Object Level Authorization (BOLA / IDOR)
+            if "{" in target_path and "}" in target_path:
+                bola_finding = test_bola_idor(full_url, method=method, session_user_a=self.session)
+                if bola_finding:
+                    findings.append(bola_finding)
+
+            # 6. Chequeo API3:2023 - Mass Assignment / Property Tampering
+            if method in ["POST", "PUT", "PATCH"]:
+                mass_finding = test_mass_assignment(full_url, method=method, session=self.session)
+                if mass_finding:
+                    findings.append(mass_finding)
+
+            # 7. Chequeo API5:2023 - Broken Function Level Authorization (BFLA)
+            bfla_finding = test_bfla(full_url, unprivileged_session=self.session)
+            if bfla_finding:
+                findings.append(bfla_finding)
+
+            # 8. Chequeo API4:2023 - Unrestricted Resource Consumption
+            for qp in query_params:
+                pname = qp.get("name", "")
+                if pname.lower() in ("limit", "size", "per_page", "page_size", "count"):
+                    res_finding = test_resource_consumption(full_url, session=self.session, param_name=pname)
+                    if res_finding:
+                        findings.append(res_finding)
 
         return findings
 
