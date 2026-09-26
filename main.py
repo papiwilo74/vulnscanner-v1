@@ -764,6 +764,14 @@ def main() -> None:
     parser.add_argument("--notify-min-severity", type=str, default="high",
                         choices=["critical", "high", "medium", "low", "info"],
                         help="Severidad mínima para despachar alertas y tickets (defecto: high)")
+    parser.add_argument("--satellite", action="store_true",
+                        help="Inicia OmniBreach como Agente Satélite Inverso para auditar redes privadas/intranets")
+    parser.add_argument("--satellite-coordinator", type=str, default="http://localhost:8000",
+                        help="URL del coordinador central para el Agente Satélite")
+    parser.add_argument("--retest", type=str, default=None, metavar="JSON_FILE",
+                        help="Re-verificación quirúrgica rápida (Verify Fix) de hallazgos desde archivo JSON")
+    parser.add_argument("--verify-ledger", type=str, default=None, metavar="JSONL_FILE",
+                        help="Verifica la integridad criptográfica de un registro de auditoría inmutable (Audit Ledger)")
 
     args = parser.parse_args()
 
@@ -839,6 +847,70 @@ def main() -> None:
         except KeyboardInterrupt:
             worker.stop()
             print("\n[WORKER] Nodo detenido limpiamente.")
+            sys.exit(0)
+
+    if args.verify_ledger:
+        from scanner.audit_ledger import AuditLedger
+        ledger = AuditLedger(ledger_file=args.verify_ledger)
+        is_valid, msg = ledger.verify_integrity()
+        print("\n" + "=" * 75)
+        print(" [🛡️ AUDIT LEDGER] VERIFICACIÓN DE INTEGRIDAD CRIPTOGRÁFICA (SOC 2 / ISO 27001)")
+        print("=" * 75)
+        print(f" Archivo: {args.verify_ledger}")
+        print(f" Total de bloques: {len(ledger.events)}")
+        print(f" Estado: {'✅ VÁLIDO (INMUTABLE)' if is_valid else '❌ COMPROMETIDO / ALTERADO'}")
+        print(f" Dictamen: {msg}")
+        print("=" * 75 + "\n")
+        sys.exit(0 if is_valid else 1)
+
+    if args.retest:
+        import json
+
+        from scanner.retest import retest_multiple_findings
+        print("\n" + "=" * 75)
+        print(" [🔬 RE-TEST QUIRÚRGICO] VERIFICACIÓN RÁPIDA DE HALLAZGOS (VERIFY FIX)")
+        print("=" * 75)
+        print(f" Cargando hallazgos desde: {args.retest}")
+        with open(args.retest, encoding="utf-8") as f:
+            raw_findings = json.load(f)
+        if isinstance(raw_findings, dict) and "findings" in raw_findings:
+            raw_findings = raw_findings["findings"]
+        if not isinstance(raw_findings, list):
+            raw_findings = [raw_findings]
+        res = retest_multiple_findings(raw_findings)
+        print(f" Total evaluados: {res['total_retested']} | Resueltos (Fixed): {res['fixed']} | Aún vulnerables: {res['still_vulnerable']} | Inconclusos: {res['inconclusive']}")
+        print("-" * 75)
+        for r in res["results"]:
+            icon = "✅" if r["status"] == "fixed" else ("❌" if r["status"] == "still_vulnerable" else "⚠️")
+            print(f" {icon} [{r['status'].upper()}] {r['vuln_type']} ({r['duration_ms']} ms)")
+            print(f"    URL: {r['url']}")
+            print(f"    Detalle: {r['details']}")
+        print("=" * 75 + "\n")
+        sys.exit(0 if res["still_vulnerable"] == 0 else 2)
+
+    if args.satellite:
+        import time
+
+        from scanner.satellite import SatelliteAgent
+        sat = SatelliteAgent(coordinator_url=args.satellite_coordinator)
+        print("\n" + "=" * 75)
+        print(" [🛰️ AGENTE SATÉLITE INVERSO] INICIANDO SONDEO SALIENTE DE RED INTERNA")
+        print("=" * 75)
+        print(f" ID Satélite: {sat.satellite_id} | Nombre: {sat.satellite_name}")
+        print(f" Coordinador Central: {sat.coordinator_url}")
+        print(" Alcance Intranet: " + ", ".join(sat.intranet_scope))
+        print(" Conectando y esperando órdenes de escaneo interno (Ctrl+C para salir)...")
+        print("=" * 75 + "\n")
+        if sat.register():
+            print("[+] Agente registrado exitosamente ante el coordinador.")
+        else:
+            print("[!] Advertencia: no se pudo confirmar registro inicial, reintentando en bucle...")
+        try:
+            while True:
+                sat.run_single_cycle()
+                time.sleep(sat.poll_interval)
+        except KeyboardInterrupt:
+            print("\n[🛰️ Satélite] Agente detenido limpiamente.")
             sys.exit(0)
 
     if args.easm:
