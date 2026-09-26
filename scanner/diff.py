@@ -115,3 +115,53 @@ def compare_scans(scan_a: dict[str, Any], scan_b: dict[str, Any]) -> ScanDiffRes
         risk_score_delta=risk_delta,
         summary=summary,
     )
+
+
+def calculate_security_drift(historical_scans: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Calcula la métrica de 'Security Drift' (deriva de seguridad y deuda técnica)
+    a lo largo de una serie temporal de escaneos históricos.
+    Retorna métricas como tasa de introducción de fallas, tasa de resolución y tendencia neta.
+    """
+    if not historical_scans or len(historical_scans) < 2:
+        return {
+            "total_scans_analyzed": len(historical_scans),
+            "drift_trend": "insufficient_data",
+            "net_vulnerability_change": 0,
+            "total_new_vulnerabilities": 0,
+            "total_resolved_vulnerabilities": 0,
+            "drift_index_percent": 0.0,
+            "summary": "Se requieren al menos 2 escaneos sucesivos para calcular la tendencia de Security Drift.",
+        }
+
+    total_new = 0
+    total_resolved = 0
+
+    for i in range(len(historical_scans) - 1):
+        diff = compare_scans(historical_scans[i], historical_scans[i + 1])
+        total_new += diff.total_new
+        total_resolved += diff.total_resolved
+
+    net_change = total_new - total_resolved
+    drift_index = round((total_new / max(total_new + total_resolved, 1)) * 100, 1)
+
+    if net_change < 0:
+        trend = "improving"
+        summary = f"Postura de seguridad en mejora: Se han resuelto {total_resolved} vulnerabilidades frente a {total_new} introducidas."
+    elif net_change > 0:
+        trend = "deteriorating"
+        summary = f"Deriva de seguridad negativa (Drift): Se han introducido {total_new} fallas superando las {total_resolved} resueltas."
+    else:
+        trend = "stable"
+        summary = "Postura de seguridad estable: El ritmo de resolución empata con las nuevas vulnerabilidades."
+
+    return {
+        "total_scans_analyzed": len(historical_scans),
+        "total_new_vulnerabilities": total_new,
+        "total_resolved_vulnerabilities": total_resolved,
+        "net_vulnerability_change": net_change,
+        "drift_index_percent": drift_index,
+        "drift_trend": trend,
+        "summary": summary,
+    }
+
