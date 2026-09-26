@@ -340,6 +340,10 @@ class Finding:
     rasp_blocked: bool = False
     attack_chain_id: Optional[str] = None
 
+    # Verificación Forense Basada en Pruebas (Proof-Based Verification)
+    is_proof_verified: bool = False
+    proof_evidence: Optional[dict[str, Any]] = None
+
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
 
     SEVERITY_ORDER: dict[str, int] = field(default_factory=lambda: {
@@ -404,6 +408,8 @@ class Finding:
             "iast_call_stack": self.iast_call_stack,
             "rasp_blocked": self.rasp_blocked,
             "attack_chain_id": self.attack_chain_id,
+            "is_proof_verified": self.is_proof_verified,
+            "proof_evidence": self.proof_evidence,
         }
 
     @classmethod

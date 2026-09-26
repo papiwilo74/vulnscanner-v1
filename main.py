@@ -599,6 +599,15 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         engine_summary["ai_copilot"] = copilot_summary
     SCAN_STATS["total_requests"] = engine.request_count
 
+    # 8.1. Verificación Forense Basada en Pruebas (Proof-Based Verification)
+    if all_findings:
+        try:
+            from scanner.proof_verifier import ProofVerifier
+            verifier = ProofVerifier(session=session)
+            verifier.verify_all(all_findings)
+        except Exception as e:
+            logger.debug("[ProofVerifier] Error durante verificación forense: %s", e)
+
     # 9. Despacho automatizado a Jira, Slack, Teams o GitHub Issues
     if all_findings:
         try:
