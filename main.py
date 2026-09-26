@@ -66,7 +66,7 @@ OMNIBREACH_BANNER = (
     r" / / / / __ `__ \/ __ \/ / __  / ___/ _ \/ __ `/ ___/ __ \ " + "\n"
     r"/ /_/ / / / / / / / / / / /_/ / /  /  __/ /_/ / /__/ / / / " + "\n"
     r"\____/_/ /_/ /_/_/ /_/_/_____/_/   \___/\__,_/\___/_/ /_/  " + "\n"
-    "                             v3.8\n"
+    "                             v3.9\n"
 )
 
 CATEGORY_MAP: dict[str, str] = {
@@ -725,7 +725,9 @@ def main() -> None:
     parser.add_argument("--oast-standalone", action="store_true",
                         help="Inicia la infraestructura OAST dedicada (DNS + HTTP) como daemon autónomo de red")
     parser.add_argument("--benchmark", action="store_true",
-                        help="Ejecuta el arnés de benchmark automatizado contra aplicaciones locales (Juice Shop / PyGoat)")
+                        help="Ejecuta la suite de benchmark científico y evaluación empírica con matriz de confusión y métricas formales")
+    parser.add_argument("--benchmark-target", type=str, default=None,
+                        help="URL objetivo externa para benchmark (si se omite, usa el testbed sintético OWASP embebido)")
 
     args = parser.parse_args()
     if not args.worker and not args.oast_standalone:
@@ -759,8 +761,15 @@ def main() -> None:
             sys.exit(0)
 
     if args.benchmark:
-        from scripts.run_benchmarks import main as run_benchmarks_main
-        run_benchmarks_main()
+        from scanner.scientific_benchmark import run_scientific_benchmark
+        print("\n" + "=" * 76)
+        print(" [📊 BENCHMARK CIENTÍFICO] INICIANDO SUITE DE EVALUACIÓN EMPÍRICA DAST")
+        print("=" * 76)
+        sci_res = run_scientific_benchmark(target_url=args.benchmark_target)
+        sci_res.print_ascii_scorecard()
+        print("[+] Reporte formal exportado en: reports/scientific_benchmark_report.md")
+        print("[+] Tabla para Tesis en LaTeX: reports/scientific_benchmark_table.tex")
+        print("[+] Dataset cuantitativo en: reports/scientific_benchmark_report.json\n")
         sys.exit(0)
 
     if args.worker:

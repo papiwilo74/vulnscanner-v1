@@ -105,6 +105,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="OmniBreach Automated Benchmark Harness")
     parser.add_argument("--juiceshop-url", default="http://localhost:3000", help="URL de OWASP Juice Shop")
     parser.add_argument("--pygoat-url", default="http://localhost:8000", help="URL de PyGoat")
+    parser.add_argument("--scientific", "--synthetic", action="store_true", help="Ejecuta el benchmark científico sintético embebido")
     parser.add_argument("--fail-on-regression", action="store_true", help="Falla con código 1 si hay regresión")
     args = parser.parse_args()
 
@@ -150,9 +151,13 @@ def main() -> None:
     else:
         logger.warning("PyGoat no accesible en %s. Omitiendo.", args.pygoat_url)
 
-    if not any_bench_run:
-        logger.info("No se detectaron servidores de prueba activos en local. Fin de ejecución.")
-        sys.exit(0)
+    # 3. Si no hay servidores externos activos o se solicitó explícitamente, ejecutar el Benchmark Científico Embebido
+    if not any_bench_run or args.scientific:
+        logger.info("Ejecutando Benchmark Científico Autónomo (OWASP Synthetic Testbed)...")
+        from scanner.scientific_benchmark import run_scientific_benchmark
+        sci_res = run_scientific_benchmark()
+        sci_res.print_ascii_scorecard()
+        any_bench_run = True
 
     if global_regression and args.fail_on_regression:
         logger.error("Se detectaron regresiones de calidad en los benchmarks. Abortando CI.")

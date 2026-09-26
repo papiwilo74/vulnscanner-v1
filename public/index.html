@@ -92,6 +92,10 @@
                 <i class="fa-solid fa-satellite-dish text-emerald-400"></i> Superficie Externa (EASM)
                 <span id="tab-badge-easm" class="hidden bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">0 Activos</span>
             </button>
+            <button id="tab-btn-benchmark" onclick="switchTab('benchmark')" class="px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+                <i class="fa-solid fa-chart-line text-amber-400"></i> Benchmark Científico
+                <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">OWASP Testbed</span>
+            </button>
         </div>
 
         <!-- TAB 1: DAST AUDIT VIEW -->
@@ -790,6 +794,145 @@
                 </div>
             </div>
         </div><!-- End view-easm -->
+
+        <!-- TAB 5: SCIENTIFIC BENCHMARK VIEW -->
+        <div id="view-benchmark" class="space-y-6 hidden">
+            <!-- Header Card & Execution Controls -->
+            <section class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="p-2 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                <i class="fa-solid fa-chart-line text-lg"></i>
+                            </span>
+                            <h2 class="text-lg font-bold text-slate-100">Evaluación Empírica & Benchmark Científico</h2>
+                            <span class="text-xs px-2.5 py-0.5 rounded-full font-mono bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Ground Truth Certificado</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">
+                            Auditoría cuantitativa de precisión determinista contra el testbed de calibración OWASP Top 10 con controles negativos anti-falsos positivos.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button id="btn-run-benchmark" onclick="executeScientificBenchmark()" class="px-5 py-2.5 rounded-xl font-semibold text-sm transition flex items-center gap-2 bg-gradient-to-r from-amber-600 to-amber-500 text-white shadow-lg shadow-amber-600/30 hover:brightness-110">
+                            <i class="fa-solid fa-flask-vial"></i> Ejecutar Benchmark Científico
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metrics Summary Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div class="bg-soc-card border border-soc-border rounded-xl p-4">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Exactitud (Accuracy)</span>
+                    <span id="bench-stat-acc" class="text-2xl font-bold font-mono text-emerald-400 mt-1 block">--</span>
+                    <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">(TP+TN) / N</span>
+                </div>
+                <div class="bg-soc-card border border-soc-border rounded-xl p-4">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Precisión (PPV)</span>
+                    <span id="bench-stat-prec" class="text-2xl font-bold font-mono text-indigo-400 mt-1 block">--</span>
+                    <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">TP / (TP+FP)</span>
+                </div>
+                <div class="bg-soc-card border border-soc-border rounded-xl p-4">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Sensibilidad (Recall)</span>
+                    <span id="bench-stat-rec" class="text-2xl font-bold font-mono text-cyan-400 mt-1 block">--</span>
+                    <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">TP / (TP+FN)</span>
+                </div>
+                <div class="bg-soc-card border border-soc-border rounded-xl p-4">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Puntuación F1</span>
+                    <span id="bench-stat-f1" class="text-2xl font-bold font-mono text-amber-400 mt-1 block">--</span>
+                    <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">Media Armónica</span>
+                </div>
+                <div class="bg-soc-card border border-soc-border rounded-xl p-4">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Coef. Matthews (MCC)</span>
+                    <span id="bench-stat-mcc" class="text-2xl font-bold font-mono text-purple-400 mt-1 block">--</span>
+                    <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">Rango [-1, +1]</span>
+                </div>
+                <div class="bg-soc-card border border-soc-border rounded-xl p-4">
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Falsos Positivos (FPR)</span>
+                    <span id="bench-stat-fpr" class="text-2xl font-bold font-mono text-rose-400 mt-1 block">--</span>
+                    <span class="text-[10px] text-slate-500 font-mono mt-0.5 block">FP / (FP+TN)</span>
+                </div>
+            </div>
+
+            <!-- Confusion Matrix & Academic Breakdown -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Confusion Matrix 2x2 Box -->
+                <div class="bg-soc-card border border-soc-border rounded-2xl p-5 shadow-xl">
+                    <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-table-cells text-indigo-400"></i> Matriz de Confusión Cuantitativa
+                    </h3>
+                    <div class="grid grid-cols-2 gap-3 text-center font-mono">
+                        <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                            <span class="text-xs text-emerald-400 block font-sans font-semibold">Verdaderos Positivos</span>
+                            <span id="bench-stat-tp" class="text-3xl font-bold text-emerald-300 mt-1 block">--</span>
+                            <span class="text-[10px] text-slate-500">Aciertos reales</span>
+                        </div>
+                        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                            <span class="text-xs text-rose-400 block font-sans font-semibold">Falsos Positivos</span>
+                            <span id="bench-stat-fp" class="text-3xl font-bold text-rose-300 mt-1 block">--</span>
+                            <span class="text-[10px] text-slate-500">Falsas alarmas</span>
+                        </div>
+                        <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                            <span class="text-xs text-amber-400 block font-sans font-semibold">Falsos Negativos</span>
+                            <span id="bench-stat-fn" class="text-3xl font-bold text-amber-300 mt-1 block">--</span>
+                            <span class="text-[10px] text-slate-500">Puntos ciegos</span>
+                        </div>
+                        <div class="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                            <span class="text-xs text-blue-400 block font-sans font-semibold">Verdaderos Negativos</span>
+                            <span id="bench-stat-tn" class="text-3xl font-bold text-blue-300 mt-1 block">--</span>
+                            <span class="text-[10px] text-slate-500">Controles limpios</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 space-y-1">
+                        <div>Total Muestras: <b id="bench-stat-total" class="text-slate-200">--</b> casos evaluados</div>
+                        <div>Tiempo de Respuesta: <b id="bench-stat-dur" class="text-slate-200">--</b> s</div>
+                    </div>
+                </div>
+
+                <!-- LaTeX Export Panel -->
+                <div class="lg:col-span-2 bg-soc-card border border-soc-border rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+                                <i class="fa-solid fa-code text-amber-400"></i> Tabla Académica LaTeX (Tesis / Opción de Grado)
+                            </h3>
+                            <button onclick="copyLatexCode()" class="text-xs px-3 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-lg transition flex items-center gap-1 font-mono">
+                                <i class="fa-solid fa-copy"></i> Copiar Código LaTeX
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-3">
+                            Código listo para pegar directamente en Overleaf o tu compilador LaTeX de tesis:
+                        </p>
+                        <textarea id="bench-latex-code" rows="7" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono text-emerald-400 focus:outline-none resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Per Category Breakdown Table -->
+            <div class="bg-soc-card border border-soc-border rounded-2xl p-5 shadow-xl">
+                <h3 class="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-cyan-400"></i> Desglose de Precisión por Familia de Vulnerabilidad (OWASP Top 10)
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="text-slate-400 border-b border-slate-800 uppercase font-mono text-[10px]">
+                            <tr>
+                                <th class="pb-2">Familia / Módulo</th>
+                                <th class="pb-2">CWE</th>
+                                <th class="pb-2">Casos</th>
+                                <th class="pb-2">Barra de Precisión</th>
+                                <th class="pb-2 text-right">Precisión</th>
+                                <th class="pb-2 text-right">Sensibilidad</th>
+                                <th class="pb-2 text-right">F1-Score</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bench-categories-tbody" class="divide-y divide-slate-800/60 font-mono">
+                            <tr><td colspan="7" class="py-6 text-center text-slate-500">Presiona "Ejecutar Benchmark Científico" para cargar las métricas.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Footer -->
@@ -1179,18 +1322,21 @@
             const btnDec = document.getElementById('tab-btn-deception');
             const btnClu = document.getElementById('tab-btn-cluster');
             const btnEasm = document.getElementById('tab-btn-easm');
+            const btnBench = document.getElementById('tab-btn-benchmark');
             const viewDast = document.getElementById('view-dast');
             const viewDec = document.getElementById('view-deception');
             const viewClu = document.getElementById('view-cluster');
             const viewEasm = document.getElementById('view-easm');
+            const viewBench = document.getElementById('view-benchmark');
 
-            [btnDast, btnDec, btnClu, btnEasm].forEach(b => {
+            [btnDast, btnDec, btnClu, btnEasm, btnBench].forEach(b => {
                 if (b) b.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800';
             });
             if (viewDast) viewDast.classList.add('hidden');
             if (viewDec) viewDec.classList.add('hidden');
             if (viewClu) viewClu.classList.add('hidden');
             if (viewEasm) viewEasm.classList.add('hidden');
+            if (viewBench) viewBench.classList.add('hidden');
 
             if (tab === 'dast') {
                 if (btnDast) btnDast.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30';
@@ -1206,6 +1352,144 @@
             } else if (tab === 'easm') {
                 if (btnEasm) btnEasm.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-emerald-600 text-white shadow-lg shadow-emerald-600/30';
                 if (viewEasm) viewEasm.classList.remove('hidden');
+            } else if (tab === 'benchmark') {
+                if (btnBench) btnBench.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-amber-600 text-white shadow-lg shadow-amber-600/30';
+                if (viewBench) viewBench.classList.remove('hidden');
+                loadBenchmarkData();
+            }
+        }
+
+        async function loadBenchmarkData() {
+            try {
+                const res = await fetch(apiUrl('/api/v1/benchmark/latest'));
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.status === 'success' && data.benchmark) {
+                    renderBenchmarkData(data.benchmark);
+                }
+            } catch (err) {
+                console.debug("Error cargando benchmark previo:", err);
+            }
+        }
+
+        async function executeScientificBenchmark() {
+            const btn = document.getElementById('btn-run-benchmark');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ejecutando Calibración...';
+            }
+            try {
+                const res = await fetch(apiUrl('/api/v1/benchmark/run'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (!res.ok) throw new Error("Fallo en la ejecución del benchmark");
+                const benchData = await res.json();
+                renderBenchmarkData(benchData);
+                showToast("✅ Benchmark Científico completado con éxito.", false);
+            } catch (err) {
+                alert("Error al ejecutar benchmark: " + err.message);
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-flask-vial"></i> Ejecutar Benchmark Científico';
+                }
+            }
+        }
+
+        function renderBenchmarkData(b) {
+            if (!b) return;
+            // Summary KPI metrics
+            const accEl = document.getElementById('bench-stat-acc');
+            const precEl = document.getElementById('bench-stat-prec');
+            const recEl = document.getElementById('bench-stat-rec');
+            const f1El = document.getElementById('bench-stat-f1');
+            const mccEl = document.getElementById('bench-stat-mcc');
+            const fprEl = document.getElementById('bench-stat-fpr');
+
+            if (accEl) accEl.textContent = (b.accuracy * 100).toFixed(1) + '%';
+            if (precEl) precEl.textContent = (b.precision * 100).toFixed(1) + '%';
+            if (recEl) recEl.textContent = (b.recall * 100).toFixed(1) + '%';
+            if (f1El) f1El.textContent = Number(b.f1_score).toFixed(4);
+            if (mccEl) mccEl.textContent = Number(b.matthews_corr_coef).toFixed(4);
+            if (fprEl) fprEl.textContent = (b.false_positive_rate * 100).toFixed(1) + '%';
+
+            // Confusion Matrix
+            const tpEl = document.getElementById('bench-stat-tp');
+            const fpEl = document.getElementById('bench-stat-fp');
+            const fnEl = document.getElementById('bench-stat-fn');
+            const tnEl = document.getElementById('bench-stat-tn');
+            const totEl = document.getElementById('bench-stat-total');
+            const durEl = document.getElementById('bench-stat-dur');
+
+            if (tpEl) tpEl.textContent = b.true_positives;
+            if (fpEl) fpEl.textContent = b.false_positives;
+            if (fnEl) fnEl.textContent = b.false_negatives;
+            if (tnEl) tnEl.textContent = b.true_negatives;
+            if (totEl) totEl.textContent = b.total_cases;
+            if (durEl) durEl.textContent = Number(b.duration_seconds).toFixed(2);
+
+            // LaTeX Code
+            const latexEl = document.getElementById('bench-latex-code');
+            if (latexEl) {
+                latexEl.value = `\\begin{table}[htbp]
+\\centering
+\\caption{Métricas Empíricas de Detección Cuantitativa contra Benchmark Certificado (OmniBreach v${b.version})}
+\\label{tab:omnibreach_benchmark}
+\\begin{tabular}{lcccc}
+\\hline
+\\textbf{Métrica de Evaluación} & \\textbf{Fórmula} & \\textbf{Valor} & \\textbf{Rango Óptimo} \\\\
+\\hline
+Exactitud (Accuracy) & $(TP+TN)/N$ & ${(b.accuracy * 100).toFixed(1)}\\% & 100\\% \\\\
+Precisión (Precision) & $TP/(TP+FP)$ & ${(b.precision * 100).toFixed(1)}\\% & 100\\% \\\\
+Sensibilidad (Recall) & $TP/(TP+FN)$ & ${(b.recall * 100).toFixed(1)}\\% & 100\\% \\\\
+Especificidad (Specificity) & $TN/(TN+FP)$ & ${(b.specificity * 100).toFixed(1)}\\% & 100\\% \\\\
+Puntuación F1 (F1-Score) & $2PR/(P+R)$ & ${Number(b.f1_score).toFixed(4)} & 1.0000 \\\\
+Tasa Falsos Positivos (FPR) & $FP/(FP+TN)$ & ${(b.false_positive_rate * 100).toFixed(1)}\\% & 0\\% \\\\
+Coef. de Matthews (MCC) & \\text{MCC}_{\\text{form}} & ${Number(b.matthews_corr_coef).toFixed(4)} & +1.0000 \\\\
+\\hline
+\\end{tabular}
+\\end{table}`;
+            }
+
+            // Categories Table
+            const tbody = document.getElementById('bench-categories-tbody');
+            if (tbody && b.categories) {
+                tbody.innerHTML = '';
+                for (const [catName, cat] of Object.entries(b.categories)) {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-slate-800/40 transition';
+                    const pct = (cat.precision * 100).toFixed(1);
+                    const recPct = (cat.recall * 100).toFixed(1);
+                    const f1Val = Number(cat.f1_score).toFixed(2);
+                    row.innerHTML = `
+                        <td class="py-2.5 font-bold text-slate-200 capitalize">${catName.replace('_', ' ')}</td>
+                        <td class="py-2.5 text-slate-400 font-mono">${cat.cwe_id || 'CWE'}</td>
+                        <td class="py-2.5 text-slate-300 font-mono">${cat.total_cases}</td>
+                        <td class="py-2.5">
+                            <div class="w-32 bg-slate-800 rounded-full h-2 overflow-hidden border border-slate-700">
+                                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full" style="width: ${pct}%"></div>
+                            </div>
+                        </td>
+                        <td class="py-2.5 text-right font-bold text-emerald-400 font-mono">${pct}%</td>
+                        <td class="py-2.5 text-right font-mono text-slate-300">${recPct}%</td>
+                        <td class="py-2.5 text-right font-mono font-bold text-amber-400">${f1Val}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            }
+        }
+
+        function copyLatexCode() {
+            const el = document.getElementById('bench-latex-code');
+            if (el && el.value) {
+                navigator.clipboard.writeText(el.value).then(() => {
+                    showToast("📋 Código LaTeX copiado al portapapeles para tu tesis.", false);
+                }).catch(() => {
+                    el.select();
+                    document.execCommand('copy');
+                    showToast("📋 Código LaTeX copiado al portapapeles.", false);
+                });
             }
         }
 

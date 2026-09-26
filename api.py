@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import uuid
+from pathlib import Path
 from threading import Lock
 from typing import Any, Optional
 
@@ -1465,6 +1466,31 @@ def get_oast_token_interactions(token: str) -> dict[str, Any]:
         "token": token,
         "interactions": hits,
         "count": len(hits),
+    }
+
+
+@app.post("/api/v1/benchmark/run", tags=["Benchmark"])
+def run_benchmark_endpoint(target_url: Optional[str] = None) -> dict[str, Any]:
+    """Ejecuta la suite de benchmark científico y retorna la matriz de confusión y métricas formales."""
+    from scanner.scientific_benchmark import run_scientific_benchmark
+    res = run_scientific_benchmark(target_url=target_url)
+    return res.to_dict()
+
+
+@app.get("/api/v1/benchmark/latest", tags=["Benchmark"])
+def get_latest_benchmark() -> dict[str, Any]:
+    """Retorna los resultados del último benchmark científico ejecutado."""
+    report_file = Path("reports") / "scientific_benchmark_report.json"
+    if report_file.exists():
+        try:
+            with open(report_file, encoding="utf-8") as f:
+                data = json.load(f)
+                return {"status": "success", "benchmark": data}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error leyendo reporte: {e}")
+    return {
+        "status": "not_found",
+        "message": "No se ha ejecutado un benchmark científico aún. Ejecute POST /api/v1/benchmark/run o python main.py --benchmark",
     }
 
 
