@@ -13,6 +13,31 @@ XSS_PAYLOADS: list[str] = [
     "javascript:alert(1)",
 ]
 
+def _is_reflection_in_html_comment(response_text: str, payload: str) -> bool:
+    """Verifica si todas las ocurrencias del payload quedaron confinadas dentro de comentarios HTML <!-- ... -->."""
+    comments: list[str] = re.findall(r"<!--(.*?)-->", response_text, re.DOTALL)
+    total_count = response_text.count(payload)
+    if total_count == 0:
+        return False
+    comment_count = sum(c.count(payload) for c in comments)
+    return bool(comment_count >= total_count)
+
+
+def _is_reflection_in_unbroken_attribute(response_text: str, payload: str) -> bool:
+    """Verifica si el payload quedó confinado dentro del valor de un atributo HTML entre comillas sin breakout."""
+    # Si el payload inicia con delimitadores de comillas (' o "), es un intento explícito de breakout
+    if payload.startswith('"') or payload.startswith("'"):
+        return False
+    if "<" not in payload and ">" not in payload:
+        return False
+    p_escaped = re.escape(payload)
+    pattern_double = rf'=\s*"[^"]*{p_escaped}[^"]*"'
+    pattern_single = rf"=\s*'[^']*{p_escaped}[^']*'"
+    matches_attr = len(re.findall(pattern_double, response_text)) + len(re.findall(pattern_single, response_text))
+    total_count = response_text.count(payload)
+    return bool(total_count > 0 and matches_attr >= total_count)
+
+
 def test_xss_payload(
     parsed: Any, params: dict[str, list[str]], param: str, payload: str, baseline_text: str = "", session: Optional[requests.Session] = None
 ) -> Optional[dict[str, str]]:
@@ -39,6 +64,14 @@ def test_xss_payload(
             escaped_payload = html.escape(payload)
             # Si el payload aparece unívocamente codificado (ej. &lt;script&gt;), no es ejecutable -> Falso positivo
             if payload != escaped_payload and escaped_payload in response_text and response_text.count(payload) == response_text.count(escaped_payload):
+                return None
+
+            # 3. Análisis contextual: Descartar si el payload está confinado dentro de un comentario HTML
+            if _is_reflection_in_html_comment(response_text, payload):
+                return None
+
+            # 4. Análisis contextual: Descartar si un payload de tag (<script> / <img>) está atrapado en atributo sin romper comillas
+            if ("<" in payload or ">" in payload) and _is_reflection_in_unbroken_attribute(response_text, payload):
                 return None
 
             return {

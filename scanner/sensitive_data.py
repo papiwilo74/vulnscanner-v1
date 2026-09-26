@@ -1,5 +1,6 @@
 import base64
 import json
+import math
 import re
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -8,8 +9,10 @@ import requests
 
 # Expresiones regulares para detectar datos sensibles
 SENSITIVE_PATTERNS: dict[str, str] = {
-    "Clave de API de AWS": r"AKIA[0-9A-Z]{16}",
-    "Clave Privada de Stripe": r"sk_live_[0-9a-zA-Z]{24}",
+    "Clave de API de AWS": r"\bAKIA[0-9A-Z]{16,20}\b",
+    "Clave Privada de Stripe": r"\bsk_live_[0-9a-zA-Z]{24}\b",
+    "Token de Acceso de GitHub": r"\bgh[pousr]_[0-9a-zA-Z]{36}\b",
+    "Clave de API de Google / Firebase": r"\bAIza[0-9A-Za-z-_]{35}\b",
     "Token JWT": r"\beyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]*",
     "Cadena de Conexion de Base de Datos": r"(mongodb(?:\+srv)?|postgres|mysql|sqlite|oracle):\/\/[^\s'\"@]+:[^\s'\"@]+@[^\s'\"]+",
 }
@@ -23,11 +26,55 @@ PLACEHOLDER_VALUES = {
     "your_value_here", "your_value", "yourvalue", "dummy", "sample",
 }
 
+def shannon_entropy(data: str) -> float:
+    """Calcula la entropía de Shannon de una cadena de caracteres en bits/char."""
+    if not data:
+        return 0.0
+    length = len(data)
+    counts = {char: data.count(char) for char in set(data)}
+    entropy = 0.0
+    for count in counts.values():
+        p_x = count / length
+        entropy -= p_x * math.log2(p_x)
+    return entropy
+
+
+def _is_suspicious_secret(name: str, secret: str) -> bool:
+    """Aplica validaciones de entropía y estructura para filtrar secretos de prueba o falsos positivos."""
+    if not secret:
+        return False
+
+    # 1. AWS Access Key (AKIA + 16 chars alfanuméricos en mayúsculas)
+    if name == "Clave de API de AWS":
+        if len(secret) < 20:
+            return False
+        key_body = secret[4:]
+        return len(set(key_body)) > 3 and shannon_entropy(key_body) >= 2.6
+
+    # 2. Stripe Secret Key (sk_live_...)
+    if name == "Clave Privada de Stripe":
+        key_suffix = secret[8:]
+        return len(set(key_suffix)) > 3 and shannon_entropy(key_suffix) >= 2.8
+
+    # 3. Tokens de GitHub (ghp_...)
+    if name == "Token de Acceso de GitHub":
+        token_body = secret[4:]
+        return len(set(token_body)) > 4 and shannon_entropy(token_body) >= 2.8
+
+    # 4. Google API Key (AIza...)
+    if name == "Clave de API de Google / Firebase":
+        key_body = secret[4:]
+        return len(set(key_body)) > 4 and shannon_entropy(key_body) >= 2.8
+
+    return True
+
+
 def _is_placeholder(val: str) -> bool:
     lv = val.lower()
     if lv in PLACEHOLDER_VALUES:
         return True
     return bool(any(p in lv for p in ["your", "placeholder", "example", "changeme", "xxx", "replace", "dummy", "sample", "default"]))
+
 
 def _is_valid_jwt(token_str: str) -> bool:
     """Verifica que un token candidato sea un JWT bien formado y no un hash base64 arbitrario."""
@@ -47,6 +94,7 @@ def _is_valid_jwt(token_str: str) -> bool:
         pass
     return False
 
+
 def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = "") -> list[dict[str, str]]:
     """
     Escanea un texto (HTML, JS, comentarios) en busca de patrones sensibles.
@@ -59,9 +107,9 @@ def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = 
         if matches:
             # Eliminar duplicados para no inundar el reporte
             unique_matches = list(set(matches))
-            # Si el patrón tiene un grupo de captura (ej. Clave Secreta Genérica), tomamos el valor capturado
             display_matches = [m[0] if isinstance(m, tuple) else m for m in unique_matches]
             display_matches = [m for m in display_matches if not _is_placeholder(m)]
+            display_matches = [m for m in display_matches if _is_suspicious_secret(name, m)]
             if name == "Token JWT":
                 display_matches = [m for m in display_matches if _is_valid_jwt(m)]
             if not display_matches:

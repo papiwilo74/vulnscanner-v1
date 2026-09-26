@@ -1452,7 +1452,7 @@ def get_oast_status() -> dict[str, Any]:
             "message": "Servidor OAST embebido inactivo. Se inicia bajo demanda durante escaneos activos.",
             "total_interactions": 0,
         }
-    return _global_oast_server.get_stats()
+    return dict(_global_oast_server.get_stats())
 
 
 @app.get("/api/v1/oast/interactions/{token}", tags=["OAST"])

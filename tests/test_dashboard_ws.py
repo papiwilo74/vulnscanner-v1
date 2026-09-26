@@ -12,7 +12,7 @@ def test_api_root_and_dashboard():
     res_root = client.get("/")
     assert res_root.status_code == 200
     data = res_root.json()
-    assert data["version"] == "3.8"
+    assert data["version"] == "3.9"
     assert data["dashboard_url"] == "/dashboard"
 
     # 1.1 Test Health
@@ -20,7 +20,7 @@ def test_api_root_and_dashboard():
     assert res_health.status_code == 200
     health_data = res_health.json()
     assert health_data["status"] == "healthy"
-    assert health_data["version"] == "3.8"
+    assert health_data["version"] == "3.9"
     assert "OmniBreach" in health_data["service"]
 
     # 2. Test Dashboard HTML

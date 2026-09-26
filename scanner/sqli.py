@@ -42,6 +42,37 @@ TIME_PAYLOADS: list[str] = [
     "1) AND SLEEP(3)--",
 ]
 
+WAF_BLOCK_SIGNATURES: list[str] = [
+    r"attention required!\s*\|\s*cloudflare",
+    r"error 1020:\s*access denied",
+    r"ray id:\s*[0-9a-f]+",
+    r"request blocked by sql injection firewall rule",
+    r"request blocked by cloudfront",
+    r"the requested url was rejected",
+    r"mod_security",
+    r"web application firewall",
+    r"sucuri website firewall",
+    r"incapsula incident id",
+    r"fortigate application control",
+    r"protected by wordfence",
+    r"akamai ghost",
+    r"barracuda networks",
+]
+
+
+def is_waf_blocking_page(status_code: int, body: str, headers: Any = None) -> bool:
+    """Detecta si una respuesta HTTP corresponde a un bloqueo perimetral de WAF y no a la base de datos."""
+    if status_code not in (400, 403, 406, 429, 503):
+        return False
+    body_lower = body.lower()
+    for sig in WAF_BLOCK_SIGNATURES:
+        if re.search(sig, body_lower):
+            return True
+    return status_code in (403, 406) and any(
+        w in body_lower for w in ("firewall", "blocked", "access denied", "forbidden", "security policy")
+    )
+
+
 def test_error_sqli(
     parsed: Any, params: dict[str, list[str]], param: str, payload: str, baseline_body: str = "", session: Optional[requests.Session] = None
 ) -> Optional[dict[str, str]]:
@@ -54,8 +85,8 @@ def test_error_sqli(
         r = client.get(test_url, timeout=5)
         body = r.text
 
-        # Ignorar errores genéricos de servidor (ej. 404 Not Found)
-        if r.status_code == 404:
+        # Ignorar errores genéricos de servidor (ej. 404 Not Found) o páginas de bloqueo WAF
+        if r.status_code == 404 or is_waf_blocking_page(r.status_code, body, getattr(r, "headers", None)):
             return None
 
         matched_sigs = []
@@ -145,14 +176,26 @@ def test_boolean_sqli(
 
         r_false = client.get(url_false, timeout=5)
 
+        # Si la respuesta de error o condición falsa es un bloqueo perimetral de WAF, no es inferencia SQL
+        if is_waf_blocking_page(r_false.status_code, r_false.text, getattr(r_false, "headers", None)):
+            return None
+
+        # Si ambas respuestas son idénticas, no hay inferencia booleana
+        if r_true.text == r_false.text:
+            return None
+
         base_len = len(baseline_body)
         true_len = len(r_true.text)
         false_len = len(r_false.text)
 
         diff_true = abs(true_len - base_len)
         diff_false = abs(false_len - base_len)
+        diff_tf = abs(true_len - false_len)
 
-        if diff_true <= 40 and (diff_false >= 60 or r_false.status_code != 200) and r_true.text != r_false.text:
+        # Confirmación booleana estricta:
+        # La condición verdadera debe aproximarse a la base (<= 40 bytes)
+        # La condición falsa debe diferir significativamente de la verdadera (>= 50 bytes)
+        if diff_true <= 40 and diff_tf >= 50 and (diff_false >= 50 or r_false.status_code != 200):
             return {
                 "vuln": f"SQLi Booleano Confirmado en parámetro '{param}'",
                 "risk": "Alto",
@@ -160,7 +203,7 @@ def test_boolean_sqli(
                     f"Inyección SQL inferencial/booleana confirmada en '{param}'. "
                     f"Condición Verdadera ('{true_payload}') replica la respuesta base mientras que "
                     f"Condición Falsa ('{false_payload}') altera la respuesta "
-                    f"(Diferencia: {abs(true_len - false_len)} bytes)."
+                    f"(Diferencia: {diff_tf} bytes)."
                 ),
                 "confidence": "confirmed",
             }

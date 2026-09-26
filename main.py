@@ -368,8 +368,9 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             auth_session = dynamic_login(login_url, login_creds, totp_secret=totp_secret)
         if auth_session is not None:
             session = auth_session
-            if getattr(engine, "session_manager", None):
-                engine.session_manager.session = session
+            session_mgr = getattr(engine, "session_manager", None)
+            if session_mgr is not None:
+                session_mgr.session = session
 
 
     if stealth:
