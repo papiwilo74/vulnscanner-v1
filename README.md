@@ -1,32 +1,32 @@
-# OmniBreach v3.8 — DAST & Security Scanner
+# OmniBreach v3.9 — DAST & Security Scanner
 
 <p align="center">
-  <img src="https://img.shields.io/badge/OmniBreach-v3.8-blue?style=for-the-badge&logo=shield" alt="OmniBreach v3.8" />
+  <img src="https://img.shields.io/badge/OmniBreach-v3.9-blue?style=for-the-badge&logo=shield" alt="OmniBreach v3.9" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.8"><img src="https://img.shields.io/badge/Release-v3.8-007EC6.svg?logo=github" alt="Release v3.8" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.9"><img src="https://img.shields.io/badge/Release-v3.9-007EC6.svg?logo=github" alt="Release v3.9" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-brightgreen.svg?logo=github-actions" alt="CI Pipeline" /></a>
   <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(126%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
   <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(28.6k%20LOC)-green.svg" alt="Bandit" /></a>
   <a href="https://osv.dev/"><img src="https://img.shields.io/badge/SCA%20Intel-OSV.dev%20Live%20Synced-blueviolet.svg" alt="OSV.dev Synced" /></a>
   <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"><img src="https://img.shields.io/badge/Threat%20Intel-CISA%20KEV%20Synced-orange.svg" alt="CISA KEV" /></a>
   <a href="https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html"><img src="https://img.shields.io/badge/Standard-SARIF%20v2.1.0%20OASIS-brightgreen.svg" alt="SARIF v2.1.0" /></a>
-  <a href="reports/ai_benchmark_report.md"><img src="https://img.shields.io/badge/AI%20Copilot-100%25%20Precision%20%7C%20100%25%20Noise%20Reduction-brightgreen.svg" alt="AI Empirical Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-378%20passing%20(100%25)-brightgreen.svg" alt="378 Tests" /></a>
+  <a href="reports/scientific_benchmark_report.md"><img src="https://img.shields.io/badge/Scientific%20Benchmark-100%25%20Precision%20%7C%200%25%20FPR-brightgreen.svg" alt="Scientific Benchmark" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-418%20passing%20(100%25)-brightgreen.svg" alt="418 Tests" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach v3.8** es un proyecto personal avanzado y de investigación académica enfocado en **Dynamic Application Security Testing (DAST)** heurístico, auditoría de superficie externa (EASM) y modelado causal de amenazas.
+> **OmniBreach v3.9** es una plataforma avanzada de **Dynamic Application Security Testing (DAST)** heurístico, auditoría de superficie externa (EASM) y validación empírica con rigor científico.
 > 
-> Desarrollado como proyecto de portafolio y opción de grado, unifica prácticas reales de ingeniería de software y seguridad defensiva:
+> Diseñado para entornos de grado corporativo y bancario:
+> - **Gestión de Autenticación Compleja & TOTP/MFA (RFC 6238)**: Inyección dinámica de tokens temporales de un solo uso en SPAs y flujos Playwright.
+> - **Servidor OAST Dedicado (RFC 1035 UDP + HTTP)**: Detección fuera de banda de vulnerabilidades ciegas (Blind SSRF, Blind XXE, Blind RCE y Blind SQLi).
+> - **Supresión Avanzada de Falsos Positivos**: Filtro anti-WAF (Cloudflare, AWS WAF, ModSecurity), análisis contextual DOM para XSS y Entropía de Shannon para secretos.
 > - **SCA Dinámico en Tiempo Real**: Consultas activas a la base de datos abierta de Google/OpenSSF (**OSV.dev**) para identificar CVEs y GHSAs en dependencias.
-> - **State-Aware Sessions & Macro Replay**: Auditoría profunda en aplicaciones SaaS y SPAs sin pérdida de sesión mediante centinelas y automatización con **Playwright**.
-> - **Fuzzing Contextual (AST)**: Análisis sintáctico del punto de reflejo en el DOM (HTML body, atributos, scripts JS, comentarios) y disparo quirúrgico de payloads de escape.
-> - **Harness de Benchmark Automatizado**: Detección continua de regresiones y validación empírica en CI/CD contra **OWASP Juice Shop** y **OWASP PyGoat** (**100% Precisión comprobada**).
-> - **Taint Tracking Dinámico & OAST**: Captura de Stack Traces de JavaScript en navegadores reales y servidor local para detección de **Blind XXE y Blind SSRF**.
-> - **Modelado de Ataques y Choke Points**: Grafo dirigido con cálculo matemático de **Centralidad de Brandes** y simulaciones analíticas *What-If*.
+> - **State-Aware Sessions & Macro Replay**: Auditoría profunda en aplicaciones SaaS y SPAs sin pérdida de sesión mediante centinelas.
+> - **Benchmark Científico Integrado**: Suite empírica con cálculo de Matriz de Confusión, MCC, F1-Score y generación automática de tablas LaTeX para reportes académicos.
 > - **Cumplimiento y DevSecOps**: Exportador nativo **SARIF v2.1.0** para GitHub Advanced Security y matriz de cumplimiento **PCI-DSS v4.0 / OWASP Top 10**.
 
 ---
