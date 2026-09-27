@@ -419,3 +419,16 @@ def enrich_findings_with_autofix(findings: list[Finding], tech_stack: Optional[l
             if patch:
                 f.autofix = patch
     return findings
+
+
+def enrich_findings_with_virtual_patches(findings: list[Finding]) -> list[Finding]:
+    """Enriquece una lista de hallazgos con contramedidas perimetrales de parcheo virtual WAF."""
+    from scanner.virtual_patching import VirtualPatchEngine
+
+    for idx, f in enumerate(findings):
+        vp = VirtualPatchEngine.synthesize_patch(f, rule_id=100001 + idx)
+        if f.autofix is None:
+            f.autofix = {}
+        f.autofix["virtual_patch"] = vp.to_dict()
+    return findings
+

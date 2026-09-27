@@ -5,8 +5,11 @@ Soporta:
 2. Login interactivo en navegador headless (Playwright / Chromium)
 3. AuthSessionManager con manejo de sesiones y soporte para auto-refresh de tokens ante 401.
 """
+import base64
 import contextlib
+import json
 import logging
+import time
 from typing import Any, Callable, Optional
 
 import requests
@@ -239,39 +242,177 @@ def headless_browser_login(
     return None
 
 
+def _extract_jwt_expiry(token_str: str) -> Optional[float]:
+    """Extrae el claim exp de un token JWT sin requerir librerías externas."""
+    try:
+        parts = token_str.split(".")
+        if len(parts) < 2:
+            return None
+        payload_b64 = parts[1]
+        rem = len(payload_b64) % 4
+        if rem > 0:
+            payload_b64 += "=" * (4 - rem)
+        payload_bytes = base64.urlsafe_b64decode(payload_b64.encode("ascii"))
+        payload_dict = json.loads(payload_bytes.decode("utf-8", errors="ignore"))
+        if isinstance(payload_dict, dict) and "exp" in payload_dict:
+            return float(payload_dict["exp"])
+    except Exception:
+        pass
+    return None
+
+
+class OAuth2TokenManager:
+    """
+    Gestor dinámico de tokens OAuth2 / OIDC con soporte para rotación de Refresh Tokens
+    y actualización automática por caducidad (proactiva y reactiva ante 401).
+    """
+
+    def __init__(
+        self,
+        token_url: str,
+        refresh_token: str,
+        client_id: Optional[str] = None,
+        client_secret: Optional[str] = None,
+        scope: Optional[str] = None,
+        access_token: Optional[str] = None,
+        totp_secret: Optional[str] = None,
+        token_type: str = "Bearer",
+    ):
+        self.token_url = token_url
+        self.refresh_token = refresh_token
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.scope = scope
+        self.access_token = access_token
+        self.totp_secret = totp_secret
+        self.token_type = token_type
+        self.expires_at: Optional[float] = None
+        if self.access_token:
+            self.expires_at = _extract_jwt_expiry(self.access_token)
+
+    def is_expired(self, leeway_seconds: int = 60) -> bool:
+        """Determina si el access_token actual ha expirado o expira pronto."""
+        if not self.access_token:
+            return True
+        if self.expires_at is not None:
+            return (time.time() + leeway_seconds) >= self.expires_at
+        return False
+
+    def refresh_access_token(self, session: Optional[requests.Session] = None) -> str:
+        """
+        Ejecuta el flujo refresh_token contra el endpoint OAuth2.
+        Actualiza el access_token y las cabeceras de autorización.
+        """
+        payload: dict[str, Any] = {
+            "grant_type": "refresh_token",
+            "refresh_token": self.refresh_token,
+        }
+        if self.client_id:
+            payload["client_id"] = self.client_id
+        if self.client_secret:
+            payload["client_secret"] = self.client_secret
+        if self.scope:
+            payload["scope"] = self.scope
+
+        if self.totp_secret:
+            with contextlib.suppress(Exception):
+                from scanner.totp import generate_totp
+                totp_val = generate_totp(self.totp_secret)
+                payload["totp"] = totp_val
+                payload["otp"] = totp_val
+
+        headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        req_client = session if session is not None else requests
+
+        r = req_client.post(self.token_url, data=payload, headers=headers, timeout=10)
+        if r.status_code >= 400:
+            # Reintentar en formato JSON si el proveedor lo requiere
+            r = req_client.post(self.token_url, json=payload, timeout=10)
+
+        r.raise_for_status()
+        data = r.json()
+
+        new_access_token = data.get("access_token") or data.get("token") or data.get("accessToken")
+        if not new_access_token:
+            raise ValueError(f"Respuesta OAuth2 no contiene access_token válido: {data}")
+
+        self.access_token = str(new_access_token)
+        if "refresh_token" in data:
+            self.refresh_token = str(data["refresh_token"])
+
+        if "expires_in" in data:
+            try:
+                self.expires_at = time.time() + float(data["expires_in"])
+            except (ValueError, TypeError):
+                self.expires_at = None
+        else:
+            self.expires_at = _extract_jwt_expiry(self.access_token)
+
+        if session is not None:
+            session.headers["Authorization"] = f"{self.token_type} {self.access_token}"
+
+        logger.info("[OAUTH2] Token renovado con éxito. Próxima expiración: %s", self.expires_at)
+        return self.access_token
+
+    def ensure_valid_token(self, session: Optional[requests.Session] = None) -> None:
+        """Verifica proactivamente si el token ha expirado y lo refresca si es necesario."""
+        if self.is_expired():
+            logger.info("[OAUTH2] Token próximo a expirar o inexistente. Refrescando...")
+            self.refresh_access_token(session)
+        elif session is not None and self.access_token:
+            session.headers.setdefault("Authorization", f"{self.token_type} {self.access_token}")
+
+
 class AuthSessionManager:
     """
     Gestor inteligente de sesión HTTP para el escáner.
-    Mantiene el estado de autenticación, detecta tokens expirados (401 Unauthorized)
-    y ejecuta callbacks de refresco de credenciales automáticamente.
+    Mantiene el estado de autenticación, detecta tokens expirados (401 Unauthorized),
+    y ejecuta callbacks de refresco o flujos OAuth2 con soporte TOTP automáticamente.
     """
 
     def __init__(
         self,
         session: Optional[requests.Session] = None,
         refresh_callback: Optional[Callable[[], Optional[requests.Session]]] = None,
-        auth_header_template: Optional[str] = None
+        auth_header_template: Optional[str] = None,
+        oauth2_manager: Optional[OAuth2TokenManager] = None,
     ):
         self.session = session or requests.Session()
         self.refresh_callback = refresh_callback
         self.auth_header_template = auth_header_template
+        self.oauth2_manager = oauth2_manager
+
+        if self.oauth2_manager:
+            with contextlib.suppress(Exception):
+                self.oauth2_manager.ensure_valid_token(self.session)
+
         has_cookies = bool(getattr(self.session, 'cookies', None))
         headers = getattr(self.session, 'headers', {})
         has_auth = "Authorization" in headers if hasattr(headers, "__contains__") else False
-        self.is_authenticated = has_cookies or has_auth
+        self.is_authenticated = has_cookies or has_auth or (self.oauth2_manager is not None)
 
     def request(self, method: str, url: str, **kwargs: Any) -> requests.Response:
-        """Envía una petición HTTP con manejo automático de 401 Unauthorized."""
+        """Envía una petición HTTP con manejo automático de refresco proactivo y reactivo ante 401."""
+        if self.oauth2_manager:
+            with contextlib.suppress(Exception):
+                self.oauth2_manager.ensure_valid_token(self.session)
+
         response = self.session.request(method, url, **kwargs)
 
-        if response.status_code == 401 and self.refresh_callback:
-            logger.info("[AUTH-MANAGER] Recibido 401 Unauthorized. Intentando refresco de sesión...")
-            new_session = self.refresh_callback()
-            if new_session:
-                self.session = new_session
-                self.is_authenticated = True
-                # Reintentar la petición original con la sesión renovada
-                return self.session.request(method, url, **kwargs)
+        if response.status_code == 401:
+            if self.oauth2_manager:
+                logger.info("[AUTH-MANAGER] Recibido 401 Unauthorized. Intentando refresco OAuth2...")
+                with contextlib.suppress(Exception):
+                    self.oauth2_manager.refresh_access_token(self.session)
+                    self.is_authenticated = True
+                    return self.session.request(method, url, **kwargs)
+            elif self.refresh_callback:
+                logger.info("[AUTH-MANAGER] Recibido 401 Unauthorized. Intentando refresco de sesión...")
+                new_session = self.refresh_callback()
+                if new_session:
+                    self.session = new_session
+                    self.is_authenticated = True
+                    return self.session.request(method, url, **kwargs)
 
         return response
 
@@ -280,3 +421,23 @@ class AuthSessionManager:
 
     def post(self, url: str, **kwargs: Any) -> requests.Response:
         return self.request("POST", url, **kwargs)
+
+
+def create_oauth2_refreshing_session(
+    token_url: str,
+    refresh_token: str,
+    client_id: Optional[str] = None,
+    client_secret: Optional[str] = None,
+    totp_secret: Optional[str] = None,
+    base_session: Optional[requests.Session] = None,
+) -> AuthSessionManager:
+    """Crea una sesión protegida que auto-renueva tokens OAuth2/OIDC con soporte opcional TOTP."""
+    manager = OAuth2TokenManager(
+        token_url=token_url,
+        refresh_token=refresh_token,
+        client_id=client_id,
+        client_secret=client_secret,
+        totp_secret=totp_secret,
+    )
+    return AuthSessionManager(session=base_session, oauth2_manager=manager)
+

@@ -248,6 +248,12 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          prefer_local_ai: bool = False,
          sarif_output: Optional[str] = None,
          eval_compliance: bool = False,
+         export_waf: Optional[str] = None,
+         waf_output: Optional[str] = None,
+         oauth2_token_url: Optional[str] = None,
+         oauth2_refresh_token: Optional[str] = None,
+         oauth2_client_id: Optional[str] = None,
+         oauth2_client_secret: Optional[str] = None,
          progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
@@ -361,6 +367,25 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             logger.info("[HAR] Importación exitosa. %d URLs y APIs recuperadas del HAR.", len(har_discovered_urls))
         except Exception as e:
             logger.warning("[HAR] Error al procesar archivo HAR: %s", e)
+
+    # 1.1 Autenticación dinámica OAuth2 con auto-refresh y soporte TOTP
+    if session is None and oauth2_token_url and oauth2_refresh_token:
+        try:
+            from scanner.auth_helper import create_oauth2_refreshing_session
+            logger.info("[OAUTH2] Configurando sesión con auto-renovación de tokens OAuth2...")
+            auth_mgr = create_oauth2_refreshing_session(
+                token_url=oauth2_token_url,
+                refresh_token=oauth2_refresh_token,
+                client_id=oauth2_client_id,
+                client_secret=oauth2_client_secret,
+                totp_secret=totp_secret,
+            )
+            session = auth_mgr.session
+            session_mgr = getattr(engine, "session_manager", None)
+            if session_mgr is not None:
+                session_mgr.session = session
+        except Exception as e:
+            logger.warning("[OAUTH2] Error configurando sesión OAuth2: %s", e)
 
     # 2. Login dinámico o headless si se especifica
     if session is None and login_url and login_creds:
@@ -647,6 +672,25 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         except Exception as e:
             logger.debug("[Compliance] Error evaluando cumplimiento: %s", e)
 
+    # 12. Síntesis y exportación de reglas WAF (Virtual Patching)
+    if export_waf and all_findings:
+        try:
+            from scanner.virtual_patching import VirtualPatchEngine
+            waf_ruleset = VirtualPatchEngine.export_ruleset(all_findings, format=export_waf)
+            if waf_output:
+                with open(waf_output, "w", encoding="utf-8") as f:
+                    f.write(waf_ruleset)
+                logger.info("[WAF] Reglas de parcheo virtual (%s) exportadas en: %s", export_waf, waf_output)
+            else:
+                print("\n" + "=" * 75)
+                print(f" [🛡️ REGLAS DE PARCHEO VIRTUAL WAF - FORMATO: {export_waf.upper()}]")
+                print("=" * 75)
+                print(waf_ruleset)
+                print("=" * 75 + "\n")
+            engine_summary["waf_virtual_patches"] = {"format": export_waf, "ruleset": waf_ruleset}
+        except Exception as e:
+            logger.debug("[WAF] Error generando reglas de parcheo virtual: %s", e)
+
     return print_report(
         url,
         all_findings,
@@ -800,6 +844,24 @@ def main() -> None:
                         help="Ruta donde exportar el reporte en estándar OASIS SARIF v2.1.0 para GitHub Code Scanning")
     parser.add_argument("--compliance", action="store_true",
                         help="Evalúa el cumplimiento normativo automático contra PCI-DSS v4.0, HIPAA, NIST SP 800-53 e ISO 27001")
+    parser.add_argument("--export-waf", type=str, default=None, choices=["modsecurity", "aws_waf", "cloudflare", "nginx", "all"],
+                        help="Exporta reglas defensivas de mitigación inmediata (Virtual Patching) para WAF")
+    parser.add_argument("--waf-output", type=str, default=None, metavar="FILE",
+                        help="Ruta de archivo donde guardar las reglas WAF generadas")
+    parser.add_argument("--oauth2-token-url", type=str, default=None,
+                        help="Endpoint OAuth2 para auto-refresco de tokens de acceso")
+    parser.add_argument("--oauth2-refresh-token", type=str, default=None,
+                        help="Refresh token OAuth2 para mantener sesiones autenticadas de larga duración")
+    parser.add_argument("--oauth2-client-id", type=str, default=None,
+                        help="Client ID para auto-refresco OAuth2")
+    parser.add_argument("--oauth2-client-secret", type=str, default=None,
+                        help="Client Secret para auto-refresco OAuth2")
+    parser.add_argument("--proxy-capture", type=int, default=None, metavar="PORT",
+                        help="Inicia proxy interceptor en el puerto dado para capturar tráfico y endpoints antes de auditar")
+    parser.add_argument("--proxy-duration", type=int, default=None, metavar="SECONDS",
+                        help="Segundos a escuchar en el proxy interceptor antes de auditar los endpoints descubiertos")
+    parser.add_argument("--import-har", type=str, default=None, metavar="HAR_FILE",
+                        help="Importa y audita endpoints y sesiones autenticadas directamente desde un archivo HAR")
 
     args = parser.parse_args()
 
@@ -915,6 +977,44 @@ def main() -> None:
             print(f"    Detalle: {r['details']}")
         print("=" * 75 + "\n")
         sys.exit(0 if res["still_vulnerable"] == 0 else 2)
+
+    if args.import_har:
+        args.har = args.import_har
+
+    if args.proxy_capture:
+        import time
+
+        from scanner.proxy_capture import ProxyCaptureServer
+
+        proxy = ProxyCaptureServer(port=args.proxy_capture)
+        print("\n" + "=" * 75)
+        print(f" [🕵️ PROXY INTERCEPTOR PASIVO] ESCUCHANDO EN http://127.0.0.1:{args.proxy_capture}")
+        print("=" * 75)
+        print(" Configure su navegador o suite de QA (Selenium/Cypress) apuntando al proxy.")
+        proxy.start()
+        capture_time = args.proxy_duration or 10
+        print(f" Capturando tráfico durante {capture_time} segundos (o presione Ctrl+C)...")
+        try:
+            time.sleep(capture_time)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            proxy.stop()
+
+        print(f"\n[+] Sesión de captura finalizada. Flujos interceptados: {len(proxy.flows)}")
+        endpoints = proxy.get_captured_endpoints()
+        print(f"[+] Endpoints únicos descubiertos: {len(endpoints)}")
+        for ep in endpoints[:10]:
+            print(f"    * {ep}")
+        if len(endpoints) > 10:
+            print(f"    ... y {len(endpoints) - 10} más.")
+
+        if not args.url and endpoints:
+            args.url = endpoints[0]
+            print(f"[+] Fijando objetivo principal para escaneo: {args.url}\n")
+        elif not args.url:
+            print("[!] No se detectó tráfico ni se especificó URL objetivo. Finalizando.")
+            sys.exit(0)
 
     if args.satellite:
         import time
@@ -1216,6 +1316,12 @@ def main() -> None:
             oast_http_port=args.oast_http_port,
             sarif_output=args.sarif,
             eval_compliance=args.compliance,
+            export_waf=args.export_waf,
+            waf_output=args.waf_output,
+            oauth2_token_url=args.oauth2_token_url,
+            oauth2_refresh_token=args.oauth2_refresh_token,
+            oauth2_client_id=args.oauth2_client_id,
+            oauth2_client_secret=args.oauth2_client_secret,
         )
     finally:
         if lab_server:

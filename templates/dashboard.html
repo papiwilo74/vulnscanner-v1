@@ -171,6 +171,14 @@
                         <label for="oast-server" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Servidor OAST Dedicado (FQDN)</label>
                         <input type="text" id="oast-server" placeholder="oast.local (o vacío para DNS+HTTP local)" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
                     </div>
+                    <div>
+                        <label for="oauth2-token-url" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">OAuth2 Token Endpoint</label>
+                        <input type="text" id="oauth2-token-url" placeholder="https://app.com/oauth/token" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
+                    </div>
+                    <div>
+                        <label for="oauth2-refresh-token" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Refresh Token (Rotación Automática)</label>
+                        <input type="text" id="oauth2-refresh-token" placeholder="rt_1234567890abcdef" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
+                    </div>
                     <div class="col-span-full flex items-center gap-2 mt-1">
                         <input type="checkbox" id="headless-login" class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
                         <label for="headless-login" class="text-xs text-slate-300">Navegador Headless Interactivo (Playwright para SPAs, React, Angular, Vue)</label>
@@ -265,6 +273,9 @@
                         <a id="btn-sarif" href="#" download class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-emerald-400 flex items-center gap-1">
                             <i class="fa-solid fa-shield"></i> SARIF
                         </a>
+                        <button id="btn-waf" onclick="openWAFModal()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-mono text-amber-400 flex items-center gap-1">
+                            <i class="fa-solid fa-shield-halved"></i> Reglas WAF
+                        </button>
                     </div>
                 </div>
                 <div class="overflow-y-auto flex-1 max-h-[420px] space-y-3 pr-1" id="findings-list">
@@ -1049,6 +1060,45 @@
                         </div>
                     </div>
                 </div>
+        </div>
+
+        <!-- Virtual Patching & WAF Ruleset Modal -->
+        <div id="modal-waf-patching" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+            <div class="bg-slate-950 border border-amber-500/30 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+                    <div class="flex items-center gap-2">
+                        <span class="p-1.5 bg-amber-500/20 text-amber-400 rounded-lg border border-amber-500/30">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </span>
+                        <div>
+                            <h3 class="font-bold text-sm text-slate-100">Reglas de Mitigación Inmediata WAF (Virtual Patching)</h3>
+                            <p class="text-[11px] text-slate-400">Contramedidas perimetrales sintetizadas automáticamente para frenar vectores de ataque en producción.</p>
+                        </div>
+                    </div>
+                    <button onclick="closeWAFModal()" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="p-4 space-y-3 flex-1 flex flex-col overflow-hidden">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <label for="waf-format-select" class="text-xs font-semibold text-slate-400 font-mono">Formato WAF:</label>
+                            <select id="waf-format-select" onchange="fetchWAFRules()" class="py-1 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs font-mono text-amber-300 focus:ring-2 focus:ring-amber-500">
+                                <option value="modsecurity">ModSecurity / OWASP CRS</option>
+                                <option value="aws_waf">AWS WAF v2 (JSON)</option>
+                                <option value="cloudflare">Cloudflare WAF Expressions</option>
+                                <option value="nginx">Nginx Location Directives</option>
+                                <option value="all">Paquete Consolidado Multi-Nube</option>
+                            </select>
+                        </div>
+                        <button onclick="copyWAFRulesToClipboard()" class="px-3 py-1.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-mono flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-copy"></i> Copiar Reglas
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-auto bg-slate-900/80 rounded-xl border border-slate-800 p-3">
+                        <pre id="waf-rules-output" class="text-xs font-mono text-slate-300 whitespace-pre-wrap">Cargando reglas WAF...</pre>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -1395,6 +1445,8 @@
             const sentinelUrl = document.getElementById('sentinel-url')?.value.trim() || null;
             const headlessLogin = document.getElementById('headless-login')?.checked || false;
             const oastServer = document.getElementById('oast-server')?.value.trim() || null;
+            const oauth2TokenUrl = document.getElementById('oauth2-token-url')?.value.trim() || null;
+            const oauth2RefreshToken = document.getElementById('oauth2-refresh-token')?.value.trim() || null;
 
             try {
                 const res = await fetch(apiUrl('/scan'), {
@@ -1412,6 +1464,8 @@
                         sentinel_url: sentinelUrl,
                         headless_login: headlessLogin,
                         oast_server: oastServer,
+                        oauth2_token_url: oauth2TokenUrl,
+                        oauth2_refresh_token: oauth2RefreshToken,
                     })
                 });
                 const data = await res.json();
@@ -2505,6 +2559,41 @@ Coef. de Matthews (MCC) & \\text{MCC}_{\\text{form}} & ${Number(b.matthews_corr_
                     }
                 }
             }
+        }
+
+        async function openWAFModal() {
+            document.getElementById('modal-waf-patching').classList.remove('hidden');
+            await fetchWAFRules();
+        }
+
+        function closeWAFModal() {
+            document.getElementById('modal-waf-patching').classList.add('hidden');
+        }
+
+        async function fetchWAFRules() {
+            const format = document.getElementById('waf-format-select').value;
+            const outputEl = document.getElementById('waf-rules-output');
+            outputEl.textContent = 'Generando reglas de mitigación ' + format + '...';
+            try {
+                const res = await fetch(apiUrl('/api/v1/waf/latest?format=' + format));
+                const data = await res.json();
+                if (data.status === 'success') {
+                    outputEl.textContent = typeof data.ruleset === 'string' ? data.ruleset : JSON.stringify(data.ruleset, null, 2);
+                } else {
+                    outputEl.textContent = '# No hay auditorías completadas en el sistema.\n# Ejecuta un escaneo DAST para sintetizar reglas WAF de parcheo virtual.';
+                }
+            } catch (err) {
+                outputEl.textContent = '# Error al solicitar reglas WAF: ' + err.message;
+            }
+        }
+
+        function copyWAFRulesToClipboard() {
+            const text = document.getElementById('waf-rules-output').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Reglas de parcheo virtual copiadas al portapapeles con éxito.');
+            }).catch(() => {
+                alert('No se pudo copiar automáticamente al portapapeles.');
+            });
         }
 
         // Iniciar WebSocket de Deception y cargar datos al inicio

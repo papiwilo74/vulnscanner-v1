@@ -124,6 +124,18 @@ def scan_text_for_sensitive_data(text: str, source_name: str, target_url: str = 
                 "confidence": "confirmed",
             })
 
+    # 1.1 Ejecutar motor DLP para tarjetas de crédito (Luhn), SSN y certificados/llaves criptográficas
+    from scanner.dlp import DLPEngine
+    dlp_leaks = DLPEngine.scan_text(text, location_label=source_name, target_url=target_url)
+    for leak in dlp_leaks:
+        if leak.category in ("credit_card", "ssn") or "Criptográfica" in leak.leak_type:
+            findings.append({
+                "vuln": f"Fuga DLP: {leak.leak_type}",
+                "risk": "Crítico" if leak.severity == "critical" else "Alto",
+                "detail": leak.detail,
+                "confidence": "confirmed",
+            })
+
     # 2. Comprobar comentarios sospechosos/sensibles (ej. TODOs con credenciales)
     comments = re.findall(r"<!--(.*?)-->", text, re.DOTALL)
     for comment in comments:
