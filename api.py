@@ -1494,3 +1494,59 @@ def get_latest_benchmark() -> dict[str, Any]:
     }
 
 
+@app.post("/api/v1/compliance/evaluate", tags=["Compliance"])
+def evaluate_compliance_endpoint(findings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Evalúa cumplimiento regulatorio (PCI-DSS, HIPAA, NIST, ISO) para una lista de hallazgos."""
+    from scanner.compliance import ComplianceEngine
+    engine = ComplianceEngine()
+    return engine.evaluate(findings)
+
+
+@app.get("/api/v1/compliance/latest", tags=["Compliance"])
+def get_latest_compliance() -> dict[str, Any]:
+    """Evalúa el cumplimiento regulatorio de la última auditoría registrada en el sistema."""
+    from scanner.compliance import ComplianceEngine
+    with _db_lock:
+        conn = _get_db()
+        row = conn.execute("SELECT results FROM tasks WHERE status = 'completed' ORDER BY created_at DESC LIMIT 1").fetchone()
+        conn.close()
+
+    if not row or not row[0]:
+        return {"status": "not_found", "message": "No hay auditorías completadas en el sistema."}
+
+    results = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+    findings = results.get("vulnerabilities", [])
+    engine = ComplianceEngine()
+    evaluation = engine.evaluate(findings)
+    return {"status": "success", "compliance": evaluation}
+
+
+@app.get("/api/v1/attack-graph/latest", tags=["Attack Graph"])
+def get_latest_attack_graph() -> dict[str, Any]:
+    """Retorna el grafo de ataque interactivo completo (nodos, aristas y choke points) del último escaneo."""
+    from scanner.attack_graph import AttackGraph
+    from scanner.models import Finding
+    with _db_lock:
+        conn = _get_db()
+        row = conn.execute("SELECT results FROM tasks WHERE status = 'completed' ORDER BY created_at DESC LIMIT 1").fetchone()
+        conn.close()
+
+    if not row or not row[0]:
+        return {"status": "not_found", "message": "No hay auditorías con grafos de ataque disponibles."}
+
+    results = json.loads(row[0]) if isinstance(row[0], str) else row[0]
+    raw_findings = results.get("vulnerabilities", [])
+    findings_objs = [
+        Finding(
+            category=f.get("category", "default"),
+            title=f.get("title", "Finding"),
+            severity=f.get("severity", "medium"),
+            affected_url=f.get("affected_url", ""),
+        )
+        for f in raw_findings
+    ]
+    graph = AttackGraph.build_from_findings(findings_objs)
+    return {"status": "success", "attack_graph": graph.to_dict()}
+
+
+

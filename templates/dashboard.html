@@ -96,6 +96,10 @@
                 <i class="fa-solid fa-chart-line text-amber-400"></i> Benchmark Científico
                 <span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">OWASP Testbed</span>
             </button>
+            <button id="tab-btn-compliance" onclick="switchTab('compliance')" class="px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+                <i class="fa-solid fa-stamp text-violet-400"></i> Cumplimiento Normativo
+                <span class="bg-violet-500/20 text-violet-300 border border-violet-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">PCI/HIPAA/NIST</span>
+            </button>
         </div>
 
         <!-- TAB 1: DAST AUDIT VIEW -->
@@ -284,9 +288,14 @@
                 </div>
                 <!-- Attack Graph Preview -->
                 <div class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl">
-                    <h3 class="font-bold text-sm mb-3 flex items-center gap-2">
-                        <i class="fa-solid fa-diagram-project text-indigo-400"></i> Grafo de Ataque & Choke Points
-                    </h3>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-diagram-project text-indigo-400"></i> Grafo de Ataque & Choke Points
+                        </h3>
+                        <button onclick="openInteractiveGraphModal()" class="text-xs bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 px-2.5 py-1 rounded-lg border border-indigo-500/30 transition flex items-center gap-1.5 font-semibold">
+                            <i class="fa-solid fa-up-right-and-down-left-from-center"></i> Explorador Interactivo & What-If
+                        </button>
+                    </div>
                     <div id="mermaid-graph" class="overflow-x-auto text-xs font-mono bg-slate-900/60 p-3 rounded-xl border border-slate-800 min-h-[140px] flex items-center justify-center text-slate-500">
                         El grafo se compondrá dinámicamente al finalizar la auditoría.
                     </div>
@@ -933,6 +942,115 @@
                 </div>
             </div>
         </div>
+
+        <!-- TAB 6: CUMPLIMIENTO REGULATORIO (PCI-DSS / HIPAA / NIST / ISO) -->
+        <div id="view-compliance" class="space-y-6 hidden">
+            <!-- Header Card -->
+            <section class="bg-soc-card border border-soc-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="p-2 rounded-lg bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                                <i class="fa-solid fa-stamp text-lg"></i>
+                            </span>
+                            <h2 class="text-lg font-bold text-slate-100">Evaluación de Cumplimiento Normativo & Auditoría</h2>
+                            <span id="compliance-overall-badge" class="text-xs px-2.5 py-0.5 rounded-full font-mono bg-violet-500/20 text-violet-300 border border-violet-500/30">Auditor Ready</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">
+                            Mapeo automático de vulnerabilidades contra PCI-DSS v4.0, HIPAA Security Rule, NIST SP 800-53 Rev 5 e ISO/IEC 27001:2022.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="loadComplianceData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-4 py-2.5 rounded-xl border border-slate-700 transition flex items-center gap-2 font-semibold">
+                            <i class="fa-solid fa-rotate"></i> Actualizar Evaluación
+                        </button>
+                        <button onclick="copyComplianceAuditSheet()" class="bg-violet-600 hover:bg-violet-500 text-white text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-violet-600/30 transition flex items-center gap-2 font-semibold">
+                            <i class="fa-solid fa-clipboard-check"></i> Copiar Hoja de Auditoría
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Global Score Banner -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+                    <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-[10px] font-mono uppercase text-slate-400">Puntaje Global de Cumplimiento</p>
+                        <h4 id="compliance-global-score" class="text-2xl font-bold font-mono text-violet-400 mt-1">--%</h4>
+                        <p id="compliance-global-grade" class="text-xs text-slate-400 mt-0.5">Pendiente de escaneo</p>
+                    </div>
+                    <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-[10px] font-mono uppercase text-slate-400">PCI-DSS v4.0</p>
+                        <h4 id="compliance-score-pci" class="text-xl font-bold font-mono text-slate-200 mt-1">--%</h4>
+                        <p id="compliance-status-pci" class="text-xs text-slate-500 mt-0.5">--</p>
+                    </div>
+                    <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-[10px] font-mono uppercase text-slate-400">HIPAA Security Rule</p>
+                        <h4 id="compliance-score-hipaa" class="text-xl font-bold font-mono text-slate-200 mt-1">--%</h4>
+                        <p id="compliance-status-hipaa" class="text-xs text-slate-500 mt-0.5">--</p>
+                    </div>
+                    <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                        <p class="text-[10px] font-mono uppercase text-slate-400">NIST SP 800-53 / ISO 27001</p>
+                        <h4 id="compliance-score-nist" class="text-xl font-bold font-mono text-slate-200 mt-1">--%</h4>
+                        <p id="compliance-status-nist" class="text-xs text-slate-500 mt-0.5">--</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detailed Framework Cards Grid -->
+            <div id="compliance-framework-cards" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="col-span-2 text-center py-12 text-slate-500 font-mono bg-soc-card border border-soc-border rounded-2xl">
+                    Ejecuta un escaneo DAST o pulsa "Actualizar Evaluación" para cargar el dictamen normativo.
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Attack Graph Modal -->
+        <div id="modal-attack-graph" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+            <div class="bg-slate-950 border border-indigo-500/30 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+                    <div class="flex items-center gap-2">
+                        <span class="p-1.5 bg-indigo-500/20 text-indigo-400 rounded-lg border border-indigo-500/30">
+                            <i class="fa-solid fa-diagram-project"></i>
+                        </span>
+                        <h3 class="font-bold text-sm text-slate-100">Explorador Interactivo de Grafo de Ataque & Choke Points</h3>
+                    </div>
+                    <button onclick="closeInteractiveGraphModal()" class="text-slate-400 hover:text-white text-sm p-1 rounded-lg">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-hidden">
+                    <!-- Graph Preview -->
+                    <div class="md:col-span-2 p-4 bg-slate-950 border-r border-slate-800 flex flex-col">
+                        <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+                            <span>Selecciona un nodo para inspeccionarlo</span>
+                            <div class="flex items-center gap-3 font-mono">
+                                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-blue-600"></span> Choke Point</span>
+                                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded bg-rose-600"></span> Impacto Crítico</span>
+                            </div>
+                        </div>
+                        <div id="modal-graph-container" class="flex-1 overflow-auto bg-slate-900/50 rounded-xl border border-slate-800/80 p-4 min-h-[350px] flex items-center justify-center">
+                            <div id="modal-graph-content" class="text-xs font-mono text-slate-500">Cargando visualización del grafo...</div>
+                        </div>
+                    </div>
+                    <!-- Node Inspector & What-If Panel -->
+                    <div class="p-4 bg-slate-900/40 flex flex-col justify-between overflow-y-auto space-y-4">
+                        <div>
+                            <h4 class="text-xs font-bold font-mono uppercase text-indigo-400 mb-2">Inspector de Nodo</h4>
+                            <div id="node-inspector-content" class="text-xs text-slate-400 space-y-2">
+                                <p class="text-slate-500 italic">Selecciona un nodo del grafo para ver su táctica MITRE, fase y probabilidad de explotación.</p>
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-800 pt-3">
+                            <h4 class="text-xs font-bold font-mono uppercase text-emerald-400 mb-1">Simulación What-If</h4>
+                            <p class="text-[11px] text-slate-400 mb-2">Calcula la reducción de riesgo sistémico si este nodo es remediado.</p>
+                            <button id="btn-simulate-what-if" onclick="simulateSelectedNodeRemediation()" disabled class="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-xs py-2 rounded-xl font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
+                                <i class="fa-solid fa-shield-virus"></i> Simular Remediación en Caliente
+                            </button>
+                            <div id="what-if-result-box" class="mt-3 hidden p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px] space-y-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
 
     <!-- Footer -->
@@ -1323,13 +1441,15 @@
             const btnClu = document.getElementById('tab-btn-cluster');
             const btnEasm = document.getElementById('tab-btn-easm');
             const btnBench = document.getElementById('tab-btn-benchmark');
+            const btnComp = document.getElementById('tab-btn-compliance');
             const viewDast = document.getElementById('view-dast');
             const viewDec = document.getElementById('view-deception');
             const viewClu = document.getElementById('view-cluster');
             const viewEasm = document.getElementById('view-easm');
             const viewBench = document.getElementById('view-benchmark');
+            const viewComp = document.getElementById('view-compliance');
 
-            [btnDast, btnDec, btnClu, btnEasm, btnBench].forEach(b => {
+            [btnDast, btnDec, btnClu, btnEasm, btnBench, btnComp].forEach(b => {
                 if (b) b.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800';
             });
             if (viewDast) viewDast.classList.add('hidden');
@@ -1337,6 +1457,7 @@
             if (viewClu) viewClu.classList.add('hidden');
             if (viewEasm) viewEasm.classList.add('hidden');
             if (viewBench) viewBench.classList.add('hidden');
+            if (viewComp) viewComp.classList.add('hidden');
 
             if (tab === 'dast') {
                 if (btnDast) btnDast.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30';
@@ -1356,6 +1477,10 @@
                 if (btnBench) btnBench.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-amber-600 text-white shadow-lg shadow-amber-600/30';
                 if (viewBench) viewBench.classList.remove('hidden');
                 loadBenchmarkData();
+            } else if (tab === 'compliance') {
+                if (btnComp) btnComp.className = 'px-4 py-2 rounded-xl text-sm font-semibold transition flex items-center gap-2 bg-violet-600 text-white shadow-lg shadow-violet-600/30';
+                if (viewComp) viewComp.classList.remove('hidden');
+                loadComplianceData();
             }
         }
 
@@ -1490,6 +1615,272 @@ Coef. de Matthews (MCC) & \\text{MCC}_{\\text{form}} & ${Number(b.matthews_corr_
                     document.execCommand('copy');
                     showToast("📋 Código LaTeX copiado al portapapeles.", false);
                 });
+            }
+        }
+
+        // =====================================================================
+        // COMPLIANCE ENGINE & AUDITOR READINESS JAVASCRIPT
+        // =====================================================================
+        let currentComplianceData = null;
+        let activeAttackGraph = null;
+        let selectedGraphNode = null;
+
+        async function loadComplianceData() {
+            try {
+                const res = await fetch(apiUrl('/api/v1/compliance/latest'));
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.status === 'success' && data.compliance) {
+                    renderComplianceData(data.compliance);
+                }
+            } catch (err) {
+                console.debug("Error cargando cumplimiento:", err);
+            }
+        }
+
+        function renderComplianceData(comp) {
+            currentComplianceData = comp;
+            const scoreEl = document.getElementById('compliance-global-score');
+            const gradeEl = document.getElementById('compliance-global-grade');
+            if (scoreEl) scoreEl.textContent = (comp.overall_compliance_score || 0) + '%';
+            if (gradeEl) gradeEl.textContent = comp.overall_grade || '--';
+
+            const fws = comp.frameworks || {};
+            if (fws['PCI-DSS v4.0']) {
+                const p = fws['PCI-DSS v4.0'];
+                const sEl = document.getElementById('compliance-score-pci');
+                const stEl = document.getElementById('compliance-status-pci');
+                if (sEl) sEl.textContent = p.compliance_score_percent + '%';
+                if (stEl) {
+                    stEl.textContent = p.status;
+                    stEl.className = p.compliance_score_percent === 100 ? 'text-xs text-emerald-400 font-semibold' : 'text-xs text-amber-400 font-semibold';
+                }
+            }
+            if (fws['HIPAA Security Rule']) {
+                const h = fws['HIPAA Security Rule'];
+                const sEl = document.getElementById('compliance-score-hipaa');
+                const stEl = document.getElementById('compliance-status-hipaa');
+                if (sEl) sEl.textContent = h.compliance_score_percent + '%';
+                if (stEl) {
+                    stEl.textContent = h.status;
+                    stEl.className = h.compliance_score_percent === 100 ? 'text-xs text-emerald-400 font-semibold' : 'text-xs text-amber-400 font-semibold';
+                }
+            }
+            if (fws['NIST SP 800-53 r5']) {
+                const n = fws['NIST SP 800-53 r5'];
+                const sEl = document.getElementById('compliance-score-nist');
+                const stEl = document.getElementById('compliance-status-nist');
+                if (sEl) sEl.textContent = n.compliance_score_percent + '%';
+                if (stEl) {
+                    stEl.textContent = n.status;
+                    stEl.className = n.compliance_score_percent === 100 ? 'text-xs text-emerald-400 font-semibold' : 'text-xs text-amber-400 font-semibold';
+                }
+            }
+
+            const cardsContainer = document.getElementById('compliance-framework-cards');
+            if (!cardsContainer) return;
+            cardsContainer.innerHTML = '';
+
+            Object.entries(fws).forEach(([fwName, fw]) => {
+                const isSuccess = fw.compliance_score_percent === 100;
+                const statusColor = isSuccess ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : (fw.compliance_score_percent >= 70 ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 'text-rose-400 border-rose-500/30 bg-rose-500/10');
+                
+                let violationsHtml = '';
+                if (fw.violations && fw.violations.length > 0) {
+                    violationsHtml = `
+                        <div class="mt-4 border-t border-slate-800/80 pt-3 space-y-2">
+                            <p class="text-[11px] font-mono text-slate-400 uppercase font-bold">Controles Fallidos & Directivas Obligatorias:</p>
+                            ${fw.violations.map(v => `
+                                <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs">
+                                    <div class="flex items-center justify-between font-mono">
+                                        <span class="text-rose-400 font-bold">[${v.control_id}] ${v.title}</span>
+                                        <span class="text-slate-500 text-[10px]">${v.findings_count} hallazgo(s)</span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-300 mt-1 font-sans"><b class="text-indigo-300">Directiva:</b> ${v.remediation}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    violationsHtml = `
+                        <div class="mt-4 border-t border-slate-800/80 pt-3 text-center text-xs text-emerald-400 font-mono">
+                            <i class="fa-solid fa-circle-check"></i> Todos los controles aplicables superaron la auditoría satisfactoriamente.
+                        </div>
+                    `;
+                }
+
+                cardsContainer.innerHTML += `
+                    <div class="bg-soc-card border border-soc-border rounded-2xl p-5 shadow-xl">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-sm text-slate-100">${fwName}</h3>
+                            <span class="text-xs px-2.5 py-0.5 rounded-full font-mono border ${statusColor}">${fw.status} (${fw.compliance_score_percent}%)</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mt-4 text-center font-mono">
+                            <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                                <span class="text-[10px] text-slate-400">Total Controles</span>
+                                <p class="text-sm font-bold text-slate-200">${fw.total_controls}</p>
+                            </div>
+                            <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                                <span class="text-[10px] text-emerald-400">Aprobados</span>
+                                <p class="text-sm font-bold text-emerald-300">${fw.passing_controls}</p>
+                            </div>
+                            <div class="bg-slate-900/60 p-2 rounded-lg border border-slate-800">
+                                <span class="text-[10px] text-rose-400">Brechas</span>
+                                <p class="text-sm font-bold text-rose-400">${fw.failing_controls}</p>
+                            </div>
+                        </div>
+                        ${violationsHtml}
+                    </div>
+                `;
+            });
+        }
+
+        function copyComplianceAuditSheet() {
+            if (!currentComplianceData) {
+                alert("Primero ejecuta un escaneo o pulsa 'Actualizar Evaluación' para generar datos.");
+                return;
+            }
+            let md = `# OmniBreach Auditor Readiness Sheet - Cumplimiento Regulatorio\n`;
+            md += `Puntaje Global: ${currentComplianceData.overall_compliance_score}% (${currentComplianceData.overall_grade})\n\n`;
+            Object.entries(currentComplianceData.frameworks || {}).forEach(([name, fw]) => {
+                md += `## ${name}: ${fw.status} (${fw.compliance_score_percent}%)\n`;
+                (fw.violations || []).forEach(v => {
+                    md += `- [${v.control_id}] ${v.title} (${v.findings_count} hallazgos)\n  Directiva: ${v.remediation}\n`;
+                });
+                md += `\n`;
+            });
+            navigator.clipboard.writeText(md).then(() => {
+                showToast("📋 Hoja de Auditoría de Cumplimiento copiada al portapapeles en Markdown.", false);
+            });
+        }
+
+        // =====================================================================
+        // INTERACTIVE ATTACK GRAPH EXPLORER & WHAT-IF MODAL
+        // =====================================================================
+        function openInteractiveGraphModal() {
+            document.getElementById('modal-attack-graph').classList.remove('hidden');
+            loadInteractiveGraph();
+        }
+
+        function closeInteractiveGraphModal() {
+            document.getElementById('modal-attack-graph').classList.add('hidden');
+        }
+
+        async function loadInteractiveGraph() {
+            const container = document.getElementById('modal-graph-content');
+            container.innerHTML = '<span class="text-indigo-400"><i class="fa-solid fa-spinner fa-spin"></i> Cargando grafo...</span>';
+            try {
+                const res = await fetch(apiUrl('/api/v1/attack-graph/latest'));
+                if (!res.ok) throw new Error("No hay grafo disponible");
+                const data = await res.json();
+                if (data.status === 'success' && data.attack_graph) {
+                    activeAttackGraph = data.attack_graph;
+                    renderInteractiveGraph(data.attack_graph);
+                } else {
+                    container.innerHTML = 'No hay datos de grafo de ataque disponibles. Ejecuta una auditoría DAST primero.';
+                }
+            } catch (err) {
+                container.innerHTML = 'Error al cargar grafo de ataque: ' + err.message;
+            }
+        }
+
+        function renderInteractiveGraph(graph) {
+            const container = document.getElementById('modal-graph-content');
+            if (!graph || !graph.nodes || graph.nodes.length === 0) {
+                container.innerHTML = 'El grafo de ataque está vacío o no contiene nodos de riesgo.';
+                return;
+            }
+
+            const chokeSet = new Set((graph.choke_points || []).map(cp => cp.node_id));
+
+            let html = '<div class="space-y-3 w-full">';
+            html += '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">';
+            graph.nodes.forEach(node => {
+                const isChoke = chokeSet.has(node.id);
+                const isImpact = node.is_critical_impact;
+                const borderStyle = isChoke ? 'border-blue-500 bg-blue-950/40 text-blue-200' : (isImpact ? 'border-rose-500 bg-rose-950/40 text-rose-200' : 'border-slate-800 bg-slate-900/80 text-slate-300');
+                const badgeIcon = isChoke ? '🛡️ Choke Point' : (isImpact ? '💥 Impacto Crítico' : node.phase);
+
+                html += `
+                    <div onclick="inspectGraphNode('${node.id}')" class="cursor-pointer p-3 rounded-xl border ${borderStyle} hover:scale-[1.02] transition shadow-md">
+                        <div class="flex items-center justify-between text-[11px] font-mono mb-1">
+                            <span class="font-bold">${badgeIcon}</span>
+                            <span class="text-slate-400 uppercase">${node.severity}</span>
+                        </div>
+                        <h5 class="font-semibold text-xs text-slate-100">${node.title}</h5>
+                        <p class="text-[10px] text-slate-400 truncate mt-0.5">${node.tactic}</p>
+                    </div>
+                `;
+            });
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
+
+        function inspectGraphNode(nodeId) {
+            if (!activeAttackGraph || !activeAttackGraph.nodes) return;
+            const node = activeAttackGraph.nodes.find(n => n.id === nodeId);
+            if (!node) return;
+            selectedGraphNode = node;
+
+            const inspector = document.getElementById('node-inspector-content');
+            inspector.innerHTML = `
+                <div class="p-3 bg-slate-900 rounded-xl border border-indigo-500/30 space-y-1.5">
+                    <div class="flex items-center justify-between font-mono">
+                        <span class="text-[10px] text-indigo-400 font-bold">ID: ${node.id}</span>
+                        <span class="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 uppercase">${node.severity}</span>
+                    </div>
+                    <h4 class="font-bold text-slate-100 text-xs">${node.title}</h4>
+                    <p class="text-[11px] text-slate-300"><b class="text-slate-400">Fase Cyber Kill Chain:</b> ${node.phase}</p>
+                    <p class="text-[11px] text-slate-300"><b class="text-slate-400">Táctica MITRE:</b> ${node.tactic}</p>
+                    <p class="text-[11px] text-slate-300"><b class="text-slate-400">Betweenness Centrality:</b> ${node.betweenness_centrality}</p>
+                    ${node.affected_url ? `<p class="text-[10px] text-slate-400 font-mono truncate">URL: ${node.affected_url}</p>` : ''}
+                </div>
+            `;
+            document.getElementById('btn-simulate-what-if').disabled = false;
+            document.getElementById('what-if-result-box').classList.add('hidden');
+        }
+
+        async function simulateSelectedNodeRemediation() {
+            if (!selectedGraphNode) return;
+            const btn = document.getElementById('btn-simulate-what-if');
+            const resultBox = document.getElementById('what-if-result-box');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Simulando...';
+
+            try {
+                const res = await fetch(apiUrl('/api/v1/attack-graph/what-if'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        remediated_node_ids: [selectedGraphNode.id],
+                        findings: (activeAttackGraph.nodes || []).map(n => ({
+                            category: n.category,
+                            title: n.title,
+                            severity: n.severity,
+                            affected_url: n.affected_url
+                        }))
+                    })
+                });
+                if (!res.ok) throw new Error("Fallo en simulación");
+                const data = await res.json();
+                resultBox.classList.remove('hidden');
+                resultBox.innerHTML = `
+                    <div class="flex items-center justify-between text-emerald-400 font-bold font-mono">
+                        <span>Riesgo Reducido:</span>
+                        <span>${data.risk_reduction_percent}%</span>
+                    </div>
+                    <div class="flex items-center justify-between text-slate-300 font-mono text-[10px]">
+                        <span>Rutas Anuladas:</span>
+                        <span>${data.severed_attack_paths}</span>
+                    </div>
+                    <p class="text-slate-300 text-[10px] mt-1 font-sans"><b class="text-indigo-400">Dictamen:</b> ${data.summary_verdict}</p>
+                `;
+            } catch (err) {
+                resultBox.classList.remove('hidden');
+                resultBox.innerHTML = `<span class="text-rose-400">Error en simulación: ${err.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-shield-virus"></i> Simular Remediación en Caliente';
             }
         }
 

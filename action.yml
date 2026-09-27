@@ -1,0 +1,66 @@
+name: 'OmniBreach Security Scanner'
+description: 'Automated DAST, API, and Compliance Security Scanner with Native SARIF and CI/CD Integrations'
+author: 'OmniBreach Team'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  target-url:
+    description: 'URL target to scan (e.g., https://staging.mycompany.com)'
+    required: true
+  profile:
+    description: 'Scan profile (passive, normal, aggressive)'
+    required: false
+    default: 'normal'
+  crawl-depth:
+    description: 'Maximum number of pages to crawl'
+    required: false
+    default: '5'
+  sarif-output:
+    description: 'Path to export the SARIF v2.1.0 report'
+    required: false
+    default: 'omnibreach-results.sarif'
+  compliance:
+    description: 'Evaluate compliance against PCI-DSS v4.0, HIPAA, and NIST 800-53'
+    required: false
+    default: 'true'
+  upload-sarif:
+    description: 'Automatically upload SARIF report to GitHub Code Scanning'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'GitHub token for SARIF upload and PR integration'
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install OmniBreach Dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Execute OmniBreach Security Scan
+      shell: bash
+      run: |
+        CMD="python main.py ${{ inputs.target-url }} --no-open --crawl ${{ inputs.crawl-depth }} --profile ${{ inputs.profile }} --sarif ${{ inputs.sarif-output }}"
+        if [ "${{ inputs.compliance }}" = "true" ]; then
+          CMD="$CMD --compliance"
+        fi
+        echo "Executing: $CMD"
+        eval $CMD
+
+    - name: Upload SARIF to GitHub Code Scanning
+      if: inputs.upload-sarif == 'true' && hashFiles(inputs.sarif-output) != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.sarif-output }}
+        category: 'omnibreach-dast'

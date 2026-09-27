@@ -246,6 +246,8 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
          source_dir: Optional[str] = None,
          dry_run: bool = False,
          prefer_local_ai: bool = False,
+         sarif_output: Optional[str] = None,
+         eval_compliance: bool = False,
          progress_callback: Optional[Any] = None) -> tuple[Optional[str], Optional[str], dict[str, Any]]:
     profile_enum = ScanProfile(profile)
     config = ScanConfig.from_profile(
@@ -623,6 +625,28 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
         except Exception as e:
             logger.debug("[DevSecOps] Error al despachar alertas: %s", e)
 
+    # 10. Exportador SARIF v2.1.0 para GitHub Code Scanning
+    if sarif_output and all_findings:
+        try:
+            from scanner.sarif import export_findings_to_sarif, save_sarif_file
+            sarif_doc = export_findings_to_sarif(all_findings, scan_url=url)
+            save_sarif_file(sarif_doc, sarif_output)
+            engine_summary["sarif_report_path"] = sarif_output
+            logger.info("[SARIF] Reporte estándar exportado exitosamente a: %s", sarif_output)
+        except Exception as e:
+            logger.debug("[SARIF] Error generando reporte SARIF: %s", e)
+
+    # 11. Mapeo y evaluación de cumplimiento normativo (PCI-DSS, HIPAA, NIST, ISO)
+    if eval_compliance and all_findings:
+        try:
+            from scanner.compliance import ComplianceEngine
+            c_engine = ComplianceEngine()
+            c_eval = c_engine.evaluate(all_findings)
+            engine_summary["compliance"] = c_eval
+            print("\n" + c_engine.generate_markdown_report(c_eval) + "\n")
+        except Exception as e:
+            logger.debug("[Compliance] Error evaluando cumplimiento: %s", e)
+
     return print_report(
         url,
         all_findings,
@@ -772,6 +796,10 @@ def main() -> None:
                         help="Re-verificación quirúrgica rápida (Verify Fix) de hallazgos desde archivo JSON")
     parser.add_argument("--verify-ledger", type=str, default=None, metavar="JSONL_FILE",
                         help="Verifica la integridad criptográfica de un registro de auditoría inmutable (Audit Ledger)")
+    parser.add_argument("--sarif", type=str, default=None, metavar="SARIF_FILE",
+                        help="Ruta donde exportar el reporte en estándar OASIS SARIF v2.1.0 para GitHub Code Scanning")
+    parser.add_argument("--compliance", action="store_true",
+                        help="Evalúa el cumplimiento normativo automático contra PCI-DSS v4.0, HIPAA, NIST SP 800-53 e ISO 27001")
 
     args = parser.parse_args()
 
@@ -1186,6 +1214,8 @@ def main() -> None:
             oast_server=args.oast_server,
             oast_dns_port=args.oast_dns_port,
             oast_http_port=args.oast_http_port,
+            sarif_output=args.sarif,
+            eval_compliance=args.compliance,
         )
     finally:
         if lab_server:
