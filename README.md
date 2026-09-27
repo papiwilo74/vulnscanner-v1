@@ -42,6 +42,7 @@
 - [Opciones de Configuración Avanzadas](#opciones-de-configuracion-avanzadas)
 - [Garantías de Calidad de Software (CI/CD Gates)](#garantias-de-calidad-de-software-cicd-gates)
 - [Estructura del Proyecto](#estructura-del-proyecto)
+- [Hoja de Ruta y Trabajo Futuro (Roadmap 2027)](#hoja-de-ruta-y-trabajo-futuro-roadmap-2027)
 - [Ética y Uso Responsable](#etica-y-uso-responsable)
 - [Licencia](#licencia)
 
@@ -396,6 +397,19 @@ VulnScanner/
     ├── ci.yml                  # Pipeline de calidad (Ruff, Mypy, Bandit, Pytest)
     └── security_benchmark.yml  # [v3.8] Runner de benchmark con Juice Shop en Docker
 ```
+
+---
+
+## Hoja de Ruta y Trabajo Futuro (Roadmap 2027)
+
+El desarrollo del núcleo dinámico (DAST) se encuentra formalmente **congelado y verificado** en OmniBreach v3.9 con 481 pruebas unitarias. Para el ciclo de investigación **2027**, se definieron 4 líneas de investigación avanzada documentadas en detalle en [`docs/ROADMAP_2027.md`](docs/ROADMAP_2027.md):
+
+1. **Agente IAST en Tiempo de Ejecución (*Interactive Application Security Testing*):** Instrumentación en memoria con análisis de flujo *Taint* para correlacionar inputs HTTP con líneas de código vulnerables.
+2. **Instrumentación Nativa del Motor V8 (Chromium CDP):** Interceptación de prototipos DOM (`innerHTML`, `eval`, `document.write`) en SPAs antes del renderizado.
+3. **Fuzzing de Protocolos Binarios Modernos (gRPC & Protobuf):** Mutación y decodificación de *wire-format* sobre HTTP/2 y WebSockets binarios.
+4. **Inferencia Formal de Máquinas de Estado para Lógica de Negocio (Algoritmo L\*):** Aprendizaje activo de autómatas para auditar flujos transaccionales multi-etapa.
+
+Consulta la especificación técnica completa en [**`docs/ROADMAP_2027.md`**](docs/ROADMAP_2027.md).
 
 ---
 
