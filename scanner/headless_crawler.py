@@ -121,11 +121,21 @@ class HeadlessCrawler:
         return list(discovered_links), intercepted_apis, rendered_html
 
 
-def crawl_site_dynamic(start_url: str, max_pages: int = 10) -> tuple[list[str], set[str]]:
+def crawl_site_dynamic(start_url: str, max_pages: int = 10, enable_monkey: bool = True) -> tuple[list[str], set[str]]:
     """
-    Rastrea un sitio web completo combinando análisis estático y renderizado headless.
-    Descubre tanto páginas HTML como endpoints de API ocultos.
+    Rastrea un sitio web completo combinando análisis dinámico, Monkey Testing e interceptación de red CDP.
+    Descubre tanto páginas HTML/SPA como endpoints de API ocultos.
     """
+    if enable_monkey:
+        with contextlib.suppress(Exception):
+            from scanner.active_crawler import ActiveCrawler
+            active_crawler = ActiveCrawler(max_monkey_actions=20)
+            res = active_crawler.crawl(start_url)
+            pages = res.discovered_pages
+            apis = {tx.url for tx in res.api_transactions}
+            if pages or apis:
+                return pages[:max_pages], apis
+
     crawler = HeadlessCrawler()
     visited: set[str] = set()
     all_apis: set[str] = set()
@@ -145,3 +155,4 @@ def crawl_site_dynamic(start_url: str, max_pages: int = 10) -> tuple[list[str], 
                 to_visit.append(lk)
 
     return list(visited), all_apis
+

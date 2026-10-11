@@ -1,4 +1,4 @@
-﻿"""
+"""
 Módulo de Inferencia de Inteligencia Artificial y Active Learning Loop.
 Clasifica cadenas y parámetros HTTP potencialmente maliciosos utilizando modelos n-gram
 de caracteres y permite la recolección de retroalimentación de analistas (Active Learning).
@@ -14,7 +14,10 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-import joblib
+try:
+    import joblib
+except Exception:
+    joblib = None
 
 logger = logging.getLogger("OmniBreach.AICheck")
 
@@ -35,7 +38,7 @@ def load_ai_model() -> bool:
     if _model is not None and _vectorizer is not None:
         return True
 
-    if not os.path.exists(MODEL_PATH) or not os.path.exists(VECTORIZER_PATH):
+    if joblib is None or not os.path.exists(MODEL_PATH) or not os.path.exists(VECTORIZER_PATH):
         return False
 
     try:

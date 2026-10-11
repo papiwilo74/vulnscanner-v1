@@ -1,0 +1,40 @@
+id: exposed-env-file
+info:
+  name: Archivo de Entorno (.env) Expuesto
+  author: OmniBreach Community
+  severity: critical
+  description: Se detectó un archivo .env accesible públicamente que contiene variables de entorno y credenciales sensibles de la aplicación.
+  remediation: Bloquear inmediatamente el acceso a archivos dotfile (.env, .git) en la configuración del servidor web (Nginx, Apache) o eliminar el archivo del directorio raíz público.
+  cwe_id: CWE-200
+  cvss_score: 8.5
+  reference:
+    - https://cwe.mitre.org/data/definitions/200.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.env"
+      - "{{BaseURL}}/.env.backup"
+      - "{{BaseURL}}/.env.production"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "DB_PASSWORD="
+          - "APP_KEY="
+          - "SECRET_KEY="
+          - "AWS_SECRET_ACCESS_KEY="
+          - "DATABASE_URL="
+          - "REDIS_PASSWORD="
+      - type: word
+        part: body
+        negative: true
+        words:
+          - "<!DOCTYPE html"
+          - "<html"

@@ -1,33 +1,35 @@
-# OmniBreach v3.9 — DAST & Security Scanner
+# OmniBreach v3.10 — DAST, EASM & ASPM Security Scanner
 
 <p align="center">
-  <img src="https://img.shields.io/badge/OmniBreach-v3.9-blue?style=for-the-badge&logo=shield" alt="OmniBreach v3.9" />
+  <img src="https://img.shields.io/badge/OmniBreach-v3.10-blue?style=for-the-badge&logo=shield" alt="OmniBreach v3.10" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.9"><img src="https://img.shields.io/badge/Release-v3.9-007EC6.svg?logo=github" alt="Release v3.9" /></a>
+  <a href="https://github.com/papiwilo74/vulnscanner-v1/releases/tag/v3.10"><img src="https://img.shields.io/badge/Release-v3.10-007EC6.svg?logo=github" alt="Release v3.10" /></a>
   <a href="https://github.com/papiwilo74/vulnscanner-v1/actions"><img src="https://img.shields.io/badge/CI%2FCD-Passing-brightgreen.svg?logo=github-actions" alt="CI Pipeline" /></a>
-  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checked-mypy%20strict%20100%25%20(126%20files)-blue.svg" alt="Mypy Strict 100%" /></a>
-  <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%200%20Alerts%20(28.6k%20LOC)-green.svg" alt="Bandit" /></a>
+  <a href="https://mypy-lang.org/"><img src="https://img.shields.io/badge/Type%20Checking-mypy%20(strict%20en%20CI)-blue.svg" alt="Mypy strict en CI" /></a>
+  <a href="https://github.com/PyCQA/bandit"><img src="https://img.shields.io/badge/Security-Bandit%20%2B%20pip--audit-green.svg" alt="Bandit y pip-audit" /></a>
   <a href="https://osv.dev/"><img src="https://img.shields.io/badge/SCA%20Intel-OSV.dev%20Live%20Synced-blueviolet.svg" alt="OSV.dev Synced" /></a>
   <a href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog"><img src="https://img.shields.io/badge/Threat%20Intel-CISA%20KEV%20Synced-orange.svg" alt="CISA KEV" /></a>
   <a href="https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html"><img src="https://img.shields.io/badge/Standard-SARIF%20v2.1.0%20OASIS-brightgreen.svg" alt="SARIF v2.1.0" /></a>
-  <a href="reports/scientific_benchmark_report.md"><img src="https://img.shields.io/badge/Scientific%20Benchmark-100%25%20Precision%20%7C%200%25%20FPR-brightgreen.svg" alt="Scientific Benchmark" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/Tests-418%20passing%20(100%25)-brightgreen.svg" alt="418 Tests" /></a>
+  <a href="reports/scientific_benchmark_report.md"><img src="https://img.shields.io/badge/Benchmark-reproducible%20local%20experiments-brightgreen.svg" alt="Benchmarks reproducibles" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/Tests-519%20passed%20(100%25)-brightgreen.svg" alt="Suite de pruebas pytest" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue?logo=python&logoColor=white" alt="Python 3.10+" /></a>
 </p>
 
-> **OmniBreach v3.9** es una plataforma avanzada de **Dynamic Application Security Testing (DAST)** heurístico, auditoría de superficie externa (EASM) y validación empírica con rigor científico.
-> 
-> Diseñado para entornos de grado corporativo y bancario:
-> - **Gestión de Autenticación Compleja & TOTP/MFA (RFC 6238)**: Inyección dinámica de tokens temporales de un solo uso en SPAs y flujos Playwright.
-> - **Servidor OAST Dedicado (RFC 1035 UDP + HTTP)**: Detección fuera de banda de vulnerabilidades ciegas (Blind SSRF, Blind XXE, Blind RCE y Blind SQLi).
-> - **Supresión Avanzada de Falsos Positivos**: Filtro anti-WAF (Cloudflare, AWS WAF, ModSecurity), análisis contextual DOM para XSS y Entropía de Shannon para secretos.
-> - **SCA Dinámico en Tiempo Real**: Consultas activas a la base de datos abierta de Google/OpenSSF (**OSV.dev**) para identificar CVEs y GHSAs en dependencias.
-> - **State-Aware Sessions & Macro Replay**: Auditoría profunda en aplicaciones SaaS y SPAs sin pérdida de sesión mediante centinelas.
-> - **Benchmark Científico Integrado**: Suite empírica con cálculo de Matriz de Confusión, MCC, F1-Score y generación automática de tablas LaTeX para reportes académicos.
-> - **Cumplimiento y DevSecOps**: Exportador nativo **SARIF v2.1.0** para GitHub Advanced Security y matriz de cumplimiento **PCI-DSS v4.0 / OWASP Top 10**.
+> **OmniBreach v3.10** es una plataforma integral de **Next-Gen DAST, EASM y ASPM (Application Security Posture Management)** diseñada para auditorías de alta velocidad, integración en CI/CD y trazabilidad forense:
+> - **Motor Declarativo de Plantillas YAML/JSON (DSL)**: Ejecución de reglas personalizables con multi-matchers, condiciones lógicas y extractores encadenados.
+> - **Pipeline Reactivo y 100% Asíncrono (AsyncIO + Streaming)**: Colas no bloqueantes con control de congestión adaptativo tipo TCP (AIMD).
+> - **Middleware IAST / RASP Plug-and-Play (ASGI + WSGI)**: Telemetría en tiempo de ejecución, hooks en sinks críticas (`eval`, `subprocess`, `os.system`) y correlación DAST+IAST con archivo y línea de código exacta.
+> - **Escaneo Quirúrgico por Git-Diff en CI/CD (<30s)**: Análisis incremental de endpoints afectados, Quality Gates configurables y bot de comentarios en Pull Requests.
+> - **Active Monkey Testing & CDP Network Interception**: Exploración dinámica de SPAs (React/Vue/Angular), mutaciones de DOM y captura profunda de llamadas XHR/Fetch/WebSockets.
+> - **Servidor OAST Dedicado (RFC 1035 UDP + HTTP)**: Detección fuera de banda de vulnerabilidades ciegas (Blind SSRF, Blind XXE, Blind RCE y Log4j).
+> - **Gestión de Autenticación Compleja & MFA/TOTP (RFC 6238)**: Inyección dinámica de tokens temporales de un solo uso en flujos Playwright y SPAs.
+> - **Supresión Avanzada de Falsos Positivos**: Proof-Based Verification (PBV), filtro anti-Soft-404, WAF Block Suppression y Entropía de Shannon.
+> - **Cumplimiento y DevSecOps**: Exportador oficial **OASIS SARIF v2.1.0**, GitHub Action nativa (`action.yml`) y matriz de cumplimiento **PCI-DSS v4.0 / NIST / ISO 27001**.
+
+> **Alcance:** las métricas, benchmarks y detectores incluidos son experimentales y dependen del objetivo, el entorno y los casos de prueba. Las cifras de precisión no deben interpretarse como garantías universales de detección.
 
 ---
 
@@ -276,6 +278,36 @@ python main.py --web
 # Abre automáticamente http://localhost:8000/dashboard
 ```
 
+### 7. Catálogo y Ejecución de Plantillas Declarativas YAML DSL (Estilo Nuclei)
+```bash
+# Listar las 11 plantillas disponibles en el catálogo
+python main.py --list-templates
+
+# Ejecutar plantillas declarativas contra el objetivo
+python main.py https://mi-aplicacion.com --templates-dir templates_dsl/
+```
+
+### 8. Escaneo Quirúrgico Incremental por Git Diff en CI/CD (<10s)
+```bash
+# Audita únicamente los endpoints modificados respecto a la rama base
+python main.py https://staging.mi-aplicacion.com \
+  --git-diff origin/main \
+  --gate-severity high \
+  --pr-comment-out pr_comment.md \
+  --incremental-sarif results.sarif
+```
+
+### 9. Agente IAST / RASP Plug-and-Play (ASGI & WSGI)
+Instrumenta tu backend en memoria para certificar **0% falsos positivos** y prevenir ataques en runtime:
+```python
+from fastapi import FastAPI
+from scanner import OmniBreachIASTMiddleware
+
+app = FastAPI()
+# Envoltura automática: modo 'monitor' (telemetría DAST) o 'protect' (bloqueo activo RASP)
+app = OmniBreachIASTMiddleware(app, mode="monitor")
+```
+
 ---
 
 ## Opciones de Configuración Avanzadas
@@ -299,7 +331,7 @@ python main.py --web
 
 ---
 
-## Garantías de Calidad de Software (CI/CD Gates)
+## Calidad y reproducibilidad (CI/CD)
 
 OmniBreach se desarrolla bajo un estándar riguroso de ingeniería de software con 4 puertas obligatorias de calidad:
 
@@ -313,7 +345,7 @@ mypy --explicit-package-bases scanner utils api.py main.py tests scripts
 # 3. Auditoría de seguridad de código AST (0 vulnerabilidades en 13.9k LOC)
 bandit -c bandit.yaml -r scanner api.py main.py utils scripts
 
-# 4. Suite completa de pruebas unitarias y de integración (347 pruebas pasando al 100%)
+# 4. Suite de pruebas unitarias y de integración ejecutada por pytest
 pytest tests -v
 ```
 

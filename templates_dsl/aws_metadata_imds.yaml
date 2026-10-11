@@ -1,0 +1,32 @@
+id: aws-metadata-imds-v1-exposed
+info:
+  name: Servicio de Metadatos de Instancia AWS (IMDSv1) Expuesto
+  author: OmniBreach Community
+  severity: critical
+  description: Se detectó el servicio de metadatos de AWS (169.254.169.254) accesible sin token de sesión IMDSv2, exponiendo potencialmente roles IAM y credenciales temporales de seguridad.
+  remediation: Forzar el uso obligatorio de IMDSv2 (HttpTokens=required) en la configuración de la instancia EC2 o ECS.
+  cwe_id: CWE-918
+  cvss_score: 9.8
+  reference:
+    - https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/latest/meta-data/"
+      - "{{BaseURL}}/latest/meta-data/iam/security-credentials/"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "ami-id"
+          - "instance-id"
+          - "local-ipv4"
+          - "security-groups"
+          - "iam"

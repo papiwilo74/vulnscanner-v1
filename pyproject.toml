@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "omnibreach"
-version = "3.9"
-description = "OmniBreach — Escáner DAST y Cartografía de Superficie de Ataque (Proyecto de Portafolio / Opción de Grado)"
+version = "3.10.0"
+description = "OmniBreach v3.10 — Enterprise DAST, EASM, Declarative YAML DSL & Universal IAST/RASP Engine"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["security", "scanner", "vulnerability", "easm", "ctem", "pentest", "cybersecurity", "dast", "sbom", "attack-graph"]
 classifiers = [
-    "Development Status :: 5 - Production/Stable",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
     "Topic :: Security",
@@ -105,7 +105,7 @@ ignore = ["E501", "B904", "SIM108"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["scanner", "utils", "api.py", "main.py", "tests", "scripts"]
+files = ["scanner", "utils", "api.py", "main.py", "tests", "scripts", "cli", "routers"]
 strict = true
 explicit_package_bases = true
 warn_unused_configs = true
@@ -146,5 +146,5 @@ py-modules = ["main", "api"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["scanner*", "utils*"]
+include = ["scanner*", "utils*", "cli*", "routers*"]
 

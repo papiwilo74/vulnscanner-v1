@@ -1,0 +1,36 @@
+id: exposed-git-repository
+info:
+  name: Repositorio Git Expuesto (.git)
+  author: OmniBreach Community
+  severity: high
+  description: Se detectó el directorio de control de versiones .git accesible públicamente, lo que permite a atacantes descargar el código fuente completo e historial de commits.
+  remediation: Denegar el acceso a carpetas y archivos que comiencen con .git en el servidor web (ej. location ~ /\.git { deny all; }).
+  cwe_id: CWE-538
+  cvss_score: 7.5
+  reference:
+    - https://cwe.mitre.org/data/definitions/538.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.git/config"
+      - "{{BaseURL}}/.git/HEAD"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "[core]"
+          - "repositoryformatversion"
+          - "ref: refs/heads/"
+      - type: word
+        part: body
+        negative: true
+        words:
+          - "<html"
+          - "<!DOCTYPE"

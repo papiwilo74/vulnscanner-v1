@@ -1,0 +1,36 @@
+id: docker-daemon-api-unauthenticated
+info:
+  name: API Docker Daemon Expuesta Sin Autenticación
+  author: OmniBreach Community
+  severity: critical
+  description: Se detectó el socket TCP de la API del Docker Engine (puerto 2375) accesible sin TLS ni autenticación, permitiendo control total sobre los contenedores y el host.
+  remediation: Deshabilitar el socket TCP sin cifrado o configurar autenticación mutua TLS obligatoria en el daemon Docker.
+  cwe_id: CWE-306
+  cvss_score: 9.8
+  reference:
+    - https://docs.docker.com/engine/security/protect-access/
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/version"
+      - "{{BaseURL}}/info"
+      - "{{BaseURL}}/containers/json"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "ApiVersion"
+          - "DockerRootDir"
+          - "KernelVersion"
+      - type: word
+        part: body
+        words:
+          - "Os"
+          - "Arch"

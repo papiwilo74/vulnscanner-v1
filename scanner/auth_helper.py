@@ -272,7 +272,7 @@ class OAuth2TokenManager:
         token_url: str,
         refresh_token: str,
         client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
+        client_secret: Optional[str] = None,  # nosec B106 B107
         scope: Optional[str] = None,
         access_token: Optional[str] = None,
         totp_secret: Optional[str] = None,
@@ -427,7 +427,7 @@ def create_oauth2_refreshing_session(
     token_url: str,
     refresh_token: str,
     client_id: Optional[str] = None,
-    client_secret: Optional[str] = None,
+    client_secret: Optional[str] = None,  # nosec B106 B107
     totp_secret: Optional[str] = None,
     base_session: Optional[requests.Session] = None,
 ) -> AuthSessionManager:

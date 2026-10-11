@@ -1,0 +1,32 @@
+id: graphql-introspection-enabled
+info:
+  name: Introspección de GraphQL Habilitada
+  author: OmniBreach Community
+  severity: medium
+  description: El endpoint de GraphQL permite consultas de introspección (__schema), exponiendo la totalidad del esquema, tipos, mutaciones y campos a usuarios no autorizados.
+  remediation: "Deshabilitar la introspección en entornos de producción (ej. Apollo Server introspection: false)."
+  cwe_id: CWE-200
+  cvss_score: 5.3
+  reference:
+    - https://cwe.mitre.org/data/definitions/200.html
+
+requests:
+  - method: POST
+    path:
+      - "{{BaseURL}}/graphql"
+      - "{{BaseURL}}/api/graphql"
+    headers:
+      Content-Type: application/json
+    body: '{"query": "{ __schema { types { name } } }"}'
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: and
+        words:
+          - '"__schema"'
+          - '"types"'

@@ -1,17 +1,21 @@
-# Arquitectura y Diseño Técnico de VulnScanner
+# Arquitectura y Diseño Técnico de OmniBreach v3.10
 
-Este documento detalla la arquitectura interna, los flujos de ejecución, los mecanismos de seguridad operacional y las especificaciones de datos de **VulnScanner**.
+Este documento detalla la arquitectura interna, los flujos de ejecución, los mecanismos de seguridad operacional y las especificaciones de datos de **OmniBreach v3.10**.
 
 ---
 
 ## 1. Visión General del Sistema
 
-VulnScanner es una plataforma de análisis de seguridad web modular orientada a DevSecOps. Combina cuatro metodologías de detección complementarias:
+OmniBreach es una plataforma integral de análisis de seguridad web y DevSecOps. Combina metodologías avanzadas de detección complementarias:
 
-1. **DAST (Dynamic Application Security Testing):** Inyección controlada de vectores activos (SQLi, XXE, SSTI, Command Injection, Path Traversal, Open Redirect) con calibración basada en tiempo y firmas de error.
-2. **SAST (Static Application Security Testing):** Análisis sintáctico y de flujo en scripts JavaScript embebidos y remotos para detección de DOM XSS, Prototype Pollution y fuga de secretos.
-3. **SCA (Software Composition Analysis):** Inspección de dependencias frontend populares contra bases de datos de vulnerabilidades conocidas.
-4. **OAST (Out-of-Band Application Security Testing):** Identificación de vulnerabilidades ciegas (Blind SSRF, Blind XXE, Blind RCE) mediante callbacks asíncronos correlacionados por tokens unívocos.
+1. **DAST (Dynamic Application Security Testing):** Inyección contextual de vectores activos (SQLi, XXE, SSTI, Command Injection, Path Traversal, Open Redirect, BOLA, Mass Assignment) calibrados con análisis sintáctico.
+2. **IAST & RASP (Interactive Application Security Testing / Runtime Protection):** Middleware universal plug-and-play para frameworks ASGI/WSGI (FastAPI, Starlette, Flask, Django) con monitoreo en memoria y bloqueo de sinks peligrosas (`eval`, `subprocess`, `os.system`).
+3. **DSL Declarativo (YAML/JSON Rules Engine):** Intérprete nativo de plantillas de seguridad estilo Nuclei con interpolación de variables, multi-step matchers y extractores regex/jsonpath.
+4. **Smart Incremental DAST (Git-Diff CI/CD Gate):** Análisis diferencial quirúrgico (<30 segundos) que mapea cambios de código fuente a endpoints reales, evaluando Quality Gates en Pull Requests.
+5. **Active Monkey Testing & CDP Network Interception:** Rastreo interactivo con Chromium headless, fuzzer de eventos DOM, bypass de Safe Navigation y captura de llamadas XHR/Fetch/WebSockets.
+6. **SAST & DOM Taint Tracking:** Análisis sintáctico y hooks en sinks JavaScript embebidos para detección de DOM XSS, Prototype Pollution y fuga de secretos.
+7. **SCA & SBOM:** Inspección de dependencias en tiempo real contra OSV.dev y generación formal de SBOM en estándares CycloneDX v1.5 y SPDX v2.3.
+8. **OAST (Out-of-Band Application Security Testing):** Identificación de vulnerabilidades ciegas (Blind SSRF, Blind XXE, Blind RCE, Log4j) mediante servidores DNS y HTTP autoritativos dedicados.
 
 ```mermaid
 graph TD
@@ -103,12 +107,25 @@ A partir de esta firma, genera snippets de código contextuales listos para apli
 
 ---
 
-## 5. Especificación de API REST (`api.py`)
+## 5. Arquitectura Desacoplada y Controladores Modulares
 
-La API REST permite la automatización e integración con orquestadores CI/CD y plataformas SOAR:
+OmniBreach v3.9 implementa el Principio de Responsabilidad Única (SRP) y separación estricta de capas mediante paquetes dedicados:
+
+### A. Capa CLI Desacoplada (`cli/`)
+- **`cli/parser.py`:** Constructor modular y validación de más de 60 banderas y modos de ejecución CLI (DAST, EASM, OAST, CI/CD, Deception, SBOM, Cluster).
+- **`cli/dispatch.py`:** Enrutador y despachador de comandos por responsabilidad aislada.
+- **`main.py`:** Orquestador de escaneo ligero (~700 líneas), enfocado exclusivamente en inicialización de sesiones y ejecución de módulos de prueba.
+
+### B. Routers de Dominio FastAPI (`routers/`)
+Para evitar controladores monolíticos en `api.py`, los endpoints se organizan en sub-routers de dominio montados vía `app.include_router()`:
+- **`routers/ci_cd.py`:** `POST /api/v1/ci/incremental-scan` (DevSecOps Quality Gates).
+- **`routers/templates.py`:** `GET /api/v1/templates`, `POST /api/v1/templates/scan` (Catálogo y ejecución DSL).
+- **`routers/crawler.py`:** `POST /api/v1/crawl/active` (Active Monkey Testing & CDP Interception).
+- **`routers/proxy.py`:** `/api/v1/proxy/*` (Proxy interceptor pasivo y exportación/importación HAR).
+- **`api.py`:** Núcleo de orquestación central, WebSockets de telemetría y autenticación multi-tenant.
 
 - **Base de Datos:** SQLite con soporte `WAL` (Write-Ahead Logging) y control de concurrencia mediante `threading.Lock`.
-- **Endpoints:**
+- **Endpoints Clave:**
   - `GET /` — Healthcheck y versión del servicio.
   - `POST /scan` — Encola una tarea asíncrona de escaneo (`BackgroundTasks`).
   - `GET /scan/{task_id}` — Consulta estado de la tarea y resultados detallados.

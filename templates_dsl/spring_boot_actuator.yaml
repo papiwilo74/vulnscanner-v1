@@ -1,0 +1,33 @@
+id: spring-boot-actuator-exposed
+info:
+  name: Endpoints de Spring Boot Actuator Expuestos
+  author: OmniBreach Community
+  severity: high
+  description: Se detectaron endpoints de administración de Spring Boot Actuator sin autenticación, exponiendo variables de entorno, métricas y configuración interna.
+  remediation: Restringir la exposición de endpoints mediante management.endpoints.web.exposure.exclude=* o protegerlos con Spring Security.
+  cwe_id: CWE-200
+  cvss_score: 7.5
+  reference:
+    - https://cwe.mitre.org/data/definitions/200.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/actuator/env"
+      - "{{BaseURL}}/actuator/health"
+    redirects: false
+    matchers_condition: or
+    matchers:
+      - type: word
+        part: body
+        condition: and
+        words:
+          - '"propertySources"'
+          - '"activeProfiles"'
+      - type: word
+        part: body
+        condition: and
+        words:
+          - '"status"'
+          - '"UP"'
+          - '"components"'

@@ -1,0 +1,31 @@
+id: minio-exposed-console
+info:
+  name: Consola de Almacenamiento MinIO Expuesta
+  author: OmniBreach Community
+  severity: medium
+  description: Se detectó una interfaz de administración de MinIO Object Storage accesible públicamente, lo que incrementa el riesgo de ataques de fuerza bruta y fuga de credenciales.
+  remediation: Restringir el puerto de la consola de MinIO (puerto 9001 o ruta /minio) para que solo sea accesible mediante VPN o red interna de confianza.
+  cwe_id: CWE-200
+  cvss_score: 5.3
+  reference:
+    - https://min.io/docs/minio/linux/administration/minio-console.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/minio/health/ready"
+      - "{{BaseURL}}/minio/health/live"
+      - "{{BaseURL}}/"
+    redirects: true
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "MinIO Console"
+          - "<title>MinIO Browser</title>"
+          - "Server: MinIO"

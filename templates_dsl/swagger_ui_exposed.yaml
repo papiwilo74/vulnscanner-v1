@@ -1,0 +1,30 @@
+id: swagger-ui-exposed
+info:
+  name: Interfaz Swagger / OpenAPI UI Expuesta
+  author: OmniBreach Community
+  severity: medium
+  description: Se detectó una interfaz interactiva de documentación Swagger / OpenAPI UI expuesta públicamente, facilitando el mapeo de endpoints y vectores de ataque a terceros.
+  remediation: Deshabilitar o proteger con autenticación el acceso a rutas como /docs, /swagger-ui, /swagger-ui.html en producción.
+  cwe_id: CWE-200
+  cvss_score: 5.3
+  reference:
+    - https://cwe.mitre.org/data/definitions/200.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/swagger-ui.html"
+      - "{{BaseURL}}/swagger-ui/index.html"
+      - "{{BaseURL}}/api/docs"
+    redirects: false
+    matchers_condition: or
+    matchers:
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "swagger-ui"
+          - "SwaggerUIBundle"
+          - "swagger-ui-standalone-preset"
+          - "swagger: '2.0'"
+          - 'openapi: 3.'

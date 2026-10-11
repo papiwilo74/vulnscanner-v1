@@ -16,6 +16,12 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from pydantic import BaseModel
 
 from main import scan
+from routers import (
+    ci_cd_router,
+    crawler_router,
+    proxy_router,
+    templates_router,
+)
 from scanner.ai_copilot import AICopilot
 from scanner.cluster import ClusterCoordinator
 from scanner.db_adapter import UniversalConnection, create_connection
@@ -41,9 +47,9 @@ async def lifespan(app: FastAPI) -> Any:
 
 
 app = FastAPI(
-    title="OmniBreach v3.9 API",
+    title="OmniBreach v3.10 API",
     description="Framework Modular de DAST y Evaluación de Superficie Externa (EASM): Fuzzing Contextual (AST), Grafos de Ataque, SBOM, Copiloto IA Híbrido y Telemetría en Tiempo Real.",
-    version="3.9",
+    version="3.10",
     lifespan=lifespan,
 )
 
@@ -75,6 +81,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RateLimitMiddleware)
+
+# Registrar Routers Modulares
+app.include_router(ci_cd_router)
+app.include_router(templates_router)
+app.include_router(crawler_router)
+app.include_router(proxy_router)
 
 deception_mgr = DeceptionManager()
 tenancy_mgr = TenancyManager()
@@ -400,16 +412,6 @@ class DLPScanRequest(BaseModel):
     target_url: str = ""
 
 
-class ProxyStartRequest(BaseModel):
-    port: int = 8089
-    forward_traffic: bool = True
-
-
-class HARImportRequest(BaseModel):
-    har_data: Optional[dict[str, Any]] = None
-    har_content: Optional[str] = None
-
-
 class ScanRequest(BaseModel):
     url: str
     stealth: bool = True
@@ -428,6 +430,9 @@ class ScanRequest(BaseModel):
     headless_login: bool = False
     openapi_spec: Optional[str] = None
     use_async_engine: bool = False
+    async_engine: bool = False
+    active_crawl: bool = False
+    monkey_actions: int = 25
     no_waf_detect: bool = False
     iast_url: Optional[str] = None
     enable_attack_chain: bool = True
@@ -510,8 +515,10 @@ def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
             har_file=req.har_file,
             headless_crawl=req.headless_crawl,
             headless_login=req.headless_login,
+            active_crawl=req.active_crawl,
+            monkey_actions=req.monkey_actions,
             openapi_spec=req.openapi_spec,
-            use_async_engine=req.use_async_engine,
+            use_async_engine=req.use_async_engine or req.async_engine,
             no_waf_detect=req.no_waf_detect,
             iast_url=req.iast_url,
             attack_chain=req.enable_attack_chain,
@@ -1580,10 +1587,6 @@ def get_latest_attack_graph() -> dict[str, Any]:
     return {"status": "success", "attack_graph": graph.to_dict()}
 
 
-_active_proxy: Any = None
-_proxy_lock = Lock()
-
-
 # =====================================================================
 # VIRTUAL PATCHING & WAF SYNTHESIS ENDPOINTS
 # =====================================================================
@@ -1644,114 +1647,5 @@ def scan_dlp_payload(req: DLPScanRequest) -> dict[str, Any]:
         "leaks": [leak.to_dict() for leak in leaks],
         "findings": [f.to_dict() for f in findings],
     }
-
-
-# =====================================================================
-# PROXY INTERCEPTOR & QA FLOW CAPTURE ENDPOINTS
-# =====================================================================
-
-@app.post("/api/v1/proxy/start", tags=["Proxy Interceptor"])
-def start_proxy_capture(req: ProxyStartRequest) -> dict[str, Any]:
-    """Inicia el servidor proxy interceptor pasivo local para capturar tráfico de QA."""
-    global _active_proxy
-    from scanner.proxy_capture import ProxyCaptureServer
-
-    with _proxy_lock:
-        if _active_proxy and _active_proxy.is_running:
-            return {
-                "status": "already_running",
-                "port": _active_proxy.port,
-                "flows_count": len(_active_proxy.flows),
-                "message": f"Proxy ya activo en http://{_active_proxy.host}:{_active_proxy.port}",
-            }
-        _active_proxy = ProxyCaptureServer(port=req.port, forward_traffic=req.forward_traffic)
-        _active_proxy.start()
-
-    return {
-        "status": "started",
-        "port": req.port,
-        "message": f"Proxy interceptor activo en http://127.0.0.1:{req.port}",
-    }
-
-
-@app.post("/api/v1/proxy/stop", tags=["Proxy Interceptor"])
-def stop_proxy_capture() -> dict[str, Any]:
-    """Detiene el servidor proxy interceptor y conserva los flujos en memoria."""
-    global _active_proxy
-    with _proxy_lock:
-        if not _active_proxy or not _active_proxy.is_running:
-            return {"status": "not_running", "message": "El servidor proxy no está en ejecución."}
-        flows_count = len(_active_proxy.flows)
-        endpoints = _active_proxy.get_captured_endpoints()
-        _active_proxy.stop()
-
-    return {
-        "status": "stopped",
-        "flows_captured": flows_count,
-        "endpoints_count": len(endpoints),
-        "endpoints": endpoints,
-    }
-
-
-@app.get("/api/v1/proxy/status", tags=["Proxy Interceptor"])
-def get_proxy_status() -> dict[str, Any]:
-    """Consulta el estado del proxy interceptor y métricas de captura."""
-    global _active_proxy
-    with _proxy_lock:
-        if not _active_proxy:
-            return {"is_running": False, "flows_count": 0, "endpoints_count": 0}
-        return {
-            "is_running": _active_proxy.is_running,
-            "port": _active_proxy.port,
-            "flows_count": len(_active_proxy.flows),
-            "endpoints_count": len(_active_proxy.get_captured_endpoints()),
-        }
-
-
-@app.get("/api/v1/proxy/flows", tags=["Proxy Interceptor"])
-def get_proxy_flows() -> dict[str, Any]:
-    """Retorna la lista de transacciones HTTP interceptadas por el proxy."""
-    global _active_proxy
-    with _proxy_lock:
-        if not _active_proxy:
-            return {"total": 0, "flows": [], "endpoints": []}
-        return {
-            "total": len(_active_proxy.flows),
-            "endpoints": _active_proxy.get_captured_endpoints(),
-            "cookies": _active_proxy.get_session_cookies(),
-            "auth_headers": _active_proxy.get_auth_headers(),
-            "flows": _active_proxy.flows,
-        }
-
-
-@app.get("/api/v1/proxy/export-har", tags=["Proxy Interceptor"])
-def export_proxy_har() -> dict[str, Any]:
-    """Exporta todas las transacciones interceptadas en formato estándar HTTP Archive (HAR 1.2)."""
-    global _active_proxy
-    with _proxy_lock:
-        if not _active_proxy:
-            raise HTTPException(status_code=404, detail="No hay proxy interceptor inicializado.")
-        return _active_proxy.export_har()
-
-
-@app.post("/api/v1/proxy/import-har", tags=["Proxy Interceptor"])
-def import_har_session(req: HARImportRequest) -> dict[str, Any]:
-    """Importa un archivo HAR y extrae cookies, tokens Bearer y catálogo de endpoints."""
-    from scanner.har_parser import HARSessionParser
-    try:
-        if req.har_data:
-            parser = HARSessionParser(req.har_data)
-        elif req.har_content:
-            parser = HARSessionParser.from_string(req.har_content)
-        else:
-            raise HTTPException(status_code=400, detail="Debe suministrar 'har_data' o 'har_content'.")
-        return {
-            "status": "success",
-            "summary": parser.get_summary(),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error al procesar archivo HAR: {e}") from e
-
-
 
 

@@ -1,0 +1,34 @@
+id: k8s-kubelet-api-unauthenticated
+info:
+  name: API Kubernetes Kubelet Expuesta Sin Autenticación
+  author: OmniBreach Community
+  severity: critical
+  description: Se detectó el puerto de API del Kubelet de Kubernetes (puerto 10255 o 10250) accesible públicamente de forma no autenticada, revelando pods, contenedores y variables de entorno del cluster.
+  remediation: Configurar --anonymous-auth=false en la configuración del Kubelet y habilitar autorización Webhook o RBAC.
+  cwe_id: CWE-306
+  cvss_score: 9.8
+  reference:
+    - https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet-authentication-authorization/
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/pods"
+      - "{{BaseURL}}/spec"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "kind\": \"PodList"
+          - "\"items\":"
+          - "metadata"
+      - type: word
+        part: body
+        words:
+          - "spec"

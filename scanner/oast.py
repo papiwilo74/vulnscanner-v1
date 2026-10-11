@@ -223,7 +223,7 @@ class OASTDNSServer:
 
     def __init__(
         self,
-        host: str = "0.0.0.0",
+        host: str = "0.0.0.0",  # nosec B104
         port: int = 0,
         response_ip: str = "127.0.0.1",
         on_interaction_callback: Callable[[dict[str, Any]], None] | None = None,
@@ -326,7 +326,7 @@ class DedicatedOASTServer:
 
     def __init__(
         self,
-        host: str = "0.0.0.0",
+        host: str = "0.0.0.0",  # nosec B104
         domain: str = "oast.local",
         public_ip: str = "127.0.0.1",
         http_port: int = 0,
@@ -440,10 +440,10 @@ class OASTClient:
     def get_callback_url(self, token: str) -> str:
         """Retorna una URL completa de callback HTTP vinculada al token."""
         if self.dedicated_server and self.dedicated_server.http_server.port > 0:
-            h = self.dedicated_server.host if self.dedicated_server.host not in ("0.0.0.0", "") else "127.0.0.1"
+            h = self.dedicated_server.host if self.dedicated_server.host not in ("0.0.0.0", "") else "127.0.0.1"  # nosec B104
             return f"http://{h}:{self.dedicated_server.http_server.port}/{token}"
         if self.local_server and self.local_server.port > 0:
-            h = self.local_server.host if self.local_server.host not in ("0.0.0.0", "") else "127.0.0.1"
+            h = self.local_server.host if self.local_server.host not in ("0.0.0.0", "") else "127.0.0.1"  # nosec B104
             return f"http://{h}:{self.local_server.port}/{token}"
         return f"http://{token}.{self.server_domain}"
 

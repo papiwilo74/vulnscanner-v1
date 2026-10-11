@@ -179,9 +179,29 @@
                         <label for="oauth2-refresh-token" class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Refresh Token (Rotación Automática)</label>
                         <input type="text" id="oauth2-refresh-token" placeholder="rt_1234567890abcdef" class="w-full py-2 px-3 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500 text-slate-200">
                     </div>
-                    <div class="col-span-full flex items-center gap-2 mt-1">
-                        <input type="checkbox" id="headless-login" class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
-                        <label for="headless-login" class="text-xs text-slate-300">Navegador Headless Interactivo (Playwright para SPAs, React, Angular, Vue)</label>
+                    <div class="col-span-full flex flex-wrap items-center gap-5 mt-2 pt-2 border-t border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="headless-login" class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                            <label for="headless-login" class="text-xs text-slate-300">Login Headless</label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="active-crawl" checked class="rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                            <label for="active-crawl" class="text-xs text-indigo-300 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-spider"></i> Active Monkey Crawler & CDP
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="async-engine" checked class="rounded bg-slate-950 border-slate-700 text-emerald-600 focus:ring-emerald-500 h-4 w-4">
+                            <label for="async-engine" class="text-xs text-emerald-300 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-bolt"></i> AsyncIO Reactive Engine
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="template-dsl" checked class="rounded bg-slate-950 border-slate-700 text-cyan-600 focus:ring-cyan-500 h-4 w-4">
+                            <label for="template-dsl" class="text-xs text-cyan-300 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-file-code"></i> Plantillas YAML DSL
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1447,6 +1467,9 @@
             const oastServer = document.getElementById('oast-server')?.value.trim() || null;
             const oauth2TokenUrl = document.getElementById('oauth2-token-url')?.value.trim() || null;
             const oauth2RefreshToken = document.getElementById('oauth2-refresh-token')?.value.trim() || null;
+            const activeCrawl = document.getElementById('active-crawl')?.checked || false;
+            const asyncEngine = document.getElementById('async-engine')?.checked || false;
+            const templateDsl = document.getElementById('template-dsl')?.checked || false;
 
             try {
                 const res = await fetch(apiUrl('/scan'), {
@@ -1466,6 +1489,9 @@
                         oast_server: oastServer,
                         oauth2_token_url: oauth2TokenUrl,
                         oauth2_refresh_token: oauth2RefreshToken,
+                        active_crawl: activeCrawl,
+                        async_engine: asyncEngine,
+                        template_dsl: templateDsl,
                     })
                 });
                 const data = await res.json();

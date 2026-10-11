@@ -1,0 +1,36 @@
+id: phpinfo-exposed
+info:
+  name: Información de Configuración PHP (phpinfo) Expuesta
+  author: OmniBreach Community
+  severity: medium
+  description: Se detectó una página phpinfo() accesible públicamente, revelando versiones exactas del servidor, módulos PHP, extensiones y variables de entorno internas.
+  remediation: Eliminar inmediatamente los archivos de diagnóstico phpinfo.php o restringir el acceso exclusivamente a la red de administración local.
+  cwe_id: CWE-200
+  cvss_score: 5.3
+  reference:
+    - https://cwe.mitre.org/data/definitions/200.html
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/phpinfo.php"
+      - "{{BaseURL}}/info.php"
+      - "{{BaseURL}}/test.php"
+      - "{{BaseURL}}/php_info.php"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "PHP Version"
+          - "Configuration File (php.ini) Path"
+          - "Zend Extension Build"
+      - type: word
+        part: body
+        words:
+          - "PHP License"

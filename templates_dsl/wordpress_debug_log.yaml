@@ -1,0 +1,37 @@
+id: wordpress-debug-log
+info:
+  name: Registro de Depuración WordPress (debug.log) Expuesto
+  author: OmniBreach Community
+  severity: high
+  description: Se detectó un archivo debug.log público de WordPress que expone errores de PHP, rutas internas del servidor, consultas SQL fallidas e información de depuración confidencial.
+  remediation: Configurar WP_DEBUG_DISPLAY en false y desactivar WP_DEBUG_LOG en wp-config.php, o bloquear el acceso a archivos *.log en el servidor web.
+  cwe_id: CWE-538
+  cvss_score: 7.5
+  reference:
+    - https://wordpress.org/documentation/article/debugging-in-wordpress/
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}/wp-content/debug.log"
+      - "{{BaseURL}}/wp-content/uploads/debug.log"
+    redirects: false
+    matchers_condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        condition: or
+        words:
+          - "PHP Notice:"
+          - "PHP Fatal error:"
+          - "PHP Warning:"
+          - "WordPress database error"
+      - type: word
+        part: body
+        negative: true
+        words:
+          - "<!DOCTYPE html"
+          - "<html"
