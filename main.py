@@ -146,6 +146,16 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
     if stealth:
         apply_stealth_headers(session)
 
+    if engine is not None:
+        def _count_hook(resp: Any, *args: Any, **kwargs: Any) -> None:
+            with contextlib.suppress(Exception):
+                req_m = getattr(getattr(resp, "request", None), "method", "GET") or "GET"
+                engine.record_request(str(getattr(resp, "url", page_url)), str(req_m), int(getattr(resp, "status_code", 200)))
+
+        hooks_list = session.hooks.setdefault("response", [])
+        if isinstance(hooks_list, list) and not any(getattr(h, "__name__", "") == "_count_hook" for h in hooks_list):
+            hooks_list.append(_count_hook)
+
     polite_delay(delay=delay, stealth=stealth)
     if engine and engine.is_cancelled:
         return [], {}, ""
@@ -157,9 +167,6 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
     except Exception as e:
         logger.warning("Error accediendo a %s: %s", page_url, e)
         return [], {}, ""
-
-    if engine:
-        engine.record_request(page_url, "GET", response.status_code)
 
     rendered_html, rendered_links = render_page(page_url)
     dom_html = rendered_html if rendered_html is not None else response.text
@@ -541,16 +548,18 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
             from scanner.async_engine import AsyncReactivePipeline
 
-            async def _run_async_batch() -> tuple[list[Finding], list[Any]]:
+            async def _run_async_batch() -> tuple[list[Finding], list[Any], int]:
                 pipeline = AsyncReactivePipeline(config, num_workers=min(8, max(2, config.max_workers)))
                 reactive_findings = await pipeline.run_full_scan(url)
                 loop = asyncio.get_running_loop()
                 tasks = [loop.run_in_executor(None, scan_func, u) for u in target_urls]
                 res = await asyncio.gather(*tasks, return_exceptions=True)
-                return reactive_findings, list(res)
+                return reactive_findings, list(res), pipeline.stats.requests_count
 
             try:
-                reactive_findings, batch_res = asyncio.run(_run_async_batch())
+                reactive_findings, batch_res, async_reqs = asyncio.run(_run_async_batch())
+                for _ in range(async_reqs):
+                    engine.record_request(url, "ASYNC")
                 all_findings.extend(reactive_findings)
                 for res in batch_res:
                     if isinstance(res, tuple):

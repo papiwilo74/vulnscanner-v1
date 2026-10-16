@@ -470,8 +470,11 @@ class Finding:
                 parsed = urlparse(affected)
                 if parsed.netloc:
                     affected = f"{parsed.scheme}://{parsed.netloc}"
+        title_norm = self.title
+        if self.category == "cors" and any(w in self.title.lower() for w in ("wildcard", "comodín", "comodin", "abierto")):
+            title_norm = "CORS Abierto (Wildcard *)"
         return hashlib.md5(
-            f"{self.category}|{self.title}|{affected}|{self.parameter or ''}".encode(),
+            f"{self.category}|{title_norm}|{affected}|{self.parameter or ''}".encode(),
             usedforsecurity=False
         ).hexdigest()
 

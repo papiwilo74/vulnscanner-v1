@@ -113,7 +113,7 @@ def generate_pdf_report(
     story: list[Any] = []
 
     # 1. Portada / Encabezado
-    story.append(Paragraph("OMNIBREACH v3.8", title_style))
+    story.append(Paragraph("OMNIBREACH v3.10", title_style))
     story.append(Paragraph("Informe Formal de Auditoría de Seguridad & Cumplimiento Normativo", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=2, color=accent_color, spaceAfter=14))
 
@@ -242,7 +242,7 @@ def generate_pdf_report(
     story.append(Paragraph("4. Acta de Cierre y Conformidad de Auditoría", h2_style))
     sig_data = [
         [
-            Paragraph("<b>Emitido por:</b><br/>Auditor de Seguridad<br/>OmniBreach v3.8 Security Suite", body_style),
+            Paragraph("<b>Emitido por:</b><br/>Auditor de Seguridad<br/>OmniBreach v3.10 Security Suite", body_style),
             Paragraph("<b>Recibido y Aprobado por:</b><br/>Responsable de Aplicaciones / CISO<br/>Firma: ________________________", body_style),
         ],
         [
