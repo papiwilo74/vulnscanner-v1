@@ -170,8 +170,8 @@ Las mediciones del escáner se validan empíricamente contra aplicaciones vulner
 
 | Métrica de Rendimiento | OWASP PyGoat (Django/Python) | OWASP Juice Shop (Angular/Node) | Análisis de Ingeniería |
 | :--- | :---: | :---: | :--- |
-| **Precision** | **100.0%** (9 / 9) | **100.0%** (10 / 10) | **0 falsos positivos** tras confirmación diferencial y supresión de bloqueos WAF. |
-| **Recall (Sensibilidad DAST)** | **69.2%** (9 / 13) | **64.3%** (10 / 14) | Detecta inyecciones, CORS, CSP, exposición de métricas/esquemas y Prototype Pollution. |
+| **Precision** | **100.0%** (9 / 9) | **100.0%** (9 / 9) | **0 falsos positivos** tras confirmación diferencial y supresión de bloqueos WAF. |
+| **Recall (Sensibilidad DAST)** | **69.2%** (9 / 13) | **64.3%** (9 / 14) | Detecta inyecciones, CORS, CSP, exposición de métricas/esquemas y Prototype Pollution. |
 | **Falsos Negativos (FN)** | **4** | **5** | Retos de lógica de negocio multi-paso y manipulación semántica que requieren contexto humano. |
 | **F1-Score** | **81.8%** | **78.3%** | Balance empírico verificable (ver [`reports/benchmark_juiceshop.json`](reports/benchmark_juiceshop.json)). |
 | **False Positives (FP)** | **0** | **0** | Ausencia de alertas espurias en el conjunto evaluado. |

@@ -5,7 +5,7 @@
   "duration_seconds": 1.0,
   "total_findings": 10,
   "ground_truth_challenges": 14,
-  "true_positives": 10,
+  "true_positives": 9,
   "false_positives": 0,
   "false_negatives": 5,
   "precision": 1.0,

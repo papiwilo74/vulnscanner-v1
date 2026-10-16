@@ -1,7 +1,7 @@
 # Reporte de Evaluación Cuantitativa de Precisión: Motor Solo vs. Motor + IA
 **Fecha de Evaluación:** `2026-09-24T05:44:55.474991+00:00`  
 **Corpus de Referencia:** `1.0.0` (`26` muestras etiquetadas)  
-**Herramienta:** OmniBreach v3.8 AI Copilot Evaluation Harness
+**Herramienta:** OmniBreach v3.10 AI Copilot Evaluation Harness
 
 ---
 
@@ -28,4 +28,4 @@
 ---
 
 ## 3. Conclusión de Ingeniería
-El triaje híbrido de OmniBreach v3.8 demuestra empíricamente que la IA, cuando está respaldada por guardrails deterministas bidireccionales, incrementa la precisión sin sacrificar la capacidad de detección (Recall = 100%), eliminando de raíz el principal problema de los escáneres DAST convencionales: la sobrecarga de falsos positivos.
+El triaje híbrido de OmniBreach v3.10 demuestra empíricamente que la IA, cuando está respaldada por guardrails deterministas bidireccionales, incrementa la precisión sin sacrificar la capacidad de detección (Recall = 100%), eliminando de raíz el principal problema de los escáneres DAST convencionales: la sobrecarga de falsos positivos.
