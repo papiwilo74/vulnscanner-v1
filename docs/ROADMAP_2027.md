@@ -1,18 +1,20 @@
 # OmniBreach — Hoja de Ruta y Trabajo Futuro (Roadmap 2027)
 
-> **Estado del Proyecto:** Congelado y Estable (v3.9).  
+> **Estado del Proyecto:** Estable y Consolidado (v3.10).  
 > **Propósito de este Documento:** Preservar de forma estructurada las líneas de investigación avanzada y desarrollo futuro identificadas para la evolución del escáner en 2027, tras la culminación de la fase de validación y defensa académica.
 
 ---
 
 ## 1. Contexto Estratégico
 
-OmniBreach v3.9 ha alcanzado la madurez de su núcleo dinámico (DAST) con:
+OmniBreach v3.10 ha alcanzado la madurez de su núcleo dinámico (DAST) con:
 - Cobertura completa de OWASP Top 10 y API Security Top 10.
+- Navegador activo (`active_crawler.py`) con instrumentación de sumideros DOM en V8 vía Chrome DevTools Protocol (`Page.addScriptToEvaluateOnNewDocument`).
+- Motor declarativo DSL (`templates_dsl/`) y fuzzing contextual guiado por análisis sintáctico (`context_fuzzer.py`).
 - Infraestructura OAST dedicada (servidor DNS autoritativo RFC 1035 UDP 53 y HTTP).
 - Síntesis automática de parches virtuales (ModSecurity, AWS WAF, Cloudflare, Nginx).
 - Motor de prevención de fuga de datos (DLP con algoritmo Luhn Mod-10).
-- Suite de 481 pruebas unitarias automatizadas con tipado estricto (`mypy --strict`).
+- Suite de 507 pruebas unitarias automatizadas con tipado estricto (`mypy --strict`) y 0 alertas SAST (`Bandit`).
 
 Para el ciclo de investigación y desarrollo correspondiente a **2027**, se definen cuatro pilares de evolución técnica hacia la frontera de la seguridad de aplicaciones:
 
@@ -23,9 +25,9 @@ Para el ciclo de investigación y desarrollo correspondiente a **2027**, se defi
 ```
                      PILARES DE EVOLUCIÓN TÉCNICA (2027)
                      
-     [ 1. IAST Runtime ]            [ 2. V8 DOM Engine Hooking ]
-     Agente en memoria del proceso   Interceptación de prototipos nativos
-     con análisis de flujo Taint.   en Chromium vía DevTools Protocol.
+     [ 1. IAST Runtime ]            [ 2. Ejecución Simbólica DOM ]
+     Agente en memoria del proceso   Resolución de restricciones (Z3)
+     con análisis de flujo Taint.   sobre trazas de sumideros CDP/V8.
      
      [ 3. Fuzzing Binario gRPC ]    [ 4. Inferencia de Lógica L* ]
      Mutación de Protocol Buffers   Aprendizaje de autómatas finitos
@@ -44,13 +46,12 @@ Para el ciclo de investigación y desarrollo correspondiente a **2027**, se defi
 
 ---
 
-### Pilar 2: Instrumentación Nativa de V8 / Chromium (CDP Hooking)
+### Pilar 2: Ejecución Concolic y Simbólica sobre Sumideros V8 (DOM Taint Solver)
 
-* **Objetivo:** Detección de vulnerabilidades DOM-XSS complejas en Single Page Applications (SPAs) sin falsos positivos por análisis estático heurístico.
+* **Objetivo:** Evolucionar la instrumentación actual de sumideros DOM en Chromium (`active_crawler.py`) hacia la resolución automática de condiciones lógicas complejas en el cliente.
 * **Arquitectura Prevista:**
-  * Extensión del subsistema de navegación headless utilizando sesiones directas del Chrome DevTools Protocol (`Page.addScriptToEvaluateOnNewDocument`).
-  * Sobrescritura de prototipos JavaScript nativos (`Element.prototype.setAttribute`, `Element.prototype.innerHTML`, `document.write`, `eval`) antes de la ejecución de cualquier script del sitio.
-  * Captura de trazas de pila (*call stacks*) completas en el motor V8 cuando un payload inyectado por OmniBreach alcanza un sumidero real en el navegador.
+  * Construcción de grafos de dependencia de datos (*Taint Propagation Graphs*) sobre las trazas capturadas vía Chrome DevTools Protocol (`Page.addScriptToEvaluateOnNewDocument`).
+  * Integración con un solver SMT (como Z3) para resolver restricciones de validación en el frontend y sintetizar automáticamente payloads que evadan sanitizadores personalizados antes de llegar a `Element.prototype.innerHTML`, `document.write` o `eval`.
 
 ---
 

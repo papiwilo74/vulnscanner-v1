@@ -36,13 +36,12 @@
 ## Tabla de Contenidos
 
 - [Arquitectura General](#arquitectura-general)
-- [Los 11 Pilares Técnicos de OmniBreach (v3.8)](#los-11-pilares-tecnicos-de-omnibreach-v38)
+- [Los 11 Pilares Técnicos de OmniBreach (v3.10)](#los-11-pilares-tecnicos-de-omnibreach-v310)
 - [Validación Empírica Cuantitativa (Juice Shop & PyGoat)](#validacion-empirica-cuantitativa-juice-shop--pygoat)
-- [Base de Conocimiento y Módulos de Estudio (`docs_notebox/`)](#base-de-conocimiento-y-modulos-de-estudio-docs_notebox)
 - [Instalación Rápida](#instalacion-rapida)
 - [Guía de Uso CLI y Ejemplos](#guia-de-uso-cli-y-ejemplos)
 - [Opciones de Configuración Avanzadas](#opciones-de-configuracion-avanzadas)
-- [Garantías de Calidad de Software (CI/CD Gates)](#garantias-de-calidad-de-software-cicd-gates)
+- [Calidad y Reproducibilidad (CI/CD)](#calidad-y-reproducibilidad-cicd)
 - [Estructura del Proyecto](#estructura-del-proyecto)
 - [Hoja de Ruta y Trabajo Futuro (Roadmap 2027)](#hoja-de-ruta-y-trabajo-futuro-roadmap-2027)
 - [Ética y Uso Responsable](#etica-y-uso-responsable)
@@ -110,7 +109,7 @@ graph TD
 
 ---
 
-## Los 11 Pilares Técnicos de OmniBreach (v3.8)
+## Los 11 Pilares Técnicos de OmniBreach (v3.10)
 
 ### 1. Fuzzing Quirúrgico Contextual (AST DOM Analysis)
 En lugar de disparar decenas de payloads a ciegas que saturan el WAF, OmniBreach envía una sonda benigna alfanumérica previa (`vScanProbe74`) y clasifica el punto de reflejo en el DOM:
@@ -131,74 +130,51 @@ Resuelve el talón de Aquiles de los escáneres DAST en aplicaciones SaaS:
 * Implementa caché en memoria y **fallback automático a base local** para entornos sin conexión a internet.
 
 ### 4. Harness de Benchmarks y Detección de Regresión en CI/CD
-* Orquesta pruebas contra **OWASP Juice Shop** y **OWASP PyGoat**, registrando Precision, Recall, F1, True Positives y False Positives en `reports/benchmark_history.json`.
+* Orquesta pruebas contra **OWASP Juice Shop** y **OWASP PyGoat**, registrando Precision, Recall, F1, True Positives y False Positives en `reports/benchmark_juiceshop.json` y `reports/benchmark_pygoat.json`.
 * **Guardián de Calidad**: Bloquea el pipeline de CI si un cambio de código reduce la precisión o incrementa los falsos positivos.
 * Workflow nativo en GitHub Actions ([`.github/workflows/security_benchmark.yml`](.github/workflows/security_benchmark.yml)).
 
 ### 5. Detección Fuera de Banda (OAST) y Blind XXE
-* Servidor HTTP multihilo embebido en segundo plano para auditorías en redes cerradas o aisladas.
+* Servidor HTTP y DNS (RFC 1035 UDP) multihilo embebido en segundo plano para auditorías en redes cerradas o aisladas.
 * Genera DTDs y entidades externas asíncronas para confirmar vulnerabilidades ciegas que no devuelven datos en la respuesta HTTP inmediata.
 
-### 6. DOM Taint Tracking Dinámico con Playwright
+### 6. DOM Taint Tracking & Active Monkey Crawler con Playwright CDP
 * Inyección de arnés JavaScript previo a la carga (`page.add_init_script`) con hooks sobre sinks peligrosos (`eval`, `setTimeout`, `document.write`, `Element.innerHTML`).
-* Captura el **Stack Trace real de JavaScript (`new Error().stack`)**, indicando al desarrollador el archivo y la línea exacta de código donde se originó el flujo inseguro.
+* Interceptación de red vía Chrome DevTools Protocol (CDP) y simulación segura de eventos DOM para descubrir rutas SPA ocultas.
 
 ### 7. Modelado Causal de Amenazas y Choke Points (Brandes Centrality)
 * Algoritmo determinista de Brandes ($O(|V| \cdot |E|)$) que identifica qué nodo de la red corta el mayor número de rutas de ataque críticas.
 * Simulador predictivo **What-If** que calcula la reducción cuantitativa de riesgo ($\Delta\text{Risk}\%$) antes de parchar.
 
-### 8. Cumplimiento Normativo y DevSecOps
+### 8. Cumplimiento Normativo, Virtual Patching y DevSecOps
 * Mapeo contra **PCI-DSS v4.0** (Req 6.2.4, 6.4.1, 6.4.3, 8.3.1, 4.1.2), **OWASP Top 10 (2021)**, **ISO/IEC 27001:2022** y **NIST SP 800-53 Rev 5**.
-* Exportación oficial en formato **SARIF v2.1.0** para integración nativa con GitHub Advanced Security, GitLab y DefectDojo.
+* Síntesis automática de reglas WAF (**ModSecurity**, **AWS WAF**, **Cloudflare**, **Nginx**) y exportación oficial **SARIF v2.1.0**.
 
 ### 9. Copiloto IA Híbrido (Groq LPUs + Ollama Local GPU) & Auto-Fix
 * **Arquitectura Híbrida**: Conmutación transparente entre inferencia ultra-rápida en la nube con LPUs (**Groq** con LLaMA 3.3 / Qwen) y privacidad total en hardware local (**Ollama** con GPU local sin fuga de datos sensibles).
-* **5 Modos Operativos Especializados**:
-  1. *Explicación Ejecutiva*: Síntesis del impacto de negocio y vectores de ataque para comités directivos.
-  2. *Remediation PR*: Generación de diffs Git y comandos de aplicación directa.
-  3. *Triage de Falsos Positivos*: Análisis probabilístico de atenuantes y verificación de contexto.
-  4. *Modelado de Amenazas*: Clasificación formal bajo frameworks STRIDE y MITRE ATT&CK.
-  5. *Auto-Fix con AST*: Análisis sintáctico y aplicación autónoma de parches directamente sobre el código fuente con backup de seguridad `.bak`.
+* **5 Modos Operativos Especializados**: Explicación ejecutiva CISO, generación de parches de remediación, triaje de falsos positivos, modelado STRIDE/MITRE y Auto-Fix AST con backup `.bak`.
 
 ### 10. Hardening de Producción, RBAC Multi-Tenant & W3C CORS
 * **Aislamiento Criptográfico**: Segregación estricta por Organización y Roles granulares (`ADMIN`, `AUDITOR`, `DEVELOPER`).
-* **Bloqueo Incondicional en Producción (Fail-Closed Security)**: La plataforma rehúsa arrancar en producción si `OMNIBREACH_JWT_SECRET` o `OMNIBREACH_ADMIN_PASSWORD` no han sido provistos con suficiente entropía, erradicando credenciales predecibles.
-* **CORS Estricto**: Rechazo tajante de comodines `*` combinados con cabeceras de autorización conforme a la especificación W3C Fetch.
+* **Bloqueo Incondicional en Producción (Fail-Closed Security)**: La plataforma rehúsa arrancar en producción si `OMNIBREACH_JWT_SECRET` o `OMNIBREACH_ADMIN_PASSWORD` no han sido provistos con suficiente entropía.
 
-### 11. Arquitectura Distribuida y Persistencia Agnóstica (PostgreSQL Neon / SQLite)
-* **Worker Desacoplado & Docker (`Dockerfile.worker`)**: Worker asíncrono con control de concurrencia, heartbeat resiliente, manejo elegante de señales `SIGTERM`/`SIGINT` y propagación íntegra de `config_json` (cookies, proxies, rate-limits, OAST, stealth).
-* **Adaptador Universal de Base de Datos (`UniversalConnection`)**: Soporte nativo para PostgreSQL Serverless (**Neon**) con fallback transparente a SQLite para desarrollo sin cambios en la lógica de aplicación.
+### 11. Arquitectura Modular Desacoplada y Persistencia Agnóstica (PostgreSQL Neon / SQLite)
+* **Separación de Responsabilidades (SRP)**: CLI modularizado en `cli/` (`parser.py`, `dispatch.py`) y controladores REST desacoplados en `routers/` (`ci_cd.py`, `templates.py`, `crawler.py`, `proxy.py`).
+* **Adaptador Universal de Base de Datos (`UniversalConnection`)**: Soporte nativo para PostgreSQL Serverless (**Neon**) con fallback transparente a SQLite.
 
 ---
 
 ## Validación Empírica Cuantitativa (Juice Shop & PyGoat)
 
-Las mediciones del escáner se validan contra aplicaciones vulnerables estándar con catálogos oficiales de retos:
+Las mediciones del escáner se validan empíricamente contra aplicaciones vulnerables reales de la industria, reportando de forma transparente tanto los aciertos como los límites actuales de detección automática:
 
-| Métrica de Rendimiento | OWASP PyGoat (Django/Python) | OWASP Juice Shop (Angular/Node) | Garantía de Ingeniería |
+| Métrica de Rendimiento | OWASP PyGoat (Django/Python) | OWASP Juice Shop (Angular/Node) | Análisis de Ingeniería |
 | :--- | :---: | :---: | :--- |
-| **Precision** | **100.0%** (10 / 10) | **100.0%** (10 / 10) | **0 falsos positivos**. Cero alertas espurias tras calibración. |
-| **Recall (Sensibilidad DAST)** | **69.2%** (9 / 13) | **64.3%** (9 / 14) | Detección consistente de los vectores de explotación principales. |
-| **F1-Score** | **81.8%** | **78.3%** | Rendimiento armónico balanceado en ambos stacks. |
-| **Tiempo Total de Escaneo** | **0.48 s** | **0.86 s** | Evaluación sub-segundo con concurrencia optimizada. |
-| **False Positives (FP)** | **0** | **0** | Ausencia total de ruido analítico. |
-
----
-
-## Base de Conocimiento y Módulos de Estudio (`docs_notebox/`)
-
-El repositorio incluye **8 documentos maestros** listos para importar en **NoteBox**, **Obsidian** o **NotebookLM** para generar podcasts, guiones de video y notas técnicas de estudio:
-
-| Módulo | Documento | Temas Cubiertos |
-| :---: | :--- | :--- |
-| **01** | [`01_redes_http_y_evasion_waf.md`](docs_notebox/01_redes_http_y_evasion_waf.md) | La vida de un paquete (MAC vs IP), 3-Way Handshake, TLS 1.3, algoritmo AIMD y evasión de WAFs. |
-| **02** | [`02_inyecciones_servidor_sqli_xxe.md`](docs_notebox/02_inyecciones_servidor_sqli_xxe.md) | SQLi booleano diferencial, time-based, error-based y procesamiento de entidades XML (XXE). |
-| **03** | [`03_vulnerabilidades_cliente_xss_dom_cors_cookies.md`](docs_notebox/03_vulnerabilidades_cliente_xss_dom_cors_cookies.md) | Same-Origin Policy (SOP), XSS, DOM Taint Tracking en Playwright, CORS y cookies de sesión vs cliente. |
-| **04** | [`04_deteccion_fuera_de_banda_oast_y_ssrf.md`](docs_notebox/04_deteccion_fuera_de_banda_oast_y_ssrf.md) | El punto ciego asíncrono, listeners OAST locales y robo de credenciales en nubes vía SSRF. |
-| **05** | [`05_arquitectura_del_escaner_y_filtros_anti_falsos_positivos.md`](docs_notebox/05_arquitectura_del_escaner_y_filtros_anti_falsos_positivos.md) | Concurrencia con `ThreadPoolExecutor`, canarios Soft-404 en SPAs y doble verificación Open Redirect. |
-| **06** | [`06_superficie_externa_easm_fuzzing_y_sca.md`](docs_notebox/06_superficie_externa_easm_fuzzing_y_sca.md) | Shadow IT, Certificate Transparency, Subdomain Takeover en S3/GitHub y fuga de secretos. |
-| **07** | [`07_seguridad_corporativa_pci_dss_sarif_devsecops.md`](docs_notebox/07_seguridad_corporativa_pci_dss_sarif_devsecops.md) | PCI-DSS v4.0, OWASP Top 10, exportador SARIF v2.1.0 y flujo DevSecOps continuo. |
-| **08** | [`08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md`](docs_notebox/08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md) | Novedades de v3.8: SCA dinámico con OSV.dev, macros State-Aware, AST DOM Fuzzing y Benchmark CI. |
+| **Precision** | **100.0%** (9 / 9) | **100.0%** (10 / 10) | **0 falsos positivos** tras confirmación diferencial y supresión de bloqueos WAF. |
+| **Recall (Sensibilidad DAST)** | **69.2%** (9 / 13) | **64.3%** (10 / 14) | Detecta inyecciones, CORS, CSP, exposición de métricas/esquemas y Prototype Pollution. |
+| **Falsos Negativos (FN)** | **4** | **5** | Retos de lógica de negocio multi-paso y manipulación semántica que requieren contexto humano. |
+| **F1-Score** | **81.8%** | **78.3%** | Balance empírico verificable (ver [`reports/benchmark_juiceshop.json`](reports/benchmark_juiceshop.json)). |
+| **False Positives (FP)** | **0** | **0** | Ausencia de alertas espurias en el conjunto evaluado. |
 
 ---
 
@@ -339,11 +315,11 @@ OmniBreach se desarrolla bajo un estándar riguroso de ingeniería de software c
 # 1. Linter y formato estricto (0 errores garantizados)
 ruff check .
 
-# 2. Tipado estático exhaustivo (0 errores en los 117 archivos del proyecto)
-mypy --explicit-package-bases scanner utils api.py main.py tests scripts
+# 2. Tipado estático exhaustivo (0 errores en todos los paquetes del proyecto)
+mypy --explicit-package-bases scanner utils api.py main.py tests scripts cli routers --strict
 
-# 3. Auditoría de seguridad de código AST (0 vulnerabilidades en 13.9k LOC)
-bandit -c bandit.yaml -r scanner api.py main.py utils scripts
+# 3. Auditoría de seguridad de código AST (0 vulnerabilidades detectadas por Bandit)
+bandit -c bandit.yaml -r scanner api.py main.py utils scripts cli routers
 
 # 4. Suite de pruebas unitarias y de integración ejecutada por pytest
 pytest tests -v
@@ -355,43 +331,54 @@ pytest tests -v
 
 ```
 VulnScanner/
-├── main.py                     # Punto de entrada CLI y orquestador del escáner
-├── api.py                      # Servidor API REST FastAPI con WebSockets y SOC Dashboard
+├── main.py                     # Orquestador ligero de sesiones y ejecución DAST
+├── api.py                      # Servidor API REST FastAPI, WebSockets y SOC Dashboard
+├── action.yml                  # Definición oficial de GitHub Action para CI/CD
 ├── train_ai.py                 # Pipeline de entrenamiento de clasificación Active Learning
 ├── requirements.txt            # Dependencias de producción
 ├── requirements-dev.txt        # Dependencias de desarrollo, linters y pruebas
-├── pyproject.toml              # Configuración de empaquetado y herramientas
+├── pyproject.toml              # Configuración de empaquetado, Ruff, Mypy y Pytest
 ├── Dockerfile                  # Contenedor Docker de producción
 ├── Dockerfile.worker           # Contenedor para worker distribuido desacoplado
 ├── docker-compose.yml          # Orquestador multi-servicio (API + CLI + Workers)
 │
-├── scanner/                    # Módulos de detección y motores nucleares
-│   ├── ai_copilot.py           # [v3.8] Copiloto IA híbrido (Groq + Ollama) y Auto-Fix AST
-│   ├── db_adapter.py           # [v3.8] Conector agnóstico PostgreSQL (Neon) y SQLite
-│   ├── worker.py               # [v3.8] CLI daemon para workers distribuidos de escaneo
-│   ├── context_fuzzer.py       # [v3.8] Fuzzing contextual con análisis de reflejo en AST DOM
-│   ├── session_macro.py        # [v3.8] State-Aware Session Manager y macro replay en caliente
-│   ├── totp.py                 # [v3.8] Generador y validador de códigos TOTP/HOTP RFC 6238/4226
-│   ├── sca.py                  # [v3.8] SCA dinámico con API de OSV.dev y fallback local
+├── cli/                        # Capa CLI desacoplada (Principio de Responsabilidad Única)
+│   ├── parser.py               # Constructor modular de argumentos y banderas CLI
+│   └── dispatch.py             # Despachador de modos operativos (DAST, EASM, OAST, CI/CD)
+│
+├── routers/                    # Controladores modulares FastAPI por dominio
+│   ├── ci_cd.py                # Endpoint de escaneo incremental quirúrgico en CI/CD
+│   ├── templates.py            # Catálogo y ejecución de plantillas declarativas YAML DSL
+│   ├── crawler.py              # Controlador de Active Monkey Crawler & CDP
+│   └── proxy.py                # Controlador de proxy interceptor pasivo y exportación HAR
+│
+├── templates_dsl/              # Catálogo de plantillas declarativas YAML (Estilo Nuclei)
+│   ├── exposed_env.yaml        # Detección de archivos .env expuestos
+│   ├── exposed_git.yaml        # Detección de repositorios .git expuestos
+│   ├── aws_metadata_imds.yaml  # Exposición de metadatos cloud IMDSv1
+│   └── ...                     # 11 plantillas declarativas listas para producción
+│
+├── scanner/                    # Motores nucleares de detección y correlación
+│   ├── template_engine.py      # Intérprete de plantillas YAML/JSON con multi-matchers
+│   ├── git_diff_scanner.py     # Escáner incremental por Git-Diff y Quality Gates CI/CD
+│   ├── active_crawler.py       # Active Monkey Testing e interceptación de red CDP
+│   ├── iast_agent.py           # Middleware IAST/RASP universal (ASGI + WSGI)
+│   ├── ai_copilot.py           # Copiloto IA híbrido (Groq + Ollama) y Auto-Fix AST
+│   ├── db_adapter.py           # Conector agnóstico PostgreSQL (Neon) y SQLite
+│   ├── context_fuzzer.py       # Fuzzing contextual con análisis de reflejo en AST DOM
+│   ├── session_macro.py        # State-Aware Session Manager y macro replay en caliente
+│   ├── totp.py                 # Generador y validador de códigos TOTP/HOTP RFC 6238
+│   ├── sca.py                  # SCA dinámico con API de OSV.dev y fallback local
 │   ├── sqli.py                 # SQLi booleano diferencial, time-based y firmas DB
 │   ├── dom_xss.py              # DOM Taint Tracking dinámico con hooks en Playwright
 │   ├── oast.py                 # Servidor local Out-of-Band HTTP/DNS para Blind Injection
 │   ├── xxe.py                  # Detección de XML External Entities clásico y ciego
 │   ├── attack_graph.py         # Grafo de ataque probabilístico y Centralidad de Brandes
 │   ├── engine.py               # ScanEngine concurrente, circuit breaker y perfiles
-│   ├── async_engine.py         # Motor de escaneo asíncrono con httpx para alto throughput
-│   ├── cookies.py              # Auditoría de cookies con discriminación sesión vs cliente
-│   ├── cors.py                 # CORS con detección de origen null y filtro de estáticos
-│   ├── headers.py              # Auditoría de cabeceras HTTP y detección de CSP débil
-│   ├── open_redirect.py        # Doble verificación contra dominios independientes
-│   ├── param_fuzzer.py         # Fuzzing de parámetros ocultos con análisis diferencial
-│   ├── directories.py          # Detección de directorios con canarios anti-Soft-404
-│   ├── headless_crawler.py     # Crawler dinámico para SPAs con Playwright
-│   ├── deception.py            # Motor de señuelos activos (HoneyTokens / Canaries)
-│   ├── sbom.py                 # Generador de SBOM CycloneDX v1.5 y SPDX v2.3
-│   ├── container_security.py   # Auditoría estática de directivas en Dockerfiles
-│   ├── cluster.py              # Orquestación de workers distribuidos para escaneo multi-nodo
-│   └── tenancy.py              # Control de acceso basado en roles (RBAC) y multi-tenancy
+│   ├── async_engine.py         # Pipeline reactivo asíncrono con httpx y control AIMD
+│   ├── virtual_patching.py     # Generador de reglas WAF (ModSecurity, Cloudflare, Nginx)
+│   ├── dlp.py                  # Motor DLP con validación matemática Luhn Mod-10
+│   └── ...                     # Módulos CORS, JWT, EASM, Deception, SBOM, Tenancy, etc.
 │
 ├── utils/                      # Utilidades y adaptadores de integración
 │   ├── adaptive_client.py      # Cliente HTTP adaptativo con algoritmo AIMD anti-WAF
@@ -400,46 +387,37 @@ VulnScanner/
 │   ├── report.py               # Generador de reportes interactivos HTML y JSON
 │   └── github_pr.py            # Integración para apertura autónoma de Pull Requests
 │
-├── scripts/                    # Scripts de soporte y automatización
-│   ├── run_benchmarks.py       # [v3.8] Harness automatizado con detección de regresiones
-│   └── __init__.py
+├── docs/                       # Documentación técnica y decisiones de arquitectura (ADR)
+│   ├── architecture.md         # Diagramas de componentes y flujos de ejecución
+│   ├── ARCHITECTURE_DECISIONS.md # Registro de decisiones arquitectónicas (ADRs)
+│   ├── DEPLOYMENT_GUIDE.md     # Guía de despliegue Cloud (Vercel + Render + Neon)
+│   ├── ROADMAP_2027.md         # Líneas de investigación futura
+│   └── openapi.yaml            # Especificación formal OpenAPI 3.1.0
 │
-├── docs_notebox/               # Base de conocimiento modular para NoteBox / NotebookLM
-│   ├── 01_redes_http_y_evasion_waf.md
-│   ├── 02_inyecciones_servidor_sqli_xxe.md
-│   ├── 03_vulnerabilidades_cliente_xss_dom_cors_cookies.md
-│   ├── 04_deteccion_fuera_de_banda_oast_y_ssrf.md
-│   ├── 05_arquitectura_del_escaner_y_filtros_anti_falsos_positivos.md
-│   ├── 06_superficie_externa_easm_fuzzing_y_sca.md
-│   ├── 07_seguridad_corporativa_pci_dss_sarif_devsecops.md
-│   └── 08_arquitectura_avanzada_v5_sca_macros_fuzzing_benchmarks.md
-│
-├── tests/                      # Suite de pruebas automatizadas (+395 pruebas)
-│   ├── test_totp.py            # [v3.8] Pruebas de generador TOTP/HOTP RFC 6238 y re-auth MFA
-│   ├── test_ai_copilot.py      # [v3.8] Pruebas del copiloto IA, Groq/Ollama y Auto-Fix
-│   ├── test_context_fuzzer.py  # [v3.8] Pruebas de detección contextual de DOM
-│   ├── test_session_macro.py   # [v3.8] Pruebas de macros y centinelas de sesión
-│   ├── test_osv_sca.py         # [v3.8] Pruebas de integración con OSV.dev y fallback
-│   ├── test_benchmark_harness.py # [v3.8] Pruebas del guardián de regresiones
+├── tests/                      # Suite de pruebas automatizadas (+500 pruebas)
+│   ├── test_template_engine.py # Pruebas del motor declarativo YAML DSL
+│   ├── test_git_diff_scanner.py # Pruebas del escáner quirúrgico CI/CD y Quality Gates
+│   ├── test_active_crawler.py  # Pruebas de Monkey Testing e interceptación CDP
+│   ├── test_iast_universal_middleware.py # Pruebas del agente IAST/RASP ASGI y WSGI
 │   ├── benchmark_juiceshop.py  # Benchmark empírico contra OWASP Juice Shop
 │   ├── benchmark_pygoat.py     # Benchmark empírico contra OWASP PyGoat
-│   └── ...                     # Pruebas de DAST, compliance, IAST, cluster, etc.
+│   └── ...                     # Pruebas de precisión, falso positivo cero, OAST, etc.
 │
 └── .github/workflows/          # Automatización CI/CD
     ├── ci.yml                  # Pipeline de calidad (Ruff, Mypy, Bandit, Pytest)
-    └── security_benchmark.yml  # [v3.8] Runner de benchmark con Juice Shop en Docker
+    └── security_benchmark.yml  # Runner de benchmark con Juice Shop en Docker
 ```
 
 ---
 
 ## Hoja de Ruta y Trabajo Futuro (Roadmap 2027)
 
-El desarrollo del núcleo dinámico (DAST) se encuentra formalmente **congelado y verificado** en OmniBreach v3.9 con 481 pruebas unitarias. Para el ciclo de investigación **2027**, se definieron 4 líneas de investigación avanzada documentadas en detalle en [`docs/ROADMAP_2027.md`](docs/ROADMAP_2027.md):
+El núcleo de **OmniBreach v3.10** se encuentra verificado con más de 500 pruebas automatizadas. Para el ciclo de investigación **2027**, se definieron 4 líneas de evolución avanzada documentadas en [`docs/ROADMAP_2027.md`](docs/ROADMAP_2027.md):
 
-1. **Agente IAST en Tiempo de Ejecución (*Interactive Application Security Testing*):** Instrumentación en memoria con análisis de flujo *Taint* para correlacionar inputs HTTP con líneas de código vulnerables.
-2. **Instrumentación Nativa del Motor V8 (Chromium CDP):** Interceptación de prototipos DOM (`innerHTML`, `eval`, `document.write`) en SPAs antes del renderizado.
-3. **Fuzzing de Protocolos Binarios Modernos (gRPC & Protobuf):** Mutación y decodificación de *wire-format* sobre HTTP/2 y WebSockets binarios.
-4. **Inferencia Formal de Máquinas de Estado para Lógica de Negocio (Algoritmo L\*):** Aprendizaje activo de autómatas para auditar flujos transaccionales multi-etapa.
+1. **Instrumentación IAST a Nivel de Bytecode / eBPF:** Extensión del middleware actual hacia trazabilidad nativa de instrucciones en máquinas virtuales (JVM/CPython) y sondas de kernel sin sobrecarga en aplicaciones de ultra-baja latencia.
+2. **Análisis Simbólico y Taint Tracking en Motor V8:** Resolución de restricciones (*concolic execution*) en el navegador para sintetizar automáticamente inputs que atraviesen validadores complejos en el cliente.
+3. **Fuzzing de Protocolos Binarios Modernos (gRPC & Protobuf):** Mutación y decodificación de *wire-format* sobre HTTP/2 y WebSockets binarios sin requerir archivos `.proto`.
+4. **Inferencia Formal de Máquinas de Estado para Lógica de Negocio (Algoritmo L\*):** Aprendizaje activo de autómatas de Mealy para auditar flujos transaccionales multi-etapa (e-commerce y pasarelas de pago).
 
 Consulta la especificación técnica completa en [**`docs/ROADMAP_2027.md`**](docs/ROADMAP_2027.md).
 

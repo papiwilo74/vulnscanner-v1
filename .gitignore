@@ -14,6 +14,7 @@ ENV/
 reports/
 !reports/benchmark_performance.json
 !reports/benchmark_juiceshop.json
+!reports/benchmark_pygoat.json
 !reports/ai_benchmark_report.json
 !reports/ai_benchmark_report.md
 *.db
@@ -32,15 +33,24 @@ ms-playwright/
 .aider*
 .mypy_cache/
 .pytest_cache/
+.pytest-runtime/
+.pytest-verify-two/
+.ruff_cache/
 .coverage
 coverage.xml
 
 # Build & packaging artifacts
 build/
 dist/
-# Environment and secrets
+
+# Environment, secrets & local study/helper files
 .env
 *.env
 *.bak
 *.egg-info/
+docs_notebox/
+docs/PLAN_DE_ESTUDIO_OMNIBREACH.md
+iniciar_laboratorio_purple_team.bat
+iniciar_panel_web.bat
+
 

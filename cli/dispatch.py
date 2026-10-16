@@ -30,6 +30,9 @@ def dispatch_cli(args: argparse.Namespace, scan_runner: Callable | None = None) 
     import os
 
     import requests
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     # Propagar flags de integración a variables de entorno para NotificationDispatcher
     if getattr(args, "slack_webhook", None):
@@ -266,8 +269,14 @@ def dispatch_cli(args: argparse.Namespace, scan_runner: Callable | None = None) 
             print("[!] No se detectó tráfico ni se especificó URL objetivo. Finalizando.")
             sys.exit(0)
 
-    # 8. Modo Plantillas Declarativas DSL
-    if getattr(args, "template", None) or getattr(args, "templates_dir", None):
+    # 8. Modo Plantillas Declarativas DSL (Modo Standalone Exclusivo)
+    is_standalone_dsl = bool(getattr(args, "template", None)) or (
+        bool(getattr(args, "templates_dir", None))
+        and not getattr(args, "full", False)
+        and not getattr(args, "active_crawl", False)
+        and getattr(args, "crawl", 1) <= 1
+    )
+    if is_standalone_dsl:
         from scanner.template_engine import TemplateEngine
         print("\n" + "=" * 75)
         print(" [📜 MOTOR DECLARATIVO DSL] EJECUCIÓN DE PLANTILLAS DE AUDITORÍA")

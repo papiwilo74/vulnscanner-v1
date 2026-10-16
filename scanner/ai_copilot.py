@@ -107,8 +107,8 @@ def _load_env_file() -> None:
                         clean_v = v.strip().strip("'\"")
                         if clean_k not in os.environ:
                             os.environ[clean_k] = clean_v
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("No se pudo leer archivo .env: %s", exc)
 
 _load_env_file()
 

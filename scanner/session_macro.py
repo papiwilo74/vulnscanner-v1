@@ -256,7 +256,7 @@ class StateAwareSessionManager:
         return True
 
 
-def build_smart_auth_macro(
+def build_smart_auth_macro(  # nosec B107
     login_url: str,
     username: str = "",
     password: str = "",

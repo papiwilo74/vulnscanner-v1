@@ -256,8 +256,8 @@ def _extract_jwt_expiry(token_str: str) -> Optional[float]:
         payload_dict = json.loads(payload_bytes.decode("utf-8", errors="ignore"))
         if isinstance(payload_dict, dict) and "exp" in payload_dict:
             return float(payload_dict["exp"])
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("No se pudo decodificar claim exp del JWT: %s", exc)
     return None
 
 

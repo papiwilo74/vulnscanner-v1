@@ -1,7 +1,7 @@
-# Guía Oficial de Despliegue en la Nube — OmniBreach v3.8
+# Guía Oficial de Despliegue en la Nube — OmniBreach v3.10
 ## Arquitectura Serverless: Vercel (Frontend) + Render (API Backend) + Neon (PostgreSQL)
 
-Esta guía detalla el procedimiento paso a paso para desplegar **OmniBreach v3.8** en un entorno en la nube utilizando los niveles gratuitos (**Free Tier**) de **Vercel**, **Render** y **Neon**, optimizado para evitar cuellos de botella de memoria RAM y suspensión por inactividad.
+Esta guía detalla el procedimiento paso a paso para desplegar **OmniBreach v3.10** en un entorno en la nube utilizando los niveles gratuitos (**Free Tier**) de **Vercel**, **Render** y **Neon**, optimizado para evitar cuellos de botella de memoria RAM y suspensión por inactividad.
 
 ---
 
@@ -45,10 +45,10 @@ Neon proporciona una base de datos PostgreSQL serverless que escala a cero cuand
 El backend de FastAPI (`api.py`) gestiona las auditorías, WebSockets y telemetría en tiempo real.
 
 ### Opción A: Despliegue con Blueprint Automático (`render.yaml`)
-El repositorio incluye el archivo [`render.yaml`](file:///c:/Users/villa/VulnScanner/render.yaml) preconfigurado.
+El repositorio incluye el archivo [`render.yaml`](../render.yaml) preconfigurado.
 1. En el Dashboard de Render, ve a **Blueprints** -> **New Blueprint Instance**.
 2. Conecta tu repositorio de GitHub `OmniBreach`.
-3. Render detectará automáticamente [`render.yaml`](file:///c:/Users/villa/VulnScanner/render.yaml).
+3. Render detectará automáticamente [`render.yaml`](../render.yaml).
 4. Rellena la variable de entorno `DATABASE_URL` con la cadena obtenida en Neon.
 5. Haz clic en **Apply**.
 

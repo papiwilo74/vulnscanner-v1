@@ -519,8 +519,8 @@ class AsyncReactivePipeline:
                 try:
                     if not self._is_cancelled:
                         await self.url_queue.join()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Excepción esperando url_queue en cleanup: %s", exc)
                 for w in workers:
                     w.cancel()
                 # Recoger hallazgos de rutas sensibles si no fue cancelado
@@ -529,8 +529,8 @@ class AsyncReactivePipeline:
                         sens_findings = await sensitive_task
                         for sf in sens_findings:
                             await self.findings_queue.put(sf)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Excepción recogiendo rutas sensibles en cleanup: %s", exc)
                 else:
                     sensitive_task.cancel()
                 # Centinela de fin de flujo

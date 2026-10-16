@@ -62,8 +62,8 @@ def check_exposed_git(
                         match_remote = re.search(r"url\s*=\s*(.+)", r_conf.text)
                         if match_remote:
                             remote_info = f" Repositorio remoto identificado: '{match_remote.group(1).strip()}'."
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("No se pudo acceder a %s: %s", config_url, exc)
 
                 return Finding(
                     category="sensitive_data",

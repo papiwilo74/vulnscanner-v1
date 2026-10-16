@@ -284,14 +284,14 @@ class SurgicalIncrementalScanner:
                 try:
                     sqli_results = check_sqli(url_with_param, self.session)
                     route_findings.extend(Finding.from_legacy_list(sqli_results, "sqli", url_with_param))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Error en prueba SQLi sobre %s: %s", url_with_param, exc)
 
                 try:
                     xss_results = check_xss(url_with_param, None, self.session, passive=False)
                     route_findings.extend(Finding.from_legacy_list(xss_results, "xss", url_with_param))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Error en prueba XSS sobre %s: %s", url_with_param, exc)
 
             # 3. Comprobaciones de API (Mass Assignment en POST/PUT/PATCH)
             if route.method in ("POST", "PUT", "PATCH"):
@@ -304,8 +304,8 @@ class SurgicalIncrementalScanner:
                     )
                     if mass_finding:
                         route_findings.append(mass_finding)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Error en prueba Mass Assignment sobre %s: %s", full_url, exc)
 
             # 4. Comprobaciones de BOLA / IDOR si la ruta tiene identificador de entidad
             if "1" in normalized_path:
@@ -319,8 +319,8 @@ class SurgicalIncrementalScanner:
                     )
                     if bola_finding:
                         route_findings.append(bola_finding)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Error en prueba BOLA/IDOR sobre %s: %s", full_url, exc)
 
             return route_findings
 

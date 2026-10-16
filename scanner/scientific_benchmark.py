@@ -167,8 +167,8 @@ class ScientificBenchmarkResult:
             try:
                 if hasattr(sys.stdout, "reconfigure"):
                     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("No se pudo reconfigurar stdout a utf-8: %s", exc)
 
         border = "=" * 76
         print("\n" + border)
@@ -434,8 +434,8 @@ if __name__ == "__main__":
         try:
             if hasattr(sys.stdout, "reconfigure"):
                 sys.stdout.reconfigure(encoding="utf-8")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("No se pudo reconfigurar stdout a utf-8: %s", exc)
 
     target = sys.argv[1] if len(sys.argv) > 1 else None
     result = run_scientific_benchmark(target)

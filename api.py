@@ -182,8 +182,8 @@ def _dispatch_coroutine_threadsafe(coro: Any) -> None:
         try:
             asyncio.run_coroutine_threadsafe(coro, target_loop)
             return
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Error despachando corutina al event loop principal: %s", exc)
 
     try:
         loop = asyncio.get_running_loop()

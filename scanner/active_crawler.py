@@ -457,8 +457,8 @@ class ActiveCrawler:
                             s_apis, s_ws = StaticBundleExtractor.extract_from_text(js_resp.text, target_url)
                             found_apis.update(s_apis)
                             websocket_endpoints.update(s_ws)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Error descargando bundle JS %s: %s", js_url, exc)
 
             # 3. Descubrir formularios en el HTML
             forms = re.findall(r'<form[^>]*action=["\']([^"\']*)["\'][^>]*method=["\']?([a-zA-Z]+)?["\']?', html_text, re.IGNORECASE)
