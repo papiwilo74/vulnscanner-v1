@@ -116,9 +116,28 @@ def check_bola_idor(
 
         # Si responde 200 OK con contenido válido distinto al error
         if resp_a_on_b.status_code == 200 and len(resp_a_on_b.text) > 20:
-            # Comprobar que no sea una página de error genérica devuelta con 200
+            # Comprobar que no sea una página de error genérica o un catch-all HTML de SPA devuelto con 200
             b_lower = resp_a_on_b.text.lower()
             if any(err in b_lower for err in ("not found", "no encontrado", "error", "unauthorized", "access denied")):
+                return None
+
+            json_a = _safe_json_parse(resp_a.text)
+            json_b = _safe_json_parse(resp_a_on_b.text)
+            if isinstance(json_a, dict):
+                # Si el recurso legítimo A es un objeto JSON, el recurso B también debe ser un objeto JSON con estructura compatible
+                if not isinstance(json_b, dict) or not json_b:
+                    return None
+                keys_a = set(json_a.keys())
+                keys_b = set(json_b.keys())
+                if keys_a and (len(keys_a & keys_b) / len(keys_a)) < 0.5:
+                    return None
+                # Si se proporcionó sesión del Usuario B, confirmar que el objeto corresponda efectivamente a la entidad B
+                if session_user_b is not None:
+                    resp_b_own = session_user_b.request(method, url_b, timeout=timeout)
+                    json_b_own = _safe_json_parse(resp_b_own.text) if resp_b_own.status_code == 200 else None
+                    if isinstance(json_b_own, dict) and set(json_b_own.keys()) != keys_b:
+                        return None
+            elif "<html" in b_lower and "<html" not in resp_a.text.lower():
                 return None
 
             return Finding(
@@ -359,8 +378,37 @@ def check_resource_consumption(
     return None
 
 
+def check_api_security(
+    url: str,
+    session: requests.Session | None = None,
+    passive: bool = False,
+) -> list[Finding]:
+    """Ejecuta la suite de auditoría OWASP API Security Top 10 sobre una URL descubierta."""
+    findings: list[Finding] = []
+
+    bfla_res = check_bfla(url, unprivileged_session=session)
+    if bfla_res:
+        findings.append(bfla_res)
+
+    if not passive:
+        bola_res = check_bola_idor(url, session_user_a=session)
+        if bola_res:
+            findings.append(bola_res)
+
+        parsed_qs = parse_qs(urlparse(url).query)
+        for page_param in ("limit", "page_size", "per_page", "size"):
+            if page_param in parsed_qs:
+                rc_res = check_resource_consumption(url, session=session, param_name=page_param)
+                if rc_res:
+                    findings.append(rc_res)
+                break
+
+    return findings
+
+
 # Aliases para compatibilidad
 test_bola_idor = check_bola_idor
 test_mass_assignment = check_mass_assignment
 test_bfla = check_bfla
 test_resource_consumption = check_resource_consumption
+

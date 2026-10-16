@@ -11,6 +11,7 @@ import requests
 
 from cli import build_cli_parser, dispatch_cli
 from scanner.ai_check import check_with_ai
+from scanner.api_security import check_api_security
 from scanner.auth_helper import dynamic_login, headless_browser_login
 from scanner.autofix import TechFingerprinter, enrich_findings_with_autofix
 from scanner.cookies import check_cookies
@@ -19,6 +20,7 @@ from scanner.crawler import crawl_site
 from scanner.directories import check_directories
 from scanner.dom_xss import check_dom_xss
 from scanner.engine import ScanConfig, ScanEngine, ScanProfile
+from scanner.exposed_artifacts import check_exposed_artifacts
 from scanner.file_upload import check_file_upload
 from scanner.forms import check_forms
 from scanner.fuzzer import check_exposed_files
@@ -200,6 +202,8 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
         ("GraphQL", "graphql", check_graphql, page_url, session),
         ("WebSocket", "websocket", check_websocket, page_url, dom_html, session),
         ("Plantillas Declarativas DSL", "template_dsl", check_declarative_templates, page_url, session),
+        ("Seguridad de APIs (BOLA/BFLA)", "api_bola", check_api_security, page_url, session, passive),
+        ("Artefactos de Nube y Backups", "sensitive_data", check_exposed_artifacts, page_url, dom_html, session, passive),
         ("IA en parámetros", "ai", check_with_ai, page_url),
     ]
 
@@ -532,17 +536,22 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             active_session=session
         )
         if use_async_engine:
-            logger.info("[ASYNC] Despachando escaneo concurrente con httpx/asyncio...")
+            logger.info("[ASYNC] Despachando escaneo concurrente con httpx/asyncio y AsyncReactivePipeline...")
             import asyncio
 
-            async def _run_async_batch() -> list[Any]:
+            from scanner.async_engine import AsyncReactivePipeline
+
+            async def _run_async_batch() -> tuple[list[Finding], list[Any]]:
+                pipeline = AsyncReactivePipeline(config, num_workers=min(8, max(2, config.max_workers)))
+                reactive_findings = await pipeline.run_full_scan(url)
                 loop = asyncio.get_running_loop()
                 tasks = [loop.run_in_executor(None, scan_func, u) for u in target_urls]
                 res = await asyncio.gather(*tasks, return_exceptions=True)
-                return list(res)
+                return reactive_findings, list(res)
 
             try:
-                batch_res = asyncio.run(_run_async_batch())
+                reactive_findings, batch_res = asyncio.run(_run_async_batch())
+                all_findings.extend(reactive_findings)
                 for res in batch_res:
                     if isinstance(res, tuple):
                         page_findings, p_headers, p_html = res

@@ -220,3 +220,29 @@ def check_database_backup_exposure(
             logger.debug("[ExposedArtifacts] Error buscando dump %s: %s", test_url, exc)
 
     return None
+
+
+def check_exposed_artifacts(
+    base_url: str,
+    html_content: str = "",
+    session: requests.Session | None = None,
+    passive: bool = False,
+) -> list[Finding]:
+    """Ejecuta la auditoría completa de artefactos de nube, repositorios .git y respaldos SQL expuestos."""
+    findings: list[Finding] = []
+
+    if html_content:
+        cloud_findings = check_cloud_storage_leak(html_content, base_url=base_url, session=session)
+        findings.extend(cloud_findings)
+
+    if not passive:
+        git_finding = check_exposed_git(base_url, session=session)
+        if git_finding:
+            findings.append(git_finding)
+
+        db_finding = check_database_backup_exposure(base_url, session=session)
+        if db_finding:
+            findings.append(db_finding)
+
+    return findings
+

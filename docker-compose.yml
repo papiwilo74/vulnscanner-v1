@@ -37,5 +37,14 @@ services:
     depends_on:
       - api
 
+  juiceshop:
+    image: bkimminich/juice-shop:v17.1.1
+    container_name: vulnscanner-juiceshop-benchmark
+    profiles: ["benchmark"]
+    ports:
+      - "3000:3000"
+    restart: "no"
+
 volumes:
   vulnscanner_reports:
+

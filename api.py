@@ -374,8 +374,13 @@ def _list_tasks(conn: UniversalConnection, tenant_id: Optional[str] = None) -> l
     return result
 
 
+def _is_production_env() -> bool:
+    return os.environ.get("OMNIBREACH_ENV", os.environ.get("ENV", _OMNIBREACH_ENV)).lower() == "production"
+
+
 def get_current_user_optional(request: Request) -> User:
-    """Extrae el usuario autenticado desde la cabecera Authorization Bearer token, o retorna el usuario default."""
+    """Extrae el usuario autenticado desde la cabecera Authorization Bearer token.
+    En modo producción exige obligatoriamente un token JWT válido (sin fallback a admin)."""
     auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
@@ -383,6 +388,11 @@ def get_current_user_optional(request: Request) -> User:
         if user:
             return user
         raise HTTPException(status_code=401, detail="Token de acceso revocado, expirado o inválido.")
+    if _is_production_env():
+        raise HTTPException(
+            status_code=401,
+            detail="Autenticación Bearer obligatoria en entorno de producción.",
+        )
     return tenancy_mgr.get_default_user()
 
 
@@ -594,10 +604,41 @@ def run_scan_in_background(task_id: str, req: ScanRequest) -> None:
             send_webhook_notification(task_id, req.webhook_url, "failed", error_info)
 
 
-def send_webhook_notification(task_id: str, webhook_url: str, status: str, payload: Any) -> None:
-    """Envía una petición POST con los resultados al Webhook especificado."""
+def _validate_webhook_url(webhook_url: str, allow_private: bool = False) -> None:
+    """Valida que el webhook_url use HTTP/HTTPS y no apunte a rangos privados/loopback/link-local (Anti-SSRF)."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    from scanner.engine import PRIVATE_RANGES
+
+    parsed = urlparse(webhook_url.strip())
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise ValueError("URL de webhook inválida: solo se permiten esquemas http/https con host válido.")
+
+    hostname = parsed.hostname
+    if not allow_private:
+        if hostname.lower() in ("localhost", "ip6-localhost", "metadata.google.internal"):
+            raise ValueError(f"SSRF Guard: Host privado o local bloqueado en webhook ({hostname}).")
+        try:
+            ip_obj = ipaddress.ip_address(hostname)
+        except ValueError:
+            try:
+                ip_obj = ipaddress.ip_address(socket.gethostbyname(hostname))
+            except (socket.gaierror, TypeError) as exc:
+                raise ValueError(f"No se pudo resolver el host del webhook ({hostname}).") from exc
+
+        if ip_obj.is_loopback or ip_obj.is_private or ip_obj.is_link_local or any(
+            isinstance(ip_obj, ipaddress.IPv4Address) and ip_obj in net for net in PRIVATE_RANGES
+        ):
+            raise ValueError(f"SSRF Guard: Destino privado o de metadatos bloqueado en webhook ({ip_obj}).")
+
+
+def send_webhook_notification(task_id: str, webhook_url: str, status: str, payload: Any, allow_private: bool = False) -> None:
+    """Envía una petición POST con los resultados al Webhook especificado tras validación Anti-SSRF."""
     logger.info(f"Enviando notificación webhook para la tarea {task_id} a: {webhook_url}")
     try:
+        _validate_webhook_url(webhook_url, allow_private=allow_private)
         response = requests.post(
             webhook_url,
             json={
@@ -657,7 +698,7 @@ def health_check() -> dict[str, Any]:
     return {
         "status": "healthy",
         "service": "OmniBreach API",
-        "version": "3.9",
+        "version": "3.10",
         "database": "neon-postgresql" if is_postgres else "sqlite",
         "lightweight_mode": os.environ.get("OMNIBREACH_LIGHTWEIGHT", "").lower() in ("1", "true", "yes"),
     }
@@ -666,8 +707,8 @@ def health_check() -> dict[str, Any]:
 @app.get("/")
 def read_root() -> dict[str, Any]:
     return {
-        "message": "Bienvenido a OmniBreach v3.9 API",
-        "version": "3.9",
+        "message": "Bienvenido a OmniBreach v3.10 API",
+        "version": "3.10",
         "standards": ["OASIS SARIF v2.1.0", "CVSS v3.1", "Executive PDF Audit", "GitHub Auto-PR", "Real-Time SOC Dashboard", "MITRE ATT&CK", "OAST", "EASM CISA KEV"],
         "dashboard_url": "/dashboard",
         "health_url": "/health",
@@ -714,13 +755,21 @@ async def websocket_scan_stream(websocket: WebSocket, task_id: str) -> None:
 
 
 @app.get("/download")
-def download_report(path: str) -> FileResponse:
-    """Permite la descarga segura de reportes generados (HTML, JSON, SARIF, PDF)."""
+def download_report(path: str, request: Request) -> FileResponse:
+    """Permite la descarga segura de reportes generados (HTML, JSON, SARIF, PDF) con control RBAC y validación de ruta."""
+    user = get_current_user_optional(request)
+    if not user.has_permission("scan:read"):
+        raise HTTPException(status_code=403, detail="Acceso denegado: no tiene permiso para descargar reportes.")
+
     normalized = os.path.abspath(path)
     reports_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "reports"))
 
-    # Validar que el archivo resida en la carpeta de reportes por seguridad
-    if not normalized.startswith(reports_dir) or not os.path.exists(normalized):
+    try:
+        is_within_reports = os.path.commonpath([normalized, reports_dir]) == reports_dir
+    except ValueError:
+        is_within_reports = False
+
+    if not is_within_reports or not os.path.isfile(normalized):
         raise HTTPException(status_code=404, detail="Archivo no encontrado o acceso denegado")
 
     filename = os.path.basename(normalized)
@@ -733,6 +782,11 @@ def start_scan(request: ScanRequest, background_tasks: BackgroundTasks, req_http
     Inicia un escaneo web (localmente o despachado al cluster distribuido de workers).
     """
     user = get_current_user_optional(req_http)
+    if request.webhook_url:
+        try:
+            _validate_webhook_url(request.webhook_url, allow_private=request.allow_private)
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err)) from err
     task_id = str(uuid.uuid4())
     region_val = request.region or "local"
 
