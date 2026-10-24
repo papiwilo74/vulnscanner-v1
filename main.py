@@ -6,8 +6,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
 from typing import Any, Callable, Optional
+from urllib.parse import urlparse
 
 import requests
+from requests.adapters import HTTPAdapter
 
 from cli import build_cli_parser, dispatch_cli
 from scanner.ai_check import check_with_ai
@@ -116,10 +118,18 @@ def check_declarative_templates(target_url: str, session: Optional[requests.Sess
 def _legacy_to_findings(legacy_list: list[dict[str, Any]], category: str, url: str) -> list[Finding]:
     return Finding.from_legacy_list(legacy_list, category, url)
 
+def _configure_session_pool(session: requests.Session) -> requests.Session:
+    """Amplía el pool de conexiones HTTP/HTTPS para evitar 'Connection pool is full' en escaneos multihilo."""
+    adapter = HTTPAdapter(pool_connections=50, pool_maxsize=50)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
 def build_session(cookie_str: Optional[str] = None, auth_header: Optional[str] = None) -> Optional[requests.Session]:
     if not cookie_str and not auth_header:
         return None
-    session = requests.Session()
+    session = _configure_session_pool(requests.Session())
     if cookie_str:
         for pair in cookie_str.split(';'):
             pair = pair.strip()
@@ -138,10 +148,10 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
                        active_session: Optional[requests.Session] = None) -> tuple[list[Finding], dict[str, Any], str]:
     session: requests.Session
     if active_session is not None:
-        session = active_session
+        session = _configure_session_pool(active_session)
     else:
         built = build_session(cookie_str, auth_header)
-        session = built if built is not None else requests.Session()
+        session = built if built is not None else _configure_session_pool(requests.Session())
 
     if stealth:
         apply_stealth_headers(session)
@@ -151,6 +161,8 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
             with contextlib.suppress(Exception):
                 req_m = getattr(getattr(resp, "request", None), "method", "GET") or "GET"
                 engine.record_request(str(getattr(resp, "url", page_url)), str(req_m), int(getattr(resp, "status_code", 200)))
+                if engine.circuit_state == "OPEN" or engine.waf_detected:
+                    engine.ratelimit()
 
         hooks_list = session.hooks.setdefault("response", [])
         if isinstance(hooks_list, list) and not any(getattr(h, "__name__", "") == "_count_hook" for h in hooks_list):
@@ -189,11 +201,20 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
             logger.warning("  Error en %s: %s", name, e)
             return []
 
+    parsed_host = urlparse(page_url)
+    host_origin = f"{parsed_host.scheme}://{parsed_host.netloc}"
+    is_first_host_scan = True
+    if engine is not None:
+        with engine._lock:
+            if host_origin in engine._scanned_hosts:
+                is_first_host_scan = False
+            else:
+                engine._scanned_hosts.add(host_origin)
+
     tasks: list[tuple[Any, ...]] = [
         ("Headers", "headers", check_headers, response),
         ("HTTPS", "ssl", check_https, page_url, response),
         ("Cookies", "cookies", check_cookies, response),
-        ("Directorios expuestos", "directories", check_directories, page_url, session),
         ("XSS reflejado", "xss", check_xss, page_url, None, session, passive),
         ("DOM-based XSS", "dom_xss", check_dom_xss, page_url, dom_html),
         ("Formularios y CSRF", "forms", check_forms, page_url, dom_html, session, passive),
@@ -206,13 +227,18 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
         ("JWT Attacks", "jwt", check_jwt_attacks, page_url, dom_html, session),
         ("File Upload", "file_upload", check_file_upload, page_url, dom_html, session),
         ("Prototype Pollution", "prototype_pollution", check_prototype_pollution, page_url, dom_html, session),
-        ("GraphQL", "graphql", check_graphql, page_url, session),
         ("WebSocket", "websocket", check_websocket, page_url, dom_html, session),
-        ("Plantillas Declarativas DSL", "template_dsl", check_declarative_templates, page_url, session),
         ("Seguridad de APIs (BOLA/BFLA)", "api_bola", check_api_security, page_url, session, passive),
-        ("Artefactos de Nube y Backups", "sensitive_data", check_exposed_artifacts, page_url, dom_html, session, passive),
         ("IA en parámetros", "ai", check_with_ai, page_url),
     ]
+
+    if is_first_host_scan:
+        tasks.extend([
+            ("Directorios expuestos", "directories", check_directories, host_origin, session),
+            ("GraphQL", "graphql", check_graphql, host_origin, session),
+            ("Plantillas Declarativas DSL", "template_dsl", check_declarative_templates, host_origin, session),
+            ("Artefactos de Nube y Backups", "sensitive_data", check_exposed_artifacts, page_url, dom_html, session, passive),
+        ])
 
     if not passive:
         tasks.append(("SQL Injection", "sqli", check_sqli, page_url, session))
@@ -444,11 +470,14 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
             waf_detector = WAFDetector(session=session)
             waf_res = waf_detector.detect(url)
             if waf_res.detected:
-                engine.waf_detected = True
+                engine.activate_waf_pacing()
                 waf_finding = waf_detector.to_finding(url, waf_res)
                 if waf_finding:
                     all_findings.append(waf_finding)
-                logger.info("[WAF] %s detectado (%s). Activando rate limiting adaptativo.", waf_res.waf_name, waf_res.evidence)
+                logger.info(
+                    "[WAF] %s detectado (%s). Activando rate limiting adaptativo (RPS=%.1f, workers=%d).",
+                    waf_res.waf_name, waf_res.evidence, engine.current_rps, engine.config.max_workers
+                )
         except Exception as e:
             logger.debug("Error detectando WAF: %s", e)
 

@@ -153,7 +153,7 @@ def check_directories(base_url: str, session: Optional[requests.Session] = None)
     except requests.RequestException:
         pass
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {
             executor.submit(
                 check_single_directory,

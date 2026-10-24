@@ -158,7 +158,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
                         help="Ruta donde exportar el reporte en estándar OASIS SARIF v2.1.0 para GitHub Code Scanning")
     parser.add_argument("--compliance", action="store_true",
                         help="Evalúa el cumplimiento normativo automático contra PCI-DSS v4.0, HIPAA, NIST SP 800-53 e ISO 27001")
-    parser.add_argument("--export-waf", type=str, default=None, choices=["modsecurity", "aws_waf", "cloudflare", "nginx", "all"],
+    parser.add_argument("--export-waf", "--waf-export", dest="export_waf", type=str, default=None, choices=["modsecurity", "aws_waf", "cloudflare", "nginx", "all"],
                         help="Exporta reglas defensivas de mitigación inmediata (Virtual Patching) para WAF")
     parser.add_argument("--waf-output", type=str, default=None, metavar="FILE",
                         help="Ruta de archivo donde guardar las reglas WAF generadas")

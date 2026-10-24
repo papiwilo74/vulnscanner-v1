@@ -116,6 +116,7 @@ class ScanEngine:
         self._cancelled = threading.Event()
         self._start_time: float = 0.0
         self._seen_urls: set[str] = set()
+        self._scanned_hosts: set[str] = set()
         self._request_log: list[dict[str, Any]] = []
         self._ratelimit_window_start: float = time.monotonic()
         self._ratelimit_count: int = 0
@@ -208,6 +209,7 @@ class ScanEngine:
         self._request_count = 0
         self._start_time = time.time()
         self._seen_urls.clear()
+        self._scanned_hosts.clear()
         self._request_log.clear()
         self._validate_target()
 
@@ -242,6 +244,13 @@ class ScanEngine:
                 return False
         return True
 
+    def activate_waf_pacing(self) -> None:
+        """Reduce la concurrencia y tasa de peticiones cuando se detecta un WAF activo (ej. Cloudflare)."""
+        with self._lock:
+            self.waf_detected = True
+            self._current_rps = min(self._current_rps, 4.0)
+            self.config.max_workers = min(self.config.max_workers, 4)
+
     def handle_response(self, status: Optional[int], headers: Optional[dict[str, Any]] = None) -> None:
         """Adapta el ritmo de peticiones segun codigos de estado del servidor o WAF."""
         if not self.adaptive_rate_limiting or status is None:
@@ -250,6 +259,9 @@ class ScanEngine:
         now = time.monotonic()
         with self._lock:
             if status in (429, 503):
+                # Evitar inundar el log por peticiones concurrentes en vuelo cuando el circuito ya está abierto
+                if self._circuit_state == "OPEN" and now < self._circuit_open_until:
+                    return
                 self._consecutive_throttles += 1
                 backoff = min(10.0, 1.5 * (2 ** (self._consecutive_throttles - 1)))
                 self._circuit_state = "OPEN"
