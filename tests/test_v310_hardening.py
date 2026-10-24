@@ -254,3 +254,74 @@ def test_cors_wildcard_public_html_vs_api() -> None:
     assert api_findings[0]["vuln"] == "CORS Abierto (Comodín)"
 
 
+def test_enterprise_poe_sqli_mathematical_evaluation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifica que el motor PoE detecte evaluación aritmética en SQL y genere prueba matemática con 100% certeza."""
+    from urllib.parse import parse_qs, urlparse
+
+    from scanner import sqli
+
+    monkeypatch.setattr(sqli.random, "randint", lambda a, b: 50000 if a > 1000 else 123)
+
+    mock_session = MagicMock()
+    calc_resp = MagicMock()
+    calc_resp.status_code = 200
+    calc_resp.text = "<html><body>Resultado de búsqueda para usuario: ID 100000 - Saldo: $500</body></html>"
+
+    def _mock_get(url: str, *args: Any, **kwargs: Any) -> Any:
+        # Si la URL contiene una expresión que evalúa a 50000 + 50000 = 100000
+        if "50000" in url:
+            return calc_resp
+        default_resp = MagicMock()
+        default_resp.status_code = 200
+        default_resp.text = "<html><body>No se encontraron resultados</body></html>"
+        return default_resp
+
+    mock_session.get.side_effect = _mock_get
+
+    target_url = "https://app.example.com/search?id=1"
+    parsed = urlparse(target_url)
+    params = parse_qs(parsed.query)
+
+    finding = sqli.test_poe_sqli(parsed, params, "id", baseline_body="<html><body>Inicio</body></html>", session=mock_session)
+    assert finding is not None
+    assert "Prueba de Explotación (PoE)" in finding["vuln"]
+    assert "100000" in finding["detail"]
+    assert "proof_of_exploit" in finding
+
+
+def test_enterprise_xss_context_awareness_and_suppression() -> None:
+    """Verifica que reflexiones en comentarios o literales escapados se descarten, y se identifique el contexto real."""
+    from urllib.parse import parse_qs, urlparse
+
+    from scanner.xss import test_xss_payload
+
+    mock_session = MagicMock()
+
+    # Caso 1: Reflejado solo dentro de comentario HTML <!-- ... --> -> Falso positivo suprimido
+    comment_resp = MagicMock()
+    comment_resp.status_code = 200
+    comment_resp.headers = {"Content-Type": "text/html"}
+    comment_resp.text = "<html><body><!-- Busqueda de usuario: <script>alert(1)</script> --></body></html>"
+    mock_session.get.return_value = comment_resp
+
+    parsed = urlparse("https://app.example.com/search?q=test")
+    params = parse_qs(parsed.query)
+
+    res_comment = test_xss_payload(parsed, params, "q", "<script>alert(1)</script>", baseline_text="<html></html>", session=mock_session)
+    assert res_comment is None
+
+    # Caso 2: Reflejado ejecutable en el DOM -> Confirmado con contexto
+    dom_resp = MagicMock()
+    dom_resp.status_code = 200
+    dom_resp.headers = {"Content-Type": "text/html"}
+    dom_resp.text = "<html><body>Resultados para: <script>alert(1)</script></body></html>"
+    mock_session.get.return_value = dom_resp
+
+    res_dom = test_xss_payload(parsed, params, "q", "<script>alert(1)</script>", baseline_text="<html></html>", session=mock_session)
+    assert res_dom is not None
+    assert "XSS reflejado" in res_dom["vuln"]
+    assert "HTML_BODY" in res_dom["detail"]
+    assert "proof_of_exploit" in res_dom
+
+
+

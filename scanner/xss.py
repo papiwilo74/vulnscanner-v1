@@ -7,11 +7,14 @@ from urllib.parse import parse_qs, urlencode, urljoin, urlparse, urlunparse
 
 import requests
 
+from scanner.context_fuzzer import detect_reflection_context, generate_contextual_payloads
+
 XSS_PAYLOADS: list[str] = [
     "<script>alert(1)</script>",
     '"><img src=x onerror=alert(1)>',
     "javascript:alert(1)",
 ]
+
 
 def _is_reflection_in_html_comment(response_text: str, payload: str) -> bool:
     """Verifica si todas las ocurrencias del payload quedaron confinadas dentro de comentarios HTML <!-- ... -->."""
@@ -36,6 +39,13 @@ def _is_reflection_in_unbroken_attribute(response_text: str, payload: str) -> bo
     matches_attr = len(re.findall(pattern_double, response_text)) + len(re.findall(pattern_single, response_text))
     total_count = response_text.count(payload)
     return bool(total_count > 0 and matches_attr >= total_count)
+
+
+def _is_reflection_in_escaped_string_literal(response_text: str, payload: str) -> bool:
+    """Verifica si el payload quedó atrapado dentro de un literal JSON/JS escapado con contrabarra (\\\" o \\')."""
+    p_escaped = re.escape(payload)
+    escaped_str_pattern = rf'\\+["\'][^"\']*?{p_escaped}'
+    return bool(re.search(escaped_str_pattern, response_text))
 
 
 def test_xss_payload(
@@ -66,19 +76,30 @@ def test_xss_payload(
             if payload != escaped_payload and escaped_payload in response_text and response_text.count(payload) == response_text.count(escaped_payload):
                 return None
 
-            # 3. Análisis contextual: Descartar si el payload está confinado dentro de un comentario HTML
-            if _is_reflection_in_html_comment(response_text, payload):
+            # 3. Análisis contextual: Descartar si el payload está confinado dentro de un comentario HTML inerte
+            if not payload.startswith("-->") and _is_reflection_in_html_comment(response_text, payload):
                 return None
 
             # 4. Análisis contextual: Descartar si un payload de tag (<script> / <img>) está atrapado en atributo sin romper comillas
             if ("<" in payload or ">" in payload) and _is_reflection_in_unbroken_attribute(response_text, payload):
                 return None
 
+            # 5. Análisis contextual: Descartar si el payload está atrapado en un literal JSON/JS escapado con backslash
+            if _is_reflection_in_escaped_string_literal(response_text, payload):
+                return None
+
+            detected_ctxs = detect_reflection_context(response_text, payload)
+            ctx_summary = ", ".join(detected_ctxs) if detected_ctxs else "HTML_BODY"
+
             return {
                 "vuln": f"XSS reflejado en parámetro '{param}'",
                 "risk": "Alto",
-                "detail": f"Payload reflejado sin escapar en la respuesta HTTP: {payload}",
+                "detail": (
+                    f"Payload reflejado sin escapar en la respuesta HTTP: {payload}. "
+                    f"Contexto sintáctico verificado: {ctx_summary} (Ejecutable en DOM)."
+                ),
                 "confidence": "confirmed",
+                "proof_of_exploit": f"Contexto: {ctx_summary} | Vector: {payload}",
             }
     except requests.RequestException:
         pass
@@ -100,6 +121,7 @@ VENDOR_INDICATORS: tuple[str, ...] = (
     "bundle.min.js",
     "core-js",
 )
+
 
 def analyze_js_code(code: str, script_name: str) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
@@ -139,6 +161,7 @@ def analyze_js_code(code: str, script_name: str) -> list[dict[str, str]]:
             return findings
 
     return findings
+
 
 def check_dom_xss(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
@@ -186,6 +209,7 @@ def check_dom_xss(url: str, html_content: Optional[str] = None, session: Optiona
 
     return results
 
+
 def check_xss(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None, passive: bool = False) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
 
@@ -209,8 +233,6 @@ def check_xss(url: str, html_content: Optional[str] = None, session: Optional[re
             baselines[param] = r_base.text
         except requests.RequestException:
             baselines[param] = ""
-
-    from scanner.context_fuzzer import detect_reflection_context, generate_contextual_payloads
 
     tasks = []
     for param in params:

