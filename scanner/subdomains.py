@@ -41,10 +41,27 @@ def _is_platform_error_page(text: str) -> bool:
     return stripped in ("not found", "404: not_found", "404 not found")
 
 
-def _verify_subdomain(target: str, scheme: str, main_html_hash: int) -> Optional[dict[str, str]]:
+def _detect_wildcard_dns(domain: str) -> set[str]:
+    """Sondea subdominios inexistentes aleatorios para detectar registros DNS Wildcard (*.dominio)."""
+    wildcard_ips: set[str] = set()
+    for probe in (f"omnibreach-wc-probe-91827.{domain}", f"nonexistent-dns-check-4419.{domain}"):
+        ip = _resolve_dns(probe)
+        if ip:
+            wildcard_ips.add(ip)
+    return wildcard_ips
+
+
+def _verify_subdomain(
+    target: str,
+    scheme: str,
+    main_html_hash: int,
+    wildcard_ips: Optional[set[str]] = None,
+) -> Optional[dict[str, str]]:
     ip = _resolve_dns(target)
     if ip is None:
         return None
+
+    is_wildcard_ip = bool(wildcard_ips and ip in wildcard_ips)
 
     schemes = [scheme] if scheme == "https" else [scheme, "https"]
     for try_scheme in schemes:
@@ -63,6 +80,11 @@ def _verify_subdomain(target: str, scheme: str, main_html_hash: int) -> Optional
                 }
         except requests.RequestException:
             continue
+
+    # Si la IP pertenece a un DNS Wildcard (ej. *.onrender.com, *.vercel.app) y no respondió HTTP válido,
+    # descartar para evitar falsos positivos por resolución comodín.
+    if is_wildcard_ip:
+        return None
 
     return {
         "vuln": "Subdominio Activo Descubierto (DNS)",
@@ -86,6 +108,8 @@ def check_subdomains(url: str) -> list[dict[str, str]]:
 
     domain = hostname
     print(f"  Buscando subdominios activos para el dominio base: {domain}...")
+
+    wildcard_ips = _detect_wildcard_dns(domain)
 
     main_html_hash = 0
     try:
@@ -114,7 +138,7 @@ def check_subdomains(url: str) -> list[dict[str, str]]:
             http_futures: dict[Any, str] = {}
             for sub, _ in dns_found:
                 target = f"{sub}.{domain}"
-                http_futures[executor.submit(_verify_subdomain, target, scheme, main_html_hash)] = target
+                http_futures[executor.submit(_verify_subdomain, target, scheme, main_html_hash, wildcard_ips)] = target
             for future in as_completed(http_futures):
                 res = future.result()
                 if res and isinstance(res, dict):

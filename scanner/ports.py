@@ -21,6 +21,7 @@ PORTS_TO_SCAN: dict[int, tuple[str, str, str]] = {
     27017: ("MongoDB", "Base de datos NoSQL MongoDB", "Alto")
 }
 
+
 def check_single_port(ip: str, port: int, name: str, service: str, risk: str) -> Optional[dict[str, str]]:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -77,8 +78,24 @@ def check_single_port(ip: str, port: int, name: str, service: str, risk: str) ->
                             return None
                     except (OSError, socket.timeout):
                         return None
+                elif port == 8080:  # HTTP-Alt (descartar proxies CDN/Cloudflare Anycast sin backend real)
+                    s.settimeout(1.2)
+                    try:
+                        if hasattr(s, "sendall"):
+                            s.sendall(f"HEAD / HTTP/1.0\r\nHost: {ip}\r\nUser-Agent: OmniBreach/3.10\r\n\r\n".encode())
+                        banner = s.recv(512)
+                        banner_lower = banner.decode("latin-1", errors="ignore").lower()
+                        if not banner_lower.startswith("http/"):
+                            return None
+                        first_line = banner_lower.splitlines()[0] if banner_lower else ""
+                        if "server: cloudflare" in banner_lower or "cf-ray:" in banner_lower:
+                            return None
+                        if any(code in first_line for code in (" 400 ", " 403 ", " 404 ", " 502 ", " 503 ", " 521 ", " 522 ")):
+                            return None
+                    except (OSError, socket.timeout):
+                        return None
 
-                is_banner_confirmed = port in (21, 22, 25, 110, 143, 3306)
+                is_banner_confirmed = port in (21, 22, 25, 110, 143, 3306, 8080)
                 return {
                     "vuln": f"Puerto expuesto públicamente: {port} ({name})",
                     "risk": risk,

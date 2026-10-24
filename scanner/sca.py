@@ -1,3 +1,5 @@
+import hashlib
+import json
 import re
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -178,6 +180,60 @@ def check_library_vulnerabilities(
     return findings
 
 
+def _check_js_sourcemap(
+    js_url: str,
+    js_text: str,
+    session: Optional[requests.Session] = None,
+) -> Optional[dict[str, str]]:
+    """
+    Inspecciona si un bundle JavaScript expone un archivo Source Map v3 (.js.map)
+    en producción (patrón REA runtime-observation / inspect_artifact).
+    Valida estructura JSON real (version == 3 y lista 'sources') y calcula digest SHA-256
+    para descartar Soft-404 HTML.
+    """
+    client = session if session is not None else requests
+    m = re.search(r"//[#@]\s*sourceMappingURL=([^\s'\"<>]+)", js_text)
+    if m:
+        raw_ref = m.group(1).strip()
+        if raw_ref.startswith("data:"):
+            return None
+        map_url = urljoin(js_url, raw_ref)
+    elif js_url.lower().endswith(".js"):
+        map_url = f"{js_url}.map"
+    else:
+        return None
+
+    try:
+        map_res = client.get(map_url, timeout=5)
+        if map_res.status_code != 200:
+            return None
+        ctype = map_res.headers.get("Content-Type", "").lower()
+        if "text/html" in ctype or map_res.text.lstrip().startswith("<"):
+            return None
+        data = json.loads(map_res.text)
+        if not isinstance(data, dict) or data.get("version") != 3:
+            return None
+        sources = data.get("sources")
+        if not isinstance(sources, list) or not sources:
+            return None
+
+        sha256_digest = hashlib.sha256(map_res.content).hexdigest()[:16]
+        sample_sources = ", ".join(str(s) for s in sources[:5])
+        return {
+            "vuln": f"Source Map JavaScript Expuesto en Producción ({urlparse(map_url).path})",
+            "risk": "Bajo",
+            "detail": (
+                f"El bundle JS expone un Source Map v3 válido en {map_url} "
+                f"(SHA-256: {sha256_digest}..., {len(sources)} archivos fuente reconstruibles: {sample_sources}). "
+                "Permite reconstruir el árbol de código fuente original del frontend."
+            ),
+            "confidence": "confirmed",
+        }
+    except (requests.RequestException, ValueError, TypeError):
+        return None
+
+
+
 def check_sca(url: str, html_content: Optional[str] = None, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     """
     Analiza el HTML y los archivos JS de la página para detectar librerías
@@ -239,6 +295,9 @@ def check_sca(url: str, html_content: Optional[str] = None, session: Optional[re
                             m = re.search(content_pattern, js_text, re.IGNORECASE)
                             if m:
                                 detected_libs[lib_name] = m.group(1)
+                    smap_finding = _check_js_sourcemap(abs_src, js_text, session=session)
+                    if smap_finding:
+                        results.append(smap_finding)
             except requests.RequestException:
                 pass
 

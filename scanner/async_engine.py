@@ -324,16 +324,20 @@ async def check_cors_async(engine: AsyncScanEngine, url: str) -> list[Finding]:
             remediation="Restringir los orígenes autorizados mediante una lista blanca explícita de dominios confiables.",
         ))
     elif acao == "*":
-        findings.append(Finding(
-            category="cors",
-            title="CORS Permisivo con Origen Wildcard (*)",
-            severity="low",
-            confidence="confirmed",
-            description="La cabecera 'Access-Control-Allow-Origin: *' permite la lectura de este recurso desde cualquier sitio web.",
-            affected_url=url,
-            evidence=Evidence(request_method="GET", request_url=url, response_status=resp.status_code),
-            remediation="Verificar si la información contenida en el endpoint es pública; en caso contrario, restringir el origen.",
-        ))
+        ctype = resp.headers.get("content-type", "").lower()
+        path_lower = urlparse(url).path.lower()
+        is_api_route = any(h in path_lower for h in ("/api", "/graphql", "/rest", "/v1", "/v2", ".json", ".xml"))
+        if is_api_route or "text/html" not in ctype:
+            findings.append(Finding(
+                category="cors",
+                title="CORS Abierto (Comodín)",
+                severity="low",
+                confidence="confirmed",
+                description="La cabecera 'Access-Control-Allow-Origin: *' permite la lectura de este recurso desde cualquier sitio web.",
+                affected_url=url,
+                evidence=Evidence(request_method="GET", request_url=url, response_status=resp.status_code),
+                remediation="Verificar si la información contenida en el endpoint es pública; en caso contrario, restringir el origen.",
+            ))
 
     return findings
 

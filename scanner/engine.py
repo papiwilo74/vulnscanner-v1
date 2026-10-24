@@ -2,13 +2,14 @@
 import contextlib
 import ipaddress
 import logging
+import re
 import socket
 import threading
 import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlparse
 
 import requests
 
@@ -303,10 +304,36 @@ class ScanEngine:
                     self._ratelimit_window_start = time.monotonic()
                     self._ratelimit_count = 1
 
+    _UUID_SEGMENT_RE = re.compile(
+        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    )
+    _INT_SEGMENT_RE = re.compile(r"^\d+$")
+
     def normalize_url(self, url: str) -> str:
-        """Normaliza una URL para comparacion de equivalencia."""
+        """Normaliza una URL colapsando segmentos paramétricos REST (/{int}, /{uuid}) y ordenando claves query (patrón REA api-surface)."""
         parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/') or '/'}"
+        raw_path = parsed.path.rstrip("/") or "/"
+        if raw_path != "/":
+            norm_segments: list[str] = []
+            for seg in raw_path.split("/"):
+                if not seg:
+                    norm_segments.append("")
+                elif self._INT_SEGMENT_RE.match(seg):
+                    norm_segments.append("{int}")
+                elif self._UUID_SEGMENT_RE.match(seg):
+                    norm_segments.append("{uuid}")
+                else:
+                    norm_segments.append(seg)
+            norm_path = "/".join(norm_segments) or "/"
+        else:
+            norm_path = "/"
+
+        base = f"{parsed.scheme}://{parsed.netloc}{norm_path}"
+        if parsed.query:
+            q_keys = sorted({k for k, _ in parse_qsl(parsed.query, keep_blank_values=True)})
+            if q_keys:
+                return f"{base}?{'&'.join(q_keys)}"
+        return base
 
     def is_duplicate(self, url: str) -> bool:
         norm = self.normalize_url(url)

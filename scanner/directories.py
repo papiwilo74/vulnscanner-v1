@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import re
 from typing import Optional
 
 import requests
@@ -22,10 +23,22 @@ SPA_SIGNATURES = [
     "window.__NEXT_DATA__",
 ]
 
+
 def is_spa_fallback(response: requests.Response) -> bool:
     """Detecta si la respuesta es el index.html de un SPA (React, Vue, Next...)"""
     body = response.text.lower()
     return any(sig.lower() in body for sig in SPA_SIGNATURES)
+
+
+def _dom_skeleton_sig(html: str) -> str:
+    """
+    Extrae la firma estructural de etiquetas HTML (DOM Tag Skeleton)
+    para detectar páginas Soft-404 que inyectan nonces/timestamps dinámicos
+    o reflejan la ruta solicitada en los primeros 300 caracteres (patrón Invicti/Burp).
+    """
+    tags = re.findall(r"<(/?[a-zA-Z0-9]+)", html[:4096])
+    return ">".join(t.lower() for t in tags[:40])
+
 
 def check_single_directory(
     base_url: str,
@@ -36,6 +49,7 @@ def check_single_directory(
     baseline_body_sig: str = "",
     baseline_len: int = 0,
     is_soft_404: bool = False,
+    baseline_skeleton_sig: str = "",
 ) -> Optional[dict[str, str]]:
     try:
         url = base_url.rstrip("/") + path
@@ -52,11 +66,18 @@ def check_single_directory(
                 return None
             if r.text[:300].lower() == baseline_body_sig:
                 return None
+            if baseline_skeleton_sig and _dom_skeleton_sig(r.text) == baseline_skeleton_sig:
+                return None
 
         if baseline_status is not None and status == baseline_status:
             if status == 200:
                 len_diff = abs(len(r.text) - baseline_len)
-                if len_diff < max(len(path) + 40, 100) or r.text[:300].lower() == baseline_body_sig or is_spa_fallback(r):
+                if (
+                    len_diff < max(len(path) + 40, 100)
+                    or r.text[:300].lower() == baseline_body_sig
+                    or is_spa_fallback(r)
+                    or (baseline_skeleton_sig and _dom_skeleton_sig(r.text) == baseline_skeleton_sig)
+                ):
                     return None
             elif status in (301, 302):
                 if r.headers.get("Location", "") == baseline_location:
@@ -110,6 +131,7 @@ def check_single_directory(
         pass
     return None
 
+
 def check_directories(base_url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
     client = session if session is not None else requests
@@ -119,12 +141,14 @@ def check_directories(base_url: str, session: Optional[requests.Session] = None)
     baseline_body_sig = ""
     baseline_len = 0
     is_soft_404 = False
+    baseline_skeleton_sig = ""
     try:
         r_fake = client.get(base_url.rstrip("/") + "/_soft404_canary_test_999_xyz.html", timeout=5, allow_redirects=False)
         baseline_status = r_fake.status_code
         baseline_location = r_fake.headers.get("Location", "")
         baseline_body_sig = r_fake.text[:300].lower()
         baseline_len = len(r_fake.text)
+        baseline_skeleton_sig = _dom_skeleton_sig(r_fake.text)
         is_soft_404 = bool(baseline_status == 200 or is_spa_fallback(r_fake))
     except requests.RequestException:
         pass
@@ -141,6 +165,7 @@ def check_directories(base_url: str, session: Optional[requests.Session] = None)
                 baseline_body_sig,
                 baseline_len,
                 is_soft_404,
+                baseline_skeleton_sig,
             ): path
             for path in COMMON_PATHS
         }
@@ -150,4 +175,3 @@ def check_directories(base_url: str, session: Optional[requests.Session] = None)
                 results.append(res)
 
     return results
-

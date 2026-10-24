@@ -8,6 +8,21 @@ STATIC_EXTENSIONS = (
     ".ico", ".woff", ".woff2", ".ttf", ".eot", ".map", ".webp", ".mp4"
 )
 
+API_PATH_HINTS = ("/api", "/graphql", "/rest", "/v1", "/v2", "/v3", ".json", ".xml")
+
+
+def _is_public_html_landing(url: str, response: requests.Response) -> bool:
+    """
+    Determina si la respuesta corresponde a una página HTML pública (no un endpoint de API),
+    donde Access-Control-Allow-Origin: * sin credenciales es un encabezado estándar de CDN/PaaS
+    y no permite lectura autenticada según W3C Fetch Specification.
+    """
+    path_lower = urlparse(url).path.lower()
+    if any(hint in path_lower for hint in API_PATH_HINTS):
+        return False
+    ctype = (response.headers.get("Content-Type") or response.headers.get("content-type") or "").lower()
+    return "text/html" in ctype
+
 
 def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dict[str, str]]:
     """
@@ -77,8 +92,8 @@ def check_cors(url: str, session: Optional[requests.Session] = None) -> list[dic
                         "confidence": "confirmed",
                     })
                     break
-                elif not is_static:
-                    # Omitir alerta en recursos estáticos públicos donde '*' es el estándar de CDNs
+                elif not is_static and not _is_public_html_landing(url, r):
+                    # Omitir alerta en recursos estáticos o páginas HTML públicas donde '*' sin credenciales es el estándar de CDNs
                     results.append({
                         "vuln": "CORS Abierto (Comodín)",
                         "risk": "Bajo",
