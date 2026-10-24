@@ -299,14 +299,14 @@ class ScanEngine:
             return
 
         now = time.monotonic()
+        sleep_duration = 0.0
+
         with self._lock:
-            # Si el circuito esta abierto debido a throttling reciente, esperar el enfriamiento
             if self._circuit_state == "OPEN":
                 if now < self._circuit_open_until:
-                    wait_time = self._circuit_open_until - now
-                    time.sleep(wait_time)
-                    now = time.monotonic()
-                self._circuit_state = "HALF-OPEN"
+                    sleep_duration = max(sleep_duration, self._circuit_open_until - now)
+                else:
+                    self._circuit_state = "HALF-OPEN"
 
             elapsed = now - self._ratelimit_window_start
             if elapsed >= 1.0:
@@ -314,11 +314,13 @@ class ScanEngine:
                 self._ratelimit_count = 0
             self._ratelimit_count += 1
             if self._ratelimit_count > target_rps:
-                sleep_time = (1.0 / target_rps) if target_rps > 0 else 0.1
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-                    self._ratelimit_window_start = time.monotonic()
-                    self._ratelimit_count = 1
+                throttle_delay = (1.0 / target_rps) if target_rps > 0 else 0.1
+                sleep_duration = max(sleep_duration, throttle_delay)
+                self._ratelimit_window_start = time.monotonic()
+                self._ratelimit_count = 1
+
+        if sleep_duration > 0:
+            time.sleep(min(sleep_duration, 10.0))
 
     _UUID_SEGMENT_RE = re.compile(
         r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
