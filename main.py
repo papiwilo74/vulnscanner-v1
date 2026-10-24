@@ -186,21 +186,6 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
     # Detección de Stack Tecnológico para Auto-Fix
     detected_tech = TechFingerprinter.detect_stack(resp_headers, dom_html, dict(response.cookies))
 
-    def _task(name: str, category: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> list[Finding]:
-        if engine and not engine.check_limits():
-            return []
-        if engine:
-            engine.ratelimit()
-        try:
-            logger.info("  %s...", name)
-            raw = fn(*args, **kwargs)
-            if raw and isinstance(raw[0], Finding):
-                return [r for r in raw if isinstance(r, Finding)]
-            return _legacy_to_findings(raw, category, page_url)
-        except Exception as e:
-            logger.warning("  Error en %s: %s", name, e)
-            return []
-
     parsed_host = urlparse(page_url)
     host_origin = f"{parsed_host.scheme}://{parsed_host.netloc}"
     is_first_host_scan = True
@@ -211,6 +196,22 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
             else:
                 engine._scanned_hosts.add(host_origin)
 
+    def _task(name: str, category: str, fn: Callable[..., Any], *args: Any, **kwargs: Any) -> list[Finding]:
+        if engine and not engine.check_limits():
+            return []
+        if engine:
+            engine.ratelimit()
+        try:
+            if is_first_host_scan:
+                logger.info("  %s...", name)
+            raw = fn(*args, **kwargs)
+            if raw and isinstance(raw[0], Finding):
+                return [r for r in raw if isinstance(r, Finding)]
+            return _legacy_to_findings(raw, category, page_url)
+        except Exception as e:
+            logger.warning("  Error en %s: %s", name, e)
+            return []
+
     tasks: list[tuple[Any, ...]] = [
         ("Headers", "headers", check_headers, response),
         ("HTTPS", "ssl", check_https, page_url, response),
@@ -218,9 +219,7 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
         ("XSS reflejado", "xss", check_xss, page_url, None, session, passive),
         ("DOM-based XSS", "dom_xss", check_dom_xss, page_url, dom_html),
         ("Formularios y CSRF", "forms", check_forms, page_url, dom_html, session, passive),
-        ("CORS", "cors", check_cors, page_url, session),
         ("Datos sensibles", "sensitive_data", check_sensitive_data, page_url, dom_html, session),
-        ("SCA", "sca", check_sca, page_url, dom_html, session),
         ("Path Traversal", "path_traversal", check_path_traversal, page_url, session),
         ("XXE", "xxe", check_xxe, page_url, dom_html, session, getattr(engine, "oast_client", None)),
         ("Open Redirect", "open_redirect", check_open_redirect, page_url, session),
@@ -234,6 +233,8 @@ def _scan_single_page(page_url: str, cookie_str: Optional[str] = None, auth_head
 
     if is_first_host_scan:
         tasks.extend([
+            ("CORS", "cors", check_cors, page_url, session),
+            ("SCA", "sca", check_sca, page_url, dom_html, session),
             ("Directorios expuestos", "directories", check_directories, host_origin, session),
             ("GraphQL", "graphql", check_graphql, host_origin, session),
             ("Plantillas Declarativas DSL", "template_dsl", check_declarative_templates, host_origin, session),
@@ -577,41 +578,31 @@ def scan(url: str, no_open: bool = False, cookie_str: Optional[str] = None,
 
             from scanner.async_engine import AsyncReactivePipeline
 
-            async def _run_async_batch() -> tuple[list[Finding], list[Any], int]:
-                pipeline = AsyncReactivePipeline(config, num_workers=min(8, max(2, config.max_workers)))
+            async def _run_async_batch() -> tuple[list[Finding], int]:
+                pipeline = AsyncReactivePipeline(config, num_workers=min(6, max(2, config.max_workers)))
                 reactive_findings = await pipeline.run_full_scan(url)
-                loop = asyncio.get_running_loop()
-                tasks = [loop.run_in_executor(None, scan_func, u) for u in target_urls]
-                res = await asyncio.gather(*tasks, return_exceptions=True)
-                return reactive_findings, list(res), pipeline.stats.requests_count
+                return reactive_findings, pipeline.stats.requests_count
 
             try:
-                reactive_findings, batch_res, async_reqs = asyncio.run(_run_async_batch())
+                reactive_findings, async_reqs = asyncio.run(_run_async_batch())
                 for _ in range(async_reqs):
                     engine.record_request(url, "ASYNC")
                 all_findings.extend(reactive_findings)
-                for res in batch_res:
-                    if isinstance(res, tuple):
-                        page_findings, p_headers, p_html = res
-                        all_findings += page_findings
-                        stack = TechFingerprinter.detect_stack(p_headers, p_html)
-                        global_tech_stack.update(stack)
             except Exception as e:
                 logger.warning("Error en despachador asíncrono: %s", e)
-        else:
-            max_workers = min(len(target_urls), config.max_workers)
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(scan_func, u): u for u in target_urls}
-                for future in as_completed(futures):
-                    try:
-                        page_findings, p_headers, p_html = future.result()
-                        all_findings += page_findings
-                        stack = TechFingerprinter.detect_stack(p_headers, p_html)
-                        global_tech_stack.update(stack)
-                    except Exception as e:
-                        logger.warning("Error escaneando %s: %s", futures[future], e)
-                    if engine.is_cancelled:
-                        break
+
+        for idx, u in enumerate(target_urls, 1):
+            if engine.is_cancelled or not engine.check_limits():
+                break
+            if idx > 1:
+                logger.info("  [Página %d/%d] Auditando ruta descubierta: %s", idx, len(target_urls), u)
+            try:
+                page_findings, p_headers, p_html = scan_func(u)
+                all_findings += page_findings
+                stack = TechFingerprinter.detect_stack(p_headers, p_html)
+                global_tech_stack.update(stack)
+            except Exception as e:
+                logger.warning("Error escaneando %s: %s", u, e)
 
     # Consolidación y Auto-Fix final
     all_findings = deduplicate_findings(all_findings)

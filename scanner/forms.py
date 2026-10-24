@@ -263,7 +263,6 @@ def check_forms(url: str, html_content: Optional[str] = None, session: Optional[
     if not html_content:
         return results
 
-    print("Extrayendo formularios de la pagina...")
     forms = extract_forms(url, html_content)
 
     if not forms:

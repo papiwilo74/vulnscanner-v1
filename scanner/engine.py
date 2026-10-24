@@ -38,7 +38,7 @@ PROFILE_CONFIG: dict[ScanProfile, dict[str, Any]] = {
     },
     ScanProfile.NORMAL: {
         "max_rps": 10,
-        "max_total_requests": 1000,
+        "max_total_requests": 2500,
         "timeout": 10,
         "active_payloads": True,
         "max_crawl_depth": 3,
@@ -117,6 +117,7 @@ class ScanEngine:
         self._start_time: float = 0.0
         self._seen_urls: set[str] = set()
         self._scanned_hosts: set[str] = set()
+        self._limit_warned: bool = False
         self._request_log: list[dict[str, Any]] = []
         self._ratelimit_window_start: float = time.monotonic()
         self._ratelimit_count: int = 0
@@ -210,6 +211,7 @@ class ScanEngine:
         self._start_time = time.time()
         self._seen_urls.clear()
         self._scanned_hosts.clear()
+        self._limit_warned = False
         self._request_log.clear()
         self._validate_target()
 
@@ -240,7 +242,9 @@ class ScanEngine:
             return False
         with self._lock:
             if self._request_count >= self.config.max_total_requests:
-                log.warning("Limite global de %d requests alcanzado", self.config.max_total_requests)
+                if not self._limit_warned:
+                    self._limit_warned = True
+                    log.warning("Limite global de %d requests alcanzado", self.config.max_total_requests)
                 return False
         return True
 
