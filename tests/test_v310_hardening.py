@@ -324,4 +324,72 @@ def test_enterprise_xss_context_awareness_and_suppression() -> None:
     assert "proof_of_exploit" in res_dom
 
 
+def test_bfla_spa_html_fallback_suppression() -> None:
+    """Verifica que rutas admin que devuelven HTML de SPA (200 OK) no se marquen como BFLA, pero JSON sí."""
+    from scanner.api_security import check_bfla
+
+    mock_session = MagicMock()
+
+    # Caso A: Endpoint administrativo /admin/users devuelve HTML de SPA con 200 -> Suprimido
+    spa_resp = MagicMock()
+    spa_resp.status_code = 200
+    spa_resp.headers = {"Content-Type": "text/html; charset=utf-8"}
+    spa_resp.text = "<!doctype html><html><body><div id='root'>SPA Admin UI</div></body></html>"
+    mock_session.get.return_value = spa_resp
+
+    finding_spa = check_bfla("https://app.example.com/api/v1/admin/users", unprivileged_session=mock_session)
+    assert finding_spa is None
+
+    # Caso B: Endpoint administrativo devuelve JSON real con datos -> BFLA Confirmado
+    json_resp = MagicMock()
+    json_resp.status_code = 200
+    json_resp.headers = {"Content-Type": "application/json"}
+    json_resp.text = '{"admin_count": 5, "roles": ["superadmin", "operator"]}'
+    json_resp.json.return_value = {"admin_count": 5, "roles": ["superadmin", "operator"]}
+    mock_session.get.return_value = json_resp
+
+    finding_json = check_bfla("https://app.example.com/api/v1/admin/users", unprivileged_session=mock_session)
+    assert finding_json is not None
+    assert finding_json.category == "api_bfla"
+    assert "BFLA" in finding_json.title
+
+
+def test_csp_strict_mutual_exclusion() -> None:
+    """Garantiza separación condicional estricta: nunca se reporta CSP faltante y débil al mismo tiempo."""
+    from scanner.headers import check_headers
+
+    class MockResp:
+        def __init__(self, headers: dict[str, str]):
+            self.headers = headers
+            self.url = "https://app.example.com/"
+
+    # Caso 1: Cabecera ausente -> Reporta únicamente "Header faltante: Content-Security-Policy"
+    r_none = MockResp({"Content-Type": "text/html"})
+    findings_none = check_headers(r_none)
+    vulns_none = [f["vuln"] for f in findings_none]
+    assert "Header faltante: Content-Security-Policy" in vulns_none
+    assert "Content-Security-Policy Débil o Permisivo" not in vulns_none
+
+    # Caso 2: Cabecera vacía/espacios -> Reporta "Header faltante: Content-Security-Policy"
+    r_empty = MockResp({"Content-Type": "text/html", "Content-Security-Policy": "   "})
+    findings_empty = check_headers(r_empty)
+    vulns_empty = [f["vuln"] for f in findings_empty]
+    assert "Header faltante: Content-Security-Policy" in vulns_empty
+    assert "Content-Security-Policy Débil o Permisivo" not in vulns_empty
+
+    # Caso 3: Cabecera permisiva ('unsafe-inline') -> Reporta "Content-Security-Policy Débil o Permisivo"
+    r_weak = MockResp({"Content-Type": "text/html", "Content-Security-Policy": "default-src 'self' 'unsafe-inline'"})
+    findings_weak = check_headers(r_weak)
+    vulns_weak = [f["vuln"] for f in findings_weak]
+    assert "Content-Security-Policy Débil o Permisivo" in vulns_weak
+    assert "Header faltante: Content-Security-Policy" not in vulns_weak
+
+    # Caso 4: Cabecera estricta -> No reporta ningún hallazgo de CSP
+    r_strong = MockResp({"Content-Type": "text/html", "Content-Security-Policy": "default-src 'self'; script-src 'self' 'nonce-xyz123'"})
+    findings_strong = check_headers(r_strong)
+    vulns_strong = [f["vuln"] for f in findings_strong if "Content-Security-Policy" in f["vuln"]]
+    assert len(vulns_strong) == 0
+
+
+
 

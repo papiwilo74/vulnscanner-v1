@@ -257,30 +257,69 @@ def check_bfla(
 
         # Si responde con 200 OK y entrega datos estructurados
         if resp.status_code == 200 and len(resp.text) > 30:
-            resp_lower = resp.text.lower()
+            headers = getattr(resp, "headers", {})
+            ctype = (headers.get("Content-Type") or headers.get("content-type") or "").lower()
+
+            # Discriminación estricta de SPAs: Si es text/html o markup web, es un fallback del frontend
+            if "text/html" in ctype or "application/xhtml+xml" in ctype:
+                return None
+
+            resp_stripped = resp.text.lstrip()
+            resp_lower = resp_stripped[:500].lower()
+            if (
+                resp_lower.startswith("<!doctype")
+                or resp_lower.startswith("<html")
+                or '<div id="root"' in resp_lower
+                or '<div id="app"' in resp_lower
+                or "<app-root" in resp_lower
+                or "window.__next_data__" in resp_lower
+                or "window.__nuxt__" in resp_lower
+            ):
+                return None
+
             # Descartar pantallas de login o accesos denegados disfrazados con 200
-            if not any(w in resp_lower for w in ("iniciar sesión", "login", "unauthorized", "access denied", "forbidden")):
-                return Finding(
-                    category="api_bfla",
-                    title=f"Broken Function Level Authorization (BFLA) en '{path_lower}'",
-                    severity="critical" if "/admin" in path_lower else "high",
-                    confidence="confirmed",
-                    description=(
-                        f"El endpoint de función administrativa '{path_lower}' es accesible "
-                        f"sin la debida autorización de rol (API5:2023). La petición devolvió HTTP 200 con datos sensibles."
-                    ),
-                    affected_url=url,
-                    evidence=Evidence(
-                        request_method="GET",
-                        request_url=url,
-                        response_status=resp.status_code,
-                        response_fragment=resp.text[:300],
-                    ),
-                    remediation=(
-                        "Aplicar un mecanismo estricto de autorización basado en roles (RBAC) en el gateway o controlador "
-                        "antes de procesar cualquier función administrativa."
-                    ),
-                )
+            full_lower = resp.text.lower()
+            if any(w in full_lower for w in ("iniciar sesión", "login", "unauthorized", "access denied", "forbidden", "acceso denegado")):
+                return None
+
+            # Validar que sea una estructura de datos real (JSON) para confirmar que es un endpoint de API
+            is_json_data = False
+            try:
+                parsed_json = resp.json()
+                if isinstance(parsed_json, (dict, list)):
+                    if isinstance(parsed_json, dict):
+                        err_msg = str(parsed_json.get("error") or parsed_json.get("detail") or parsed_json.get("message") or "").lower()
+                        if any(w in err_msg for w in ("unauthorized", "forbidden", "denied", "permiso", "login")):
+                            return None
+                    is_json_data = True
+            except Exception:
+                if "<html" in full_lower or "<body" in full_lower:
+                    return None
+
+            if not is_json_data and "application/json" not in ctype and "application/xml" not in ctype:
+                return None
+
+            return Finding(
+                category="api_bfla",
+                title=f"Broken Function Level Authorization (BFLA) en '{path_lower}'",
+                severity="critical" if "/admin" in path_lower else "high",
+                confidence="confirmed",
+                description=(
+                    f"El endpoint de función administrativa '{path_lower}' es accesible "
+                    f"sin la debida autorización de rol (API5:2023). La petición devolvió HTTP 200 con datos sensibles."
+                ),
+                affected_url=url,
+                evidence=Evidence(
+                    request_method="GET",
+                    request_url=url,
+                    response_status=resp.status_code,
+                    response_fragment=resp.text[:300],
+                ),
+                remediation=(
+                    "Aplicar un mecanismo estricto de autorización basado en roles (RBAC) en el gateway o controlador "
+                    "antes de procesar cualquier función administrativa."
+                ),
+            )
     except Exception as exc:
         logger.debug("[BFLA] Error durante prueba en %s: %s", url, exc)
 

@@ -26,6 +26,7 @@ HTML_CONTENT_TYPES: tuple[str, ...] = (
     "image/svg+xml",
 )
 
+
 def _get_header_case_insensitive(headers: Mapping[str, Any], name: str) -> str | None:
     target = name.lower()
     for key, value in headers.items():
@@ -33,9 +34,11 @@ def _get_header_case_insensitive(headers: Mapping[str, Any], name: str) -> str |
             return str(value)
     return None
 
+
 def _is_https_response(response: requests.Response | Any) -> bool:
     url = getattr(response, "url", "") or ""
     return str(url).lower().startswith("https://")
+
 
 def _is_browser_document_response(response: requests.Response | Any) -> bool:
     headers = getattr(response, "headers", {})
@@ -47,13 +50,17 @@ def _is_browser_document_response(response: requests.Response | Any) -> bool:
     content_type = content_type.lower()
     return any(expected in content_type for expected in HTML_CONTENT_TYPES)
 
+
 def check_headers(response: requests.Response | Any) -> list[dict[str, str]]:
     results: list[dict[str, str]] = []
     is_https = _is_https_response(response)
     is_browser_document = _is_browser_document_response(response)
 
-    # 1. Cabeceras de seguridad faltantes
+    # 1. Cabeceras de seguridad generales (Content-Security-Policy se evalúa con separación condicional estricta)
     for header, (risk, desc) in SECURITY_HEADERS.items():
+        if header == "Content-Security-Policy":
+            continue
+
         if header == "Strict-Transport-Security" and not is_https:
             continue
 
@@ -68,11 +75,21 @@ def check_headers(response: requests.Response | Any) -> list[dict[str, str]]:
                 "confidence": "confirmed",
             })
 
-    # 2. Auditoría de Content-Security-Policy Débil / Permisivo
+    # 2. Separación condicional estricta y mutuamente excluyente de Content-Security-Policy
     if is_browser_document:
-        csp = _get_header_case_insensitive(response.headers, "Content-Security-Policy")
-        if csp:
-            csp_lower = csp.lower()
+        csp_val = _get_header_case_insensitive(response.headers, "Content-Security-Policy")
+
+        # CASO A: Cabecera ausente o vacía (whitespace) -> Alerta de Header faltante (Alto)
+        if csp_val is None or not str(csp_val).strip():
+            results.append({
+                "vuln": "Header faltante: Content-Security-Policy",
+                "risk": "Alto",
+                "detail": "Previene XSS y code injection",
+                "confidence": "confirmed",
+            })
+        # CASO B: Cabecera presente -> Evaluar debilidades / permisividad sintáctica (Medio)
+        else:
+            csp_lower = str(csp_val).lower()
             weaknesses: list[str] = []
             if "'unsafe-inline'" in csp_lower and "nonce-" not in csp_lower and "sha256-" not in csp_lower:
                 weaknesses.append("'unsafe-inline' sin nonce/hash")
